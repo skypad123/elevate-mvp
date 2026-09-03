@@ -68,8 +68,8 @@ export default function LoginScreen() {
           {/* Apple SSO Button */}
           <Pressable onPress={handleAppleSignIn}>
             <XStack
-              backgroundColor="$color12"
-              borderRadius="$3"
+              backgroundColor="#000000"
+              borderRadius={4}
               padding="$3.5"
               alignItems="center"
               justifyContent="center"
@@ -79,10 +79,10 @@ export default function LoginScreen() {
             >
               <Ionicons
                 name="logo-apple"
-                size={20}
-                color="white"
+                size={22}
+                color="#FFFFFF"
               />
-              <Paragraph color="white" fontWeight="600">
+              <Paragraph color="#FFFFFF" fontWeight="600" fontSize="$5">
                 Continue with Apple
               </Paragraph>
             </XStack>
@@ -94,7 +94,7 @@ export default function LoginScreen() {
               backgroundColor="$color2"
               borderWidth={1}
               borderColor="$color4"
-              borderRadius="$3"
+              borderRadius={4}
               padding="$3.5"
               alignItems="center"
               justifyContent="center"
@@ -128,7 +128,7 @@ export default function LoginScreen() {
           <Button
             flex={1}
             size="$3"
-            borderRadius="$2"
+            borderRadius={4}
             backgroundColor={isEmail ? '$color4' : '$color2'}
             color="$color12"
             borderWidth={1}
@@ -141,7 +141,7 @@ export default function LoginScreen() {
           <Button
             flex={1}
             size="$3"
-            borderRadius="$2"
+            borderRadius={4}
             backgroundColor={!isEmail ? '$color4' : '$color2'}
             color="$color12"
             borderWidth={1}
@@ -166,7 +166,7 @@ export default function LoginScreen() {
                 backgroundColor="$color2"
                 borderColor="$color4"
                 borderWidth={1}
-                borderRadius="$2"
+                borderRadius={4}
                 color="$color12"
                 placeholderTextColor="$color9"
                 size="$4"
@@ -187,7 +187,7 @@ export default function LoginScreen() {
               backgroundColor="$color2"
               borderColor="$color4"
               borderWidth={1}
-              borderRadius="$2"
+              borderRadius={4}
               color="$color12"
               placeholderTextColor="$color9"
               size="$4"
@@ -207,7 +207,7 @@ export default function LoginScreen() {
               backgroundColor="$color2"
               borderColor="$color4"
               borderWidth={1}
-              borderRadius="$2"
+              borderRadius={4}
               color="$color12"
               placeholderTextColor="$color9"
               size="$4"
@@ -234,7 +234,7 @@ export default function LoginScreen() {
         {/* Submit Button */}
         <Button
           size="$4"
-          borderRadius="$3"
+          borderRadius={4}
           backgroundColor="$color12"
           color="$background"
           fontWeight="600"
