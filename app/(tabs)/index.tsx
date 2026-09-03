@@ -73,7 +73,7 @@ export default function CoursesScreen() {
           }
         />
       ) : (
-        <XStack flexWrap="wrap" gap="$3">
+        <XStack flexWrap="wrap" gap="$3" justifyContent="space-between">
           {filteredCourses.map((course) => {
             const openTasks = tasks.filter(
               (task) => task.courseId === course.id && !task.done
@@ -83,7 +83,8 @@ export default function CoursesScreen() {
                 <YStack
                   cursor="pointer"
                   pressStyle={{ opacity: 0.88 }}
-                  width="calc(50% - 6px)"
+                  flex={1}
+                  maxWidth="48%"
                   minWidth={280}
                 >
                   <Surface gap="$3" padding={0} overflow="hidden">
