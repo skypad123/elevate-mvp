@@ -14,6 +14,10 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: theme.background?.val,
           borderTopColor: theme.color4?.val,
+          paddingLeft: 16,
+          paddingRight: 16,
+          paddingBottom: 16,
+          borderRadius: 0,
         },
         tabBarLabelStyle: {
           fontSize: 10,
