@@ -11,16 +11,11 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
     <YStack paddingHorizontal="$4" paddingBottom="$4">
       <XStack
         backgroundColor="$background"
-        borderRadius="$6"
         paddingVertical="$3"
         paddingHorizontal="$2"
         alignItems="center"
         justifyContent="space-around"
         elevation={8}
-        shadowColor="#000"
-        shadowOffset={{ width: 0, height: 4 }}
-        shadowOpacity={0.15}
-        shadowRadius={12}
         borderWidth={1}
         borderColor="$color4"
       >
