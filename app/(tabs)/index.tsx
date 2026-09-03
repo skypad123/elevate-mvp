@@ -73,7 +73,7 @@ export default function CoursesScreen() {
           }
         />
       ) : (
-        <XStack flexWrap="wrap" gap="$3" marginHorizontal="$-1.5">
+        <XStack flexWrap="wrap" gap="$3">
           {filteredCourses.map((course) => {
             const openTasks = tasks.filter(
               (task) => task.courseId === course.id && !task.done
