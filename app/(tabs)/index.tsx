@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { Link, router } from 'expo-router'
 import { useState } from 'react'
+import { Image } from 'react-native'
 import { Input, Paragraph, XStack, YStack } from 'tamagui'
 import {
   AccentButton,
@@ -85,35 +86,48 @@ export default function CoursesScreen() {
                   width="calc(50% - 12px)"
                   minWidth={280}
                 >
-                  <Surface gap="$3">
-                    <XStack justifyContent="space-between" alignItems="flex-start">
-                      <YStack flex={1} gap="$2">
-                        <XStack alignItems="center" gap="$2">
-                          <ColorDot color={course.color} />
-                          <Eyebrow>{course.code || 'Course'}</Eyebrow>
-                        </XStack>
-                        <Paragraph color="$color12" fontSize="$7" fontWeight="700">
-                          {course.name}
-                        </Paragraph>
-                        {course.instructor ? (
-                          <Paragraph color="$color10">{course.instructor}</Paragraph>
-                        ) : null}
-                      </YStack>
-                      <Paragraph color="$color8">›</Paragraph>
-                    </XStack>
-                    <Paragraph color="$color10">
-                      {course.meetings.length
-                        ? course.meetings
-                            .map(
-                              (meeting) =>
-                                `${WEEKDAYS[meeting.day]} ${formatTime(meeting.start)}`
-                            )
-                            .join('  ·  ')
-                        : 'No meetings'}
-                    </Paragraph>
-                    <Eyebrow>
-                      {`${openTasks} open task${openTasks === 1 ? '' : 's'}`}
-                    </Eyebrow>
+                  <Surface gap="$3" padding={0} overflow="hidden">
+                    {course.thumbnail ? (
+                      <Image
+                        source={{ uri: course.thumbnail }}
+                        style={{
+                          width: '100%',
+                          aspectRatio: 1,
+                          backgroundColor: '#f0f0f0',
+                        }}
+                        resizeMode="cover"
+                      />
+                    ) : null}
+                    <YStack gap="$3" padding="$4">
+                      <XStack justifyContent="space-between" alignItems="flex-start">
+                        <YStack flex={1} gap="$2">
+                          <XStack alignItems="center" gap="$2">
+                            <ColorDot color={course.color} />
+                            <Eyebrow>{course.code || 'Course'}</Eyebrow>
+                          </XStack>
+                          <Paragraph color="$color12" fontSize="$7" fontWeight="700">
+                            {course.name}
+                          </Paragraph>
+                          {course.instructor ? (
+                            <Paragraph color="$color10">{course.instructor}</Paragraph>
+                          ) : null}
+                        </YStack>
+                        <Paragraph color="$color8">›</Paragraph>
+                      </XStack>
+                      <Paragraph color="$color10">
+                        {course.meetings.length
+                          ? course.meetings
+                              .map(
+                                (meeting) =>
+                                  `${WEEKDAYS[meeting.day]} ${formatTime(meeting.start)}`
+                              )
+                              .join('  ·  ')
+                          : 'No meetings'}
+                      </Paragraph>
+                      <Eyebrow>
+                        {`${openTasks} open task${openTasks === 1 ? '' : 's'}`}
+                      </Eyebrow>
+                    </YStack>
                   </Surface>
                 </YStack>
               </Link>

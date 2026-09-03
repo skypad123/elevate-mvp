@@ -25,6 +25,7 @@ const seedState: PlannerState = {
       instructor: 'Dr. Chen',
       location: 'Hall 204',
       color: 'teal',
+      thumbnail: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=400&h=400&fit=crop',
       meetings: [
         { id: 'm1', day: 1, start: '09:00', end: '10:20' },
         { id: 'm2', day: 3, start: '09:00', end: '10:20' },
@@ -37,6 +38,7 @@ const seedState: PlannerState = {
       instructor: 'Prof. Alvarez',
       location: 'Studio B',
       color: 'purple',
+      thumbnail: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=400&fit=crop',
       meetings: [
         { id: 'm3', day: 2, start: '13:00', end: '15:30' },
         { id: 'm4', day: 4, start: '13:00', end: '15:30' },
@@ -49,6 +51,7 @@ const seedState: PlannerState = {
       instructor: 'Dr. Patel',
       location: 'Science 18',
       color: 'orange',
+      thumbnail: 'https://images.unsplash.com/photo-1543286386-713bdd548da4?w=400&h=400&fit=crop',
       meetings: [{ id: 'm5', day: 5, start: '11:00', end: '12:15' }],
     },
   ],
