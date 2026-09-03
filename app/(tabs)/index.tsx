@@ -83,7 +83,7 @@ export default function CoursesScreen() {
                 <YStack
                   cursor="pointer"
                   pressStyle={{ opacity: 0.88 }}
-                  width="calc(50% - 12px)"
+                  width="calc(50% - 6px)"
                   minWidth={280}
                 >
                   <Surface gap="$3" padding={0} overflow="hidden">
