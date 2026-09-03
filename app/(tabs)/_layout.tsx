@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
+import type { Route } from '@react-navigation/native'
 import { Tabs } from 'expo-router'
 import { TouchableOpacity } from 'react-native'
 import { Paragraph, useTheme, XStack, YStack } from 'tamagui'
 
-function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+function FloatingTabBar({ state, descriptors, navigation }: any) {
   const theme = useTheme()
 
   return (
@@ -24,7 +24,7 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         borderWidth={1}
         borderColor="$color4"
       >
-        {state.routes.map((route, index) => {
+        {state.routes.map((route: Route<string>, index: number) => {
           const { options } = descriptors[route.key]
           const label =
             options.tabBarLabel !== undefined
@@ -47,7 +47,9 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             }
           }
 
-          const iconColor = isFocused ? theme.accent8?.val : theme.color9?.val
+          const iconColor = isFocused
+            ? String(theme.accent8?.val)
+            : String(theme.color9?.val)
 
           return (
             <TouchableOpacity
@@ -55,7 +57,6 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarTestID}
               onPress={onPress}
               style={{ flex: 1, alignItems: 'center' }}
             >
@@ -65,7 +66,7 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                   fontSize={10}
                   letterSpacing={1.2}
                   textTransform="uppercase"
-                  color={iconColor}
+                  style={{ color: iconColor }}
                 >
                   {typeof label === 'string' ? label : ''}
                 </Paragraph>
