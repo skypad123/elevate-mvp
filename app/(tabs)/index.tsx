@@ -20,7 +20,12 @@ export default function CoursesScreen() {
       <ScreenHeader
         eyebrow="Elvate"
         title="Courses"
-        action={<AccentButton onPress={() => router.push('/course/new')}>Add</AccentButton>}
+        action={
+          <XStack gap="$2">
+            <AccentButton onPress={() => router.push('/login')}>Login</AccentButton>
+            <AccentButton onPress={() => router.push('/course/new')}>Add</AccentButton>
+          </XStack>
+        }
       />
 
       {courses.length === 0 ? (
