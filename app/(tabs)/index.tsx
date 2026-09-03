@@ -85,7 +85,7 @@ export default function CoursesScreen() {
                   pressStyle={{ opacity: 0.88 }}
                   flex={1}
                   maxWidth="48%"
-                  minWidth={160}
+                  minWidth={280}
                 >
                   <Surface gap="$3" padding={0} overflow="hidden">
                     {course.thumbnail ? (
