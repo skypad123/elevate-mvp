@@ -113,8 +113,23 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
           return
         }
         const parsed = JSON.parse(raw) as PlannerState
+        
+        // Migration: Add thumbnails to existing courses that don't have them
+        const thumbnailMap: Record<string, string> = {
+          'course_algo': 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=400&h=400&fit=crop',
+          'course_design': 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=400&fit=crop',
+          'course_stats': 'https://images.unsplash.com/photo-1543286386-713bdd548da4?w=400&h=400&fit=crop',
+        }
+        
+        const migratedCourses = (parsed.courses ?? []).map(course => {
+          if (!course.thumbnail && thumbnailMap[course.id]) {
+            return { ...course, thumbnail: thumbnailMap[course.id] }
+          }
+          return course
+        })
+        
         setState({
-          courses: parsed.courses ?? [],
+          courses: migratedCourses,
           tasks: parsed.tasks ?? [],
         })
       })
