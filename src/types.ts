@@ -28,6 +28,7 @@ export type Course = {
   location: string
   color: CourseColor
   meetings: Meeting[]
+  thumbnail?: string
 }
 
 export type Task = {

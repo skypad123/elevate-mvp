@@ -1,5 +1,8 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { Link, router } from 'expo-router'
-import { Paragraph, XStack, YStack } from 'tamagui'
+import { useState } from 'react'
+import { Image } from 'react-native'
+import { Input, Paragraph, XStack, YStack } from 'tamagui'
 import {
   AccentButton,
   ColorDot,
@@ -14,6 +17,17 @@ import { usePlanner } from '../../src/store/planner-store'
 
 export default function CoursesScreen() {
   const { courses, tasks } = usePlanner()
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredCourses = courses.filter((course) => {
+    const query = searchQuery.toLowerCase().trim()
+    if (!query) return true
+    return (
+      course.name.toLowerCase().includes(query) ||
+      course.code.toLowerCase().includes(query) ||
+      course.instructor.toLowerCase().includes(query)
+    )
+  })
 
   return (
     <Screen scroll>
@@ -23,55 +37,104 @@ export default function CoursesScreen() {
         action={<AccentButton onPress={() => router.push('/course/new')}>Add</AccentButton>}
       />
 
-      {courses.length === 0 ? (
+      <YStack gap="$4" marginBottom="$4">
+        <XStack
+          alignItems="center"
+          backgroundColor="$color2"
+          borderWidth={1}
+          borderColor="$color4"
+          borderRadius="$2"
+          paddingHorizontal="$3"
+          paddingVertical="$2"
+          gap="$2"
+        >
+          <Ionicons name="search" size={20} color="gray" />
+          <Input
+            flex={1}
+            placeholder="Search courses..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            backgroundColor="transparent"
+            borderWidth={0}
+            padding={0}
+            fontSize="$4"
+            placeholderTextColor="$color9"
+          />
+        </XStack>
+      </YStack>
+
+      {filteredCourses.length === 0 ? (
         <EmptyState
-          title="No courses yet"
-          body="Add a class to start planning meetings and assignments."
+          title={searchQuery ? 'No courses found' : 'No courses yet'}
+          body={
+            searchQuery
+              ? 'Try a different search term.'
+              : 'Add a class to start planning meetings and assignments.'
+          }
         />
       ) : (
-        <YStack gap="$3">
-          {courses.map((course) => {
+        <XStack flexWrap="wrap" gap="$3" justifyContent="space-between">
+          {filteredCourses.map((course) => {
             const openTasks = tasks.filter(
               (task) => task.courseId === course.id && !task.done
             ).length
             return (
               <Link key={course.id} href={`/course/${course.id}`} asChild>
-                <YStack cursor="pointer" pressStyle={{ opacity: 0.88 }}>
-                  <Surface gap="$3">
-                    <XStack justifyContent="space-between" alignItems="flex-start">
-                      <YStack flex={1} gap="$2">
-                        <XStack alignItems="center" gap="$2">
-                          <ColorDot color={course.color} />
-                          <Eyebrow>{course.code || 'Course'}</Eyebrow>
-                        </XStack>
-                        <Paragraph color="$color12" fontSize="$7" fontWeight="700">
-                          {course.name}
-                        </Paragraph>
-                        {course.instructor ? (
-                          <Paragraph color="$color10">{course.instructor}</Paragraph>
-                        ) : null}
-                      </YStack>
-                      <Paragraph color="$color8">›</Paragraph>
-                    </XStack>
-                    <Paragraph color="$color10">
-                      {course.meetings.length
-                        ? course.meetings
-                            .map(
-                              (meeting) =>
-                                `${WEEKDAYS[meeting.day]} ${formatTime(meeting.start)}`
-                            )
-                            .join('  ·  ')
-                        : 'No meetings'}
-                    </Paragraph>
-                    <Eyebrow>
-                      {`${openTasks} open task${openTasks === 1 ? '' : 's'}`}
-                    </Eyebrow>
+                <YStack
+                  cursor="pointer"
+                  pressStyle={{ opacity: 0.88 }}
+                  flex={1}
+                  maxWidth="48%"
+                  minWidth={150}
+                >
+                  <Surface gap="$3" padding={0} overflow="hidden">
+                    {course.thumbnail ? (
+                      <Image
+                        source={{ uri: course.thumbnail }}
+                        style={{
+                          width: '100%',
+                          aspectRatio: 1,
+                          backgroundColor: '#f0f0f0',
+                        }}
+                        resizeMode="cover"
+                      />
+                    ) : null}
+                    <YStack gap="$3" padding="$4">
+                      <XStack justifyContent="space-between" alignItems="flex-start">
+                        <YStack flex={1} gap="$2">
+                          <XStack alignItems="center" gap="$2">
+                            <ColorDot color={course.color} />
+                            <Eyebrow>{course.code || 'Course'}</Eyebrow>
+                          </XStack>
+                          <Paragraph color="$color12" fontSize="$7" fontWeight="700">
+                            {course.name}
+                          </Paragraph>
+                          {course.instructor ? (
+                            <Paragraph color="$color10">{course.instructor}</Paragraph>
+                          ) : null}
+                        </YStack>
+                        <Paragraph color="$color8">›</Paragraph>
+                      </XStack>
+                      <Paragraph color="$color10">
+                        {course.meetings.length
+                          ? course.meetings
+                              .map(
+                                (meeting) =>
+                                  `${WEEKDAYS[meeting.day]} ${formatTime(meeting.start)}`
+                              )
+                              .join('  ·  ')
+                          : 'No meetings'}
+                      </Paragraph>
+                      <Eyebrow>
+                        {`${openTasks} open task${openTasks === 1 ? '' : 's'}`}
+                      </Eyebrow>
+                    </YStack>
                   </Surface>
                 </YStack>
               </Link>
             )
           })}
-        </YStack>
+        </XStack>
       )}
     </Screen>
   )
