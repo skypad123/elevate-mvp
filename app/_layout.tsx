@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { TamaguiProvider, useTheme } from 'tamagui'
 import { PlannerProvider } from '../src/store/planner-store'
 import { AuthProvider, useAuth } from '../src/store/auth-store'
+import { ProfileProvider } from '../src/store/profile-store'
 import { config } from '../tamagui.config'
 
 function ThemedStack() {
@@ -32,6 +33,7 @@ function ThemedStack() {
         <Stack.Screen name="course/[id]" options={{ title: 'Course' }} />
         <Stack.Screen name="course/new" options={{ title: 'New course' }} />
         <Stack.Screen name="task/new" options={{ title: 'New task' }} />
+        <Stack.Screen name="settings-page" options={{ title: 'Settings' }} />
       </Stack>
     </>
   )
@@ -67,9 +69,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <TamaguiProvider config={config} defaultTheme={theme}>
         <AuthProvider>
-          <PlannerProvider>
-            <RootNavigator />
-          </PlannerProvider>
+          <ProfileProvider>
+            <PlannerProvider>
+              <RootNavigator />
+            </PlannerProvider>
+          </ProfileProvider>
         </AuthProvider>
       </TamaguiProvider>
     </GestureHandlerRootView>
