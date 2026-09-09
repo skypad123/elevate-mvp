@@ -1,11 +1,11 @@
 import { router } from 'expo-router'
 import { Alert } from 'react-native'
 import { Button, Paragraph, YStack } from 'tamagui'
-import { Eyebrow, ScreenHeader } from '../../src/components/chrome'
-import { Screen } from '../../src/components/screen'
-import { useAuth } from '../../src/store/auth-store'
+import { Eyebrow } from '../src/components/chrome'
+import { Screen } from '../src/components/screen'
+import { useAuth } from '../src/store/auth-store'
 
-export default function SettingsScreen() {
+export default function SettingsPageScreen() {
   const { signOut } = useAuth()
 
   const handleSignOut = () => {
@@ -32,8 +32,6 @@ export default function SettingsScreen() {
 
   return (
     <Screen scroll>
-      <ScreenHeader eyebrow="Elvate" title="Settings" />
-
       <YStack gap="$4" paddingTop="$4">
         {/* Account Section */}
         <YStack gap="$3">

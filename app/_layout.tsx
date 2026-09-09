@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { TamaguiProvider, useTheme } from 'tamagui'
 import { PlannerProvider } from '../src/store/planner-store'
 import { AuthProvider, useAuth } from '../src/store/auth-store'
+import { ProfileProvider } from '../src/store/profile-store'
 import { config } from '../tamagui.config'
 
 function ThemedStack() {
@@ -32,6 +33,7 @@ function ThemedStack() {
         <Stack.Screen name="course/[id]" options={{ title: 'Course' }} />
         <Stack.Screen name="course/new" options={{ title: 'New course' }} />
         <Stack.Screen name="task/new" options={{ title: 'New task' }} />
+        <Stack.Screen name="settings-page" options={{ title: 'Settings' }} />
       </Stack>
     </>
   )
@@ -46,12 +48,16 @@ function RootNavigator() {
     if (isLoading) return
 
     const inAuthGroup = segments[0] === '(tabs)'
+    const isProtectedRoute = inAuthGroup || 
+      segments[0] === 'course' || 
+      segments[0] === 'task' || 
+      segments[0] === 'settings-page'
 
-    if (!isAuthenticated && inAuthGroup) {
-      // Redirect to login if not authenticated
+    if (!isAuthenticated && isProtectedRoute) {
+      // Redirect to login if not authenticated and trying to access protected route
       router.replace('/login')
-    } else if (isAuthenticated && !inAuthGroup) {
-      // Redirect to app if authenticated
+    } else if (isAuthenticated && segments[0] === 'login') {
+      // Redirect to app if authenticated and on login page
       router.replace('/(tabs)')
     }
   }, [isAuthenticated, segments, isLoading])
@@ -67,9 +73,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <TamaguiProvider config={config} defaultTheme={theme}>
         <AuthProvider>
-          <PlannerProvider>
-            <RootNavigator />
-          </PlannerProvider>
+          <ProfileProvider>
+            <PlannerProvider>
+              <RootNavigator />
+            </PlannerProvider>
+          </ProfileProvider>
         </AuthProvider>
       </TamaguiProvider>
     </GestureHandlerRootView>
