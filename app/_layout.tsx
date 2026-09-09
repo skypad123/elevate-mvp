@@ -48,12 +48,16 @@ function RootNavigator() {
     if (isLoading) return
 
     const inAuthGroup = segments[0] === '(tabs)'
+    const isProtectedRoute = inAuthGroup || 
+      segments[0] === 'course' || 
+      segments[0] === 'task' || 
+      segments[0] === 'settings-page'
 
-    if (!isAuthenticated && inAuthGroup) {
-      // Redirect to login if not authenticated
+    if (!isAuthenticated && isProtectedRoute) {
+      // Redirect to login if not authenticated and trying to access protected route
       router.replace('/login')
-    } else if (isAuthenticated && !inAuthGroup) {
-      // Redirect to app if authenticated
+    } else if (isAuthenticated && segments[0] === 'login') {
+      // Redirect to app if authenticated and on login page
       router.replace('/(tabs)')
     }
   }, [isAuthenticated, segments, isLoading])
