@@ -102,9 +102,9 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="enrollments"
+        name="lessons"
         options={{
-          title: 'Enrollments',
+          title: 'Lessons',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="school-outline" color={color} size={size} />
           ),
