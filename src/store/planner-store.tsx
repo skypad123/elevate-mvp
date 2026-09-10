@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { mergeCatalog } from '../lib/catalog'
 import { addDays, toISODate } from '../lib/dates'
 import { createId } from '../lib/id'
 import type { Course, Meeting, PlannerState, Task } from '../types'
@@ -17,67 +18,7 @@ const STORAGE_KEY = '@elvate/planner'
 const today = new Date()
 
 const seedState: PlannerState = {
-  courses: [
-    {
-      id: 'course_algo',
-      name: 'Intro to Algorithms',
-      code: 'CS 161',
-      instructor: 'Dr. Chen',
-      location: 'Hall 204',
-      color: 'teal',
-      thumbnail: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=400&h=400&fit=crop',
-      meetings: [
-        { id: 'm1', day: 1, start: '09:00', end: '10:20' },
-        { id: 'm2', day: 3, start: '09:00', end: '10:20' },
-      ],
-    },
-    {
-      id: 'course_design',
-      name: 'Interaction Design',
-      code: 'DES 220',
-      instructor: 'Prof. Alvarez',
-      location: 'Studio B',
-      color: 'purple',
-      thumbnail: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=400&fit=crop',
-      meetings: [
-        { id: 'm3', day: 2, start: '13:00', end: '15:30' },
-        { id: 'm4', day: 4, start: '13:00', end: '15:30' },
-      ],
-    },
-    {
-      id: 'course_stats',
-      name: 'Applied Statistics',
-      code: 'STAT 110',
-      instructor: 'Dr. Patel',
-      location: 'Science 18',
-      color: 'orange',
-      thumbnail: 'https://images.unsplash.com/photo-1543286386-713bdd548da4?w=400&h=400&fit=crop',
-      meetings: [{ id: 'm5', day: 5, start: '11:00', end: '12:15' }],
-    },
-    {
-      id: 'course_webdev',
-      name: 'Web Development',
-      code: 'CS 290',
-      instructor: 'Prof. Martinez',
-      location: 'Tech Lab 3',
-      color: 'blue',
-      thumbnail: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=400&fit=crop',
-      meetings: [
-        { id: 'm6', day: 2, start: '10:00', end: '11:30' },
-        { id: 'm7', day: 4, start: '10:00', end: '11:30' },
-      ],
-    },
-    {
-      id: 'course_photography',
-      name: 'Digital Photography',
-      code: 'ART 155',
-      instructor: 'Ms. Kim',
-      location: 'Arts Building',
-      color: 'pink',
-      thumbnail: 'https://images.unsplash.com/photo-1452587925148-ce544e77e70d?w=400&h=400&fit=crop',
-      meetings: [{ id: 'm8', day: 1, start: '14:00', end: '16:30' }],
-    },
-  ],
+  courses: mergeCatalog([]),
   tasks: [
     {
       id: 'task_ps2',
@@ -125,6 +66,7 @@ const seedState: PlannerState = {
 type PlannerContextValue = PlannerState & {
   ready: boolean
   addCourse: (course: Omit<Course, 'id' | 'meetings'> & { meetings?: Meeting[] }) => string
+  enrollCourse: (courseId: string) => void
   updateCourse: (course: Course) => void
   deleteCourse: (courseId: string) => void
   addMeeting: (courseId: string, meeting: Omit<Meeting, 'id'>) => void
@@ -153,7 +95,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         }
         const parsed = JSON.parse(raw) as PlannerState
         setState({
-          courses: parsed.courses ?? [],
+          courses: mergeCatalog(parsed.courses ?? []),
           tasks: parsed.tasks ?? [],
         })
       })
@@ -180,13 +122,27 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         ...current,
         courses: [
           ...current.courses,
-          { ...course, id, meetings: course.meetings ?? [] },
+          {
+            ...course,
+            id,
+            meetings: course.meetings ?? [],
+            enrolled: course.enrolled ?? true,
+          },
         ],
       }))
       return id
     },
     []
   )
+
+  const enrollCourse = useCallback((courseId: string) => {
+    setState((current) => ({
+      ...current,
+      courses: current.courses.map((course) =>
+        course.id === courseId ? { ...course, enrolled: true } : course
+      ),
+    }))
+  }, [])
 
   const updateCourse = useCallback((course: Course) => {
     setState((current) => ({
@@ -271,6 +227,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       ...state,
       ready,
       addCourse,
+      enrollCourse,
       updateCourse,
       deleteCourse,
       addMeeting,
@@ -285,6 +242,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       state,
       ready,
       addCourse,
+      enrollCourse,
       updateCourse,
       deleteCourse,
       addMeeting,

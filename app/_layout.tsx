@@ -30,6 +30,14 @@ function ThemedStack() {
       >
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="search"
+          options={{
+            headerShown: false,
+            presentation: 'transparentModal',
+            animation: 'none',
+          }}
+        />
         <Stack.Screen name="course/[id]" options={{ title: 'Course' }} />
         <Stack.Screen name="course/new" options={{ title: 'New course' }} />
         <Stack.Screen name="task/new" options={{ title: 'New task' }} />
@@ -47,16 +55,18 @@ function RootNavigator() {
   useEffect(() => {
     if (isLoading) return
 
-    const inAuthGroup = segments[0] === '(tabs)'
-    const isProtectedRoute = inAuthGroup || 
-      segments[0] === 'course' || 
-      segments[0] === 'task' || 
-      segments[0] === 'settings-page'
+    const rootSegment = String(segments[0] ?? '')
+    const isProtectedRoute =
+      rootSegment === '(tabs)' ||
+      rootSegment === 'course' ||
+      rootSegment === 'task' ||
+      rootSegment === 'settings-page' ||
+      rootSegment === 'search'
 
     if (!isAuthenticated && isProtectedRoute) {
       // Redirect to login if not authenticated and trying to access protected route
       router.replace('/login')
-    } else if (isAuthenticated && segments[0] === 'login') {
+    } else if (isAuthenticated && rootSegment === 'login') {
       // Redirect to app if authenticated and on login page
       router.replace('/(tabs)')
     }

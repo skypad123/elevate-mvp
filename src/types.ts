@@ -29,6 +29,10 @@ export type Course = {
   color: CourseColor
   meetings: Meeting[]
   thumbnail?: string
+  description?: string
+  tags?: string[]
+  popularity?: number
+  enrolled?: boolean
 }
 
 export type Task = {
