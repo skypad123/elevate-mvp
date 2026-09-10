@@ -14,9 +14,11 @@ import { EmptyState } from '../../src/components/empty-state'
 import { Screen } from '../../src/components/screen'
 import { WEEKDAYS, formatTime } from '../../src/lib/dates'
 import { usePlanner } from '../../src/store/planner-store'
+import { useProfile } from '../../src/store/profile-store'
 
 export default function CoursesScreen() {
   const { courses, tasks } = usePlanner()
+  const { profile } = useProfile()
   const [searchQuery, setSearchQuery] = useState('')
 
   const filteredCourses = courses.filter((course) => {
@@ -33,7 +35,7 @@ export default function CoursesScreen() {
     <Screen scroll>
       <ScreenHeader
         eyebrow="elevate"
-        title="Hi, Student"
+        title={`Hi, ${profile.name}`}
         action={<AccentButton onPress={() => router.push('/course/new')}>Add</AccentButton>}
       />
 
