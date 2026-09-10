@@ -124,7 +124,7 @@ function WeekScheduleModal({
   )
 }
 
-export default function EnrollmentsScreen() {
+export default function LessonsScreen() {
   const { courses, tasks } = usePlanner()
   const [showWeekSchedule, setShowWeekSchedule] = useState(false)
   const theme = useTheme()
@@ -150,7 +150,7 @@ export default function EnrollmentsScreen() {
       <Screen scroll>
         <ScreenHeader
           eyebrow="Elevate"
-          title="Enrollments"
+          title="Lessons"
           action={
             <Button
               size="$3"
@@ -163,7 +163,7 @@ export default function EnrollmentsScreen() {
 
         {enrolledCourses.length === 0 ? (
           <EmptyState
-            title="No enrollments yet"
+            title="No lessons yet"
             body="Add a course to start tracking your progress."
           />
         ) : (
