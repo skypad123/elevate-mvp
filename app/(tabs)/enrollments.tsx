@@ -18,6 +18,7 @@ import {
   weekDays,
   weekdayOf,
 } from '../../src/lib/dates'
+import { isEnrolled } from '../../src/lib/catalog'
 import { usePlanner } from '../../src/store/planner-store'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from 'tamagui'
@@ -36,6 +37,7 @@ function WeekScheduleModal({
   const weekday = weekdayOf(selectedDate)
 
   const meetings = courses
+    .filter(isEnrolled)
     .flatMap((course) =>
       course.meetings
         .filter((meeting) => meeting.day === weekday)
@@ -126,9 +128,10 @@ export default function EnrollmentsScreen() {
   const { courses, tasks } = usePlanner()
   const [showWeekSchedule, setShowWeekSchedule] = useState(false)
   const theme = useTheme()
+  const enrolledCourses = courses.filter(isEnrolled)
 
   const courseProgress = useMemo(() => {
-    return courses.map((course) => {
+    return enrolledCourses.map((course) => {
       const courseTasks = tasks.filter((task) => task.courseId === course.id)
       const completedTasks = courseTasks.filter((task) => task.done).length
       const totalTasks = courseTasks.length
@@ -140,7 +143,7 @@ export default function EnrollmentsScreen() {
         progress,
       }
     })
-  }, [courses, tasks])
+  }, [enrolledCourses, tasks])
 
   return (
     <>
@@ -158,7 +161,7 @@ export default function EnrollmentsScreen() {
           }
         />
 
-        {courses.length === 0 ? (
+        {enrolledCourses.length === 0 ? (
           <EmptyState
             title="No enrollments yet"
             body="Add a course to start tracking your progress."
