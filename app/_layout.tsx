@@ -1,12 +1,13 @@
 import { Stack, useSegments, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useColorScheme } from 'react-native'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { TamaguiProvider, useTheme } from 'tamagui'
 import { PlannerProvider } from '../src/store/planner-store'
 import { AuthProvider, useAuth } from '../src/store/auth-store'
 import { ProfileProvider } from '../src/store/profile-store'
+import { runStorageMigrations } from '../src/store/store-utils'
 import { config } from '../tamagui.config'
 
 function ThemedStack() {
@@ -68,6 +69,18 @@ function RootNavigator() {
 export default function RootLayout() {
   const colorScheme = useColorScheme()
   const theme = colorScheme === 'dark' ? 'dark' : 'light'
+  const [migrationsComplete, setMigrationsComplete] = useState(false)
+
+  useEffect(() => {
+    runStorageMigrations().finally(() => {
+      setMigrationsComplete(true)
+    })
+  }, [])
+
+  // Wait for migrations before rendering providers
+  if (!migrationsComplete) {
+    return null
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
