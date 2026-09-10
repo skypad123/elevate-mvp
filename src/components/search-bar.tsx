@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import type { ReactNode } from 'react'
-import { Pressable } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { Pressable, TextInput } from 'react-native'
 import { Input, Paragraph, XStack, YStack } from 'tamagui'
 
 export const SEARCH_BAR_HEIGHT = 52
@@ -52,11 +53,22 @@ export function ConversationComposer({
   autoFocus?: boolean
 }) {
   const canSend = value.trim().length > 0
+  const inputRef = useRef<TextInput>(null)
+
+  useEffect(() => {
+    if (autoFocus) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus()
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [autoFocus])
 
   return (
     <SearchBarShell>
       <Ionicons name="sparkles-outline" size={18} color="gray" />
       <Input
+        ref={inputRef}
         flex={1}
         value={value}
         onChangeText={onChangeText}
@@ -68,7 +80,6 @@ export function ConversationComposer({
         placeholderTextColor="$color9"
         returnKeyType="send"
         onSubmitEditing={onSubmit}
-        autoFocus={autoFocus}
       />
         <YStack
           onPress={canSend ? onSubmit : undefined}

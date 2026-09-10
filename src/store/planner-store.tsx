@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { mergeCatalog } from '../lib/catalog'
+import { CATALOG_COURSES, mergeCatalog } from '../lib/catalog'
 import { addDays, toISODate } from '../lib/dates'
 import { createId } from '../lib/id'
 import type { Course, Meeting, PlannerState, Task } from '../types'
@@ -152,8 +152,13 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const deleteCourse = useCallback((courseId: string) => {
+    const isCatalogCourse = CATALOG_COURSES.some((course) => course.id === courseId)
     setState((current) => ({
-      courses: current.courses.filter((course) => course.id !== courseId),
+      courses: isCatalogCourse
+        ? current.courses.map((course) =>
+            course.id === courseId ? { ...course, enrolled: false } : course
+          )
+        : current.courses.filter((course) => course.id !== courseId),
       tasks: current.tasks.filter((task) => task.courseId !== courseId),
     }))
   }, [])

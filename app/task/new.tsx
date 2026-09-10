@@ -4,12 +4,14 @@ import { Paragraph, XStack, YStack } from 'tamagui'
 import { AccentButton, Chip } from '../../src/components/chrome'
 import { Field, TextField } from '../../src/components/field'
 import { Screen } from '../../src/components/screen'
+import { isEnrolled } from '../../src/lib/catalog'
 import { toISODate } from '../../src/lib/dates'
 import { usePlanner } from '../../src/store/planner-store'
 
 export default function NewTaskScreen() {
   const { courses, addTask } = usePlanner()
-  const [courseId, setCourseId] = useState(courses[0]?.id ?? '')
+  const enrolledCourses = courses.filter(isEnrolled)
+  const [courseId, setCourseId] = useState(enrolledCourses[0]?.id ?? '')
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
   const [dueAt, setDueAt] = useState(toISODate(new Date()))
@@ -30,7 +32,7 @@ export default function NewTaskScreen() {
       <YStack gap="$4" paddingVertical="$3">
         <Field label="Course">
           <XStack flexWrap="wrap" gap="$2">
-            {courses.map((course) => (
+            {enrolledCourses.map((course) => (
               <Chip
                 key={course.id}
                 selected={course.id === courseId}
