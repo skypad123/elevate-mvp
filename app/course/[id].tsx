@@ -7,6 +7,7 @@ import { ColorPicker } from '../../src/components/color-picker'
 import { Field, TextField } from '../../src/components/field'
 import { Screen } from '../../src/components/screen'
 import { WEEKDAYS, formatTime, toISODate } from '../../src/lib/dates'
+import { isEnrolled } from '../../src/lib/catalog'
 import { usePlanner } from '../../src/store/planner-store'
 import type { CourseColor, Weekday } from '../../src/types'
 
@@ -18,6 +19,7 @@ export default function CourseDetailScreen() {
     getCourse,
     updateCourse,
     deleteCourse,
+    enrollCourse,
     addMeeting,
     removeMeeting,
     tasks,
@@ -105,6 +107,9 @@ export default function CourseDetailScreen() {
           <ColorPicker value={color} onChange={setColor} />
         </Field>
         <AccentButton onPress={save}>Save course</AccentButton>
+        {!isEnrolled(course) ? (
+          <AccentButton onPress={() => enrollCourse(course.id)}>Enroll in course</AccentButton>
+        ) : null}
 
         <Eyebrow>Meetings</Eyebrow>
         {course.meetings.length === 0 ? (

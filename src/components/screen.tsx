@@ -4,9 +4,10 @@ import { ScrollView, YStack, type ScrollViewProps, type YStackProps } from 'tama
 type ScreenProps = YStackProps & {
   scroll?: boolean
   scrollProps?: ScrollViewProps
+  fullWidth?: boolean
 }
 
-export function Screen({ children, scroll, scrollProps, ...props }: ScreenProps) {
+export function Screen({ children, scroll, scrollProps, fullWidth, ...props }: ScreenProps) {
   const insets = useSafeAreaInsets()
 
   return (
@@ -22,7 +23,7 @@ export function Screen({ children, scroll, scrollProps, ...props }: ScreenProps)
         width="100%"
         maxWidth={720}
         alignSelf="center"
-        paddingHorizontal="$4"
+        paddingHorizontal={fullWidth ? 0 : "$4"}
       >
         {scroll ? (
           <ScrollView
