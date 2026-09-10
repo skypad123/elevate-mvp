@@ -32,8 +32,8 @@ export default function CoursesScreen() {
   return (
     <Screen scroll>
       <ScreenHeader
-        eyebrow="Elvate"
-        title="Courses"
+        eyebrow="elevate"
+        title="Hi, Student"
         action={<AccentButton onPress={() => router.push('/course/new')}>Add</AccentButton>}
       />
 
