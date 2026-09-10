@@ -30,14 +30,16 @@ export default function CoursesScreen() {
   })
 
   return (
-    <Screen scroll>
-      <ScreenHeader
-        eyebrow="Elvate"
-        title="Courses"
-        action={<AccentButton onPress={() => router.push('/course/new')}>Add</AccentButton>}
-      />
+    <Screen scroll fullWidth>
+      <YStack paddingHorizontal="$4">
+        <ScreenHeader
+          eyebrow="Elvate"
+          title="Courses"
+          action={<AccentButton onPress={() => router.push('/course/new')}>Add</AccentButton>}
+        />
+      </YStack>
 
-      <YStack gap="$4" marginBottom="$4">
+      <YStack gap="$4" marginBottom="$4" paddingHorizontal="$4">
         <XStack
           alignItems="center"
           backgroundColor="$color2"
@@ -64,16 +66,18 @@ export default function CoursesScreen() {
       </YStack>
 
       {filteredCourses.length === 0 ? (
-        <EmptyState
-          title={searchQuery ? 'No courses found' : 'No courses yet'}
-          body={
-            searchQuery
-              ? 'Try a different search term.'
-              : 'Add a class to start planning meetings and assignments.'
-          }
-        />
+        <YStack paddingHorizontal="$4">
+          <EmptyState
+            title={searchQuery ? 'No courses found' : 'No courses yet'}
+            body={
+              searchQuery
+                ? 'Try a different search term.'
+                : 'Add a class to start planning meetings and assignments.'
+            }
+          />
+        </YStack>
       ) : (
-        <XStack flexWrap="wrap" gap="$3" justifyContent="space-between">
+        <XStack flexWrap="wrap" gap="$3" justifyContent="space-between" paddingHorizontal="$4">
           {filteredCourses.map((course) => {
             const openTasks = tasks.filter(
               (task) => task.courseId === course.id && !task.done
