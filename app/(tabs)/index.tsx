@@ -31,8 +31,8 @@ export default function CoursesScreen() {
   return (
     <Screen scroll>
       <ScreenHeader
-        eyebrow="Elvate"
-        title="Courses"
+        eyebrow="elevate"
+        title="Hi, Student"
       />
 
       <YStack gap="$4" marginBottom="$4">
