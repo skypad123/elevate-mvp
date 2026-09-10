@@ -1,10 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { Link, router } from 'expo-router'
+import { Link } from 'expo-router'
 import { useState } from 'react'
 import { Image } from 'react-native'
 import { Input, Paragraph, XStack, YStack } from 'tamagui'
 import {
-  AccentButton,
   ColorDot,
   Eyebrow,
   ScreenHeader,
@@ -34,7 +33,6 @@ export default function CoursesScreen() {
       <ScreenHeader
         eyebrow="Elvate"
         title="Courses"
-        action={<AccentButton onPress={() => router.push('/course/new')}>Add</AccentButton>}
       />
 
       <YStack gap="$4" marginBottom="$4">
