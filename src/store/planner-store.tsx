@@ -13,7 +13,7 @@ import { addDays, toISODate } from '../lib/dates'
 import { createId } from '../lib/id'
 import type { Course, Meeting, PlannerState, Task } from '../types'
 
-const STORAGE_KEY = '@elvate/planner'
+const STORAGE_KEY = '@elevate/planner'
 
 const today = new Date()
 
