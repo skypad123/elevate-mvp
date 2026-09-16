@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { create } from 'zustand'
 import { persist } from './store-utils'
 import { storage } from './store-utils'
@@ -20,8 +19,6 @@ export const useAuthStore = create<AuthState>()(
 
       signIn: async () => {
         try {
-          // Mock token - in real app this would come from authentication API
-          await AsyncStorage.setItem(AUTH_KEY, 'mock_auth_token')
           set({ isAuthenticated: true })
         } catch (error) {
           console.error('Error signing in:', error)
@@ -31,7 +28,6 @@ export const useAuthStore = create<AuthState>()(
 
       signOut: async () => {
         try {
-          await AsyncStorage.removeItem(AUTH_KEY)
           set({ isAuthenticated: false })
         } catch (error) {
           console.error('Error signing out:', error)
@@ -42,11 +38,8 @@ export const useAuthStore = create<AuthState>()(
     {
       name: AUTH_KEY,
       storage,
-      onRehydrateStorage: () => (state) => {
-        // Once rehydration is complete, set isLoading to false
-        if (state) {
-          state.isLoading = false
-        }
+      onRehydrateStorage: () => (state, error) => {
+        useAuthStore.setState({ isLoading: false })
       },
     }
   )

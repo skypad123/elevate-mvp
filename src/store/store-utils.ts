@@ -31,6 +31,7 @@ const MIGRATION_FLAG_KEY = '@elevate/migration_v1_complete'
 
 /**
  * One-time migration: fix misspelled key @elvate/planner → @elevate/planner
+ * and migrate raw auth token to Zustand persist JSON format
  * This should be called once on app startup before any stores are initialized
  */
 export async function runStorageMigrations(): Promise<void> {
@@ -55,6 +56,29 @@ export async function runStorageMigrations(): Promise<void> {
       await AsyncStorage.removeItem(oldKey)
       
       console.log('Storage migration: moved @elvate/planner → @elevate/planner')
+    }
+
+    // Migrate auth token from raw string to Zustand persist JSON format
+    const authKey = '@elevate_auth_token'
+    const authData = await AsyncStorage.getItem(authKey)
+    
+    if (authData !== null) {
+      try {
+        // Try to parse as JSON - if it succeeds, it's already in the new format
+        JSON.parse(authData)
+      } catch {
+        // Not valid JSON, so it's the old raw token format
+        // Convert to Zustand persist format with isAuthenticated: true
+        const zustandFormat = {
+          state: {
+            isAuthenticated: true,
+            isLoading: false,
+          },
+          version: 0,
+        }
+        await AsyncStorage.setItem(authKey, JSON.stringify(zustandFormat))
+        console.log('Storage migration: converted raw auth token to Zustand persist format')
+      }
     }
 
     // Mark migration as complete
