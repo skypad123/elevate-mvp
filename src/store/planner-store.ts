@@ -71,7 +71,8 @@ interface PlannerStore extends PlannerState {
 export const usePlannerStore = create<PlannerStore>()(
   persist(
     (set, get) => ({
-      ...seedState,
+      courses: [],
+      tasks: [],
       ready: false,
 
       addCourse: (course) => {
@@ -171,10 +172,26 @@ export const usePlannerStore = create<PlannerStore>()(
     {
       name: '@elevate/planner',
       storage,
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.courses = mergeCatalog(state.courses ?? [])
-          state.ready = true
+      onRehydrateStorage: () => {
+        return (state, error) => {
+          if (error) {
+            usePlannerStore.setState({
+              courses: mergeCatalog(seedState.courses),
+              tasks: seedState.tasks,
+              ready: true,
+            })
+          } else if (!state || (state.courses.length === 0 && state.tasks.length === 0)) {
+            usePlannerStore.setState({
+              courses: mergeCatalog(seedState.courses),
+              tasks: seedState.tasks,
+              ready: true,
+            })
+          } else {
+            usePlannerStore.setState({
+              courses: mergeCatalog(state.courses),
+              ready: true,
+            })
+          }
         }
       },
     }

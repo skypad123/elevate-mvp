@@ -48,13 +48,41 @@ export async function runStorageMigrations(): Promise<void> {
     const oldData = await AsyncStorage.getItem(oldKey)
     
     if (oldData !== null) {
-      // Write to corrected key
-      await AsyncStorage.setItem(newKey, oldData)
-      
-      // Remove the old key
-      await AsyncStorage.removeItem(oldKey)
-      
-      console.log('Storage migration: moved @elvate/planner → @elevate/planner')
+      try {
+        const parsed = JSON.parse(oldData)
+        
+        // Check if data is already in Zustand persist format (has state property)
+        let migratedData: string
+        if (parsed.state !== undefined) {
+          // Already in new format, just copy it
+          migratedData = oldData
+        } else {
+          // Old Context format: { courses, tasks }
+          // Wrap it in Zustand persist envelope: { state: { courses, tasks, ready }, version: 0 }
+          const wrapped = {
+            state: {
+              courses: parsed.courses || [],
+              tasks: parsed.tasks || [],
+              ready: false,
+            },
+            version: 0,
+          }
+          migratedData = JSON.stringify(wrapped)
+        }
+        
+        // Write to corrected key
+        await AsyncStorage.setItem(newKey, migratedData)
+        
+        // Remove the old key
+        await AsyncStorage.removeItem(oldKey)
+        
+        console.log('Storage migration: moved @elvate/planner → @elevate/planner')
+      } catch (error) {
+        console.error('Error parsing old storage data:', error)
+        // If parsing fails, just copy the raw data
+        await AsyncStorage.setItem(newKey, oldData)
+        await AsyncStorage.removeItem(oldKey)
+      }
     }
 
     // Mark migration as complete

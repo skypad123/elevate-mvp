@@ -15,7 +15,9 @@ export default function CourseDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>()
   const id = Array.isArray(params.id) ? params.id[0] : params.id
   const ready = usePlannerStore((state) => state.ready)
-  const getCourse = usePlannerStore((state) => state.getCourse)
+  const course = usePlannerStore((state) =>
+    state.courses.find((course) => course.id === id)
+  )
   const updateCourse = usePlannerStore((state) => state.updateCourse)
   const deleteCourse = usePlannerStore((state) => state.deleteCourse)
   const enrollCourse = usePlannerStore((state) => state.enrollCourse)
@@ -23,7 +25,6 @@ export default function CourseDetailScreen() {
   const removeMeeting = usePlannerStore((state) => state.removeMeeting)
   const tasks = usePlannerStore((state) => state.tasks)
   const addTask = usePlannerStore((state) => state.addTask)
-  const course = getCourse(id)
 
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
