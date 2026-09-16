@@ -6,10 +6,10 @@ import { Alert, TouchableOpacity } from 'react-native'
 import { Avatar, Button, H4, Input, Paragraph, YStack, XStack } from 'tamagui'
 import { Eyebrow, ScreenHeader } from '../../src/components/chrome'
 import { Screen } from '../../src/components/screen'
-import { useProfile } from '../../src/store/profile-store'
+import { useProfileStore } from '../../src/store/profile-store'
 
 export default function ProfileScreen() {
-  const { profile, updateProfile } = useProfile()
+  const { profile, updateProfile } = useProfileStore()
   const [isEditing, setIsEditing] = useState(false)
   const [editedName, setEditedName] = useState(profile.name)
 

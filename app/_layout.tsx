@@ -6,7 +6,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { TamaguiProvider, useTheme } from 'tamagui'
 import { PlannerProvider } from '../src/store/planner-store'
 import { AuthProvider, useAuth } from '../src/store/auth-store'
-import { ProfileProvider } from '../src/store/profile-store'
 import { runStorageMigrations } from '../src/store/store-utils'
 import { config } from '../tamagui.config'
 
@@ -96,11 +95,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <TamaguiProvider config={config} defaultTheme={theme}>
         <AuthProvider>
-          <ProfileProvider>
-            <PlannerProvider>
-              <RootNavigator />
-            </PlannerProvider>
-          </ProfileProvider>
+          <PlannerProvider>
+            <RootNavigator />
+          </PlannerProvider>
         </AuthProvider>
       </TamaguiProvider>
     </GestureHandlerRootView>
