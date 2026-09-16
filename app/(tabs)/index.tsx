@@ -8,7 +8,7 @@ import { EmptyState } from '../../src/components/empty-state'
 import { Screen } from '../../src/components/screen'
 import { HomeSearchBar } from '../../src/components/search-bar'
 import { getRecommendedCourses, getTrendingCourses } from '../../src/lib/catalog'
-import { usePlanner } from '../../src/store/planner-store'
+import { usePlannerStore } from '../../src/store/planner-store'
 import { useProfile } from '../../src/store/profile-store'
 import type { Course } from '../../src/types'
 
@@ -58,7 +58,7 @@ function CourseRail({
 }
 
 export default function HomeScreen() {
-  const { courses } = usePlanner()
+  const courses = usePlannerStore((state) => state.courses)
   const { profile } = useProfile()
   const firstName = profile.name.trim().split(/\s+/)[0] || 'Student'
 

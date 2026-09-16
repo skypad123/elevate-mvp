@@ -5,11 +5,11 @@ import { AccentButton } from '../../src/components/chrome'
 import { ColorPicker } from '../../src/components/color-picker'
 import { Field, TextField } from '../../src/components/field'
 import { Screen } from '../../src/components/screen'
-import { usePlanner } from '../../src/store/planner-store'
+import { usePlannerStore } from '../../src/store/planner-store'
 import type { CourseColor } from '../../src/types'
 
 export default function NewCourseScreen() {
-  const { addCourse } = usePlanner()
+  const addCourse = usePlannerStore((state) => state.addCourse)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [instructor, setInstructor] = useState('')

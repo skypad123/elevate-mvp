@@ -5,10 +5,11 @@ import { AccentButton, Chip } from '../../src/components/chrome'
 import { Field, TextField } from '../../src/components/field'
 import { Screen } from '../../src/components/screen'
 import { toISODate } from '../../src/lib/dates'
-import { usePlanner } from '../../src/store/planner-store'
+import { usePlannerStore } from '../../src/store/planner-store'
 
 export default function NewTaskScreen() {
-  const { courses, addTask } = usePlanner()
+  const courses = usePlannerStore((state) => state.courses)
+  const addTask = usePlannerStore((state) => state.addTask)
   const [courseId, setCourseId] = useState(courses[0]?.id ?? '')
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')

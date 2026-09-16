@@ -34,7 +34,7 @@ import {
   replyToUser,
 } from '../src/lib/course-assistant'
 import { createId } from '../src/lib/id'
-import { usePlanner } from '../src/store/planner-store'
+import { usePlannerStore } from '../src/store/planner-store'
 import { useProfile } from '../src/store/profile-store'
 import type { Course } from '../src/types'
 
@@ -112,7 +112,8 @@ function TypingIndicator() {
 export default function SearchScreen() {
   const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
-  const { courses, tasks } = usePlanner()
+  const courses = usePlannerStore((state) => state.courses)
+  const tasks = usePlannerStore((state) => state.tasks)
   const { profile } = useProfile()
   const theme = useTheme()
   const scrollRef = useRef<ScrollView>(null)

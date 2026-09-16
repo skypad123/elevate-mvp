@@ -4,7 +4,6 @@ import { useColorScheme } from 'react-native'
 import { useEffect, useState } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { TamaguiProvider, useTheme } from 'tamagui'
-import { PlannerProvider } from '../src/store/planner-store'
 import { AuthProvider, useAuth } from '../src/store/auth-store'
 import { ProfileProvider } from '../src/store/profile-store'
 import { runStorageMigrations } from '../src/store/store-utils'
@@ -97,9 +96,7 @@ export default function RootLayout() {
       <TamaguiProvider config={config} defaultTheme={theme}>
         <AuthProvider>
           <ProfileProvider>
-            <PlannerProvider>
-              <RootNavigator />
-            </PlannerProvider>
+            <RootNavigator />
           </ProfileProvider>
         </AuthProvider>
       </TamaguiProvider>

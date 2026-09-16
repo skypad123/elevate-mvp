@@ -19,7 +19,7 @@ import {
   weekdayOf,
 } from '../../src/lib/dates'
 import { isEnrolled } from '../../src/lib/catalog'
-import { usePlanner } from '../../src/store/planner-store'
+import { usePlannerStore } from '../../src/store/planner-store'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from 'tamagui'
 
@@ -30,7 +30,7 @@ function WeekScheduleModal({
   visible: boolean
   onClose: () => void
 }) {
-  const { courses } = usePlanner()
+  const courses = usePlannerStore((state) => state.courses)
   const days = useMemo(() => weekDays(new Date()), [])
   const [selected, setSelected] = useState(() => toISODate(new Date()))
   const selectedDate = days.find((day) => toISODate(day) === selected) ?? new Date()
@@ -125,7 +125,8 @@ function WeekScheduleModal({
 }
 
 export default function LessonsScreen() {
-  const { courses, tasks } = usePlanner()
+  const courses = usePlannerStore((state) => state.courses)
+  const tasks = usePlannerStore((state) => state.tasks)
   const [showWeekSchedule, setShowWeekSchedule] = useState(false)
   const theme = useTheme()
   const enrolledCourses = courses.filter(isEnrolled)

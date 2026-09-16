@@ -8,23 +8,21 @@ import { Field, TextField } from '../../src/components/field'
 import { Screen } from '../../src/components/screen'
 import { WEEKDAYS, formatTime, toISODate } from '../../src/lib/dates'
 import { isEnrolled } from '../../src/lib/catalog'
-import { usePlanner } from '../../src/store/planner-store'
+import { usePlannerStore } from '../../src/store/planner-store'
 import type { CourseColor, Weekday } from '../../src/types'
 
 export default function CourseDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>()
   const id = Array.isArray(params.id) ? params.id[0] : params.id
-  const {
-    ready,
-    getCourse,
-    updateCourse,
-    deleteCourse,
-    enrollCourse,
-    addMeeting,
-    removeMeeting,
-    tasks,
-    addTask,
-  } = usePlanner()
+  const ready = usePlannerStore((state) => state.ready)
+  const getCourse = usePlannerStore((state) => state.getCourse)
+  const updateCourse = usePlannerStore((state) => state.updateCourse)
+  const deleteCourse = usePlannerStore((state) => state.deleteCourse)
+  const enrollCourse = usePlannerStore((state) => state.enrollCourse)
+  const addMeeting = usePlannerStore((state) => state.addMeeting)
+  const removeMeeting = usePlannerStore((state) => state.removeMeeting)
+  const tasks = usePlannerStore((state) => state.tasks)
+  const addTask = usePlannerStore((state) => state.addTask)
   const course = getCourse(id)
 
   const [name, setName] = useState('')

@@ -10,10 +10,12 @@ import {
 import { EmptyState } from '../../src/components/empty-state'
 import { Screen } from '../../src/components/screen'
 import { dueLabel, formatDate } from '../../src/lib/dates'
-import { usePlanner } from '../../src/store/planner-store'
+import { usePlannerStore } from '../../src/store/planner-store'
 
 export default function TasksScreen() {
-  const { tasks, courses, toggleTask } = usePlanner()
+  const tasks = usePlannerStore((state) => state.tasks)
+  const courses = usePlannerStore((state) => state.courses)
+  const toggleTask = usePlannerStore((state) => state.toggleTask)
   const open = tasks
     .filter((task) => !task.done)
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
