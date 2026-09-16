@@ -30,6 +30,20 @@ export const useProfileStore = create<ProfileState>()(
     {
       name: '@elevate_profile',
       storage,
+      migrate: (persistedState: any, version: number) => {
+        // Migrate old raw UserProfile format to new Zustand persist format
+        if (persistedState && typeof persistedState === 'object' && !('profile' in persistedState)) {
+          // Old format: { name, imageUri }
+          // Convert to new format: { profile: { name, imageUri }, isLoading: false }
+          return {
+            profile: persistedState as UserProfile,
+            isLoading: false,
+            updateProfile: undefined as any, // Functions are not persisted
+          }
+        }
+        // Already in new format or null/undefined
+        return persistedState as ProfileState
+      },
       onRehydrateStorage: () => (state) => {
         // Set isLoading to false once hydration is complete
         if (state) {
