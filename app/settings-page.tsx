@@ -3,10 +3,10 @@ import { Alert } from 'react-native'
 import { Button, Paragraph, YStack } from 'tamagui'
 import { Eyebrow } from '../src/components/chrome'
 import { Screen } from '../src/components/screen'
-import { useAuth } from '../src/store/auth-store'
+import { useAuthStore } from '../src/store/auth-store'
 
 export default function SettingsPageScreen() {
-  const { signOut } = useAuth()
+  const { signOut } = useAuthStore()
 
   const handleSignOut = () => {
     Alert.alert(

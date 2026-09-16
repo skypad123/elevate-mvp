@@ -13,13 +13,13 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { Screen } from '../src/components/screen'
 import { Eyebrow } from '../src/components/chrome'
-import { useAuth } from '../src/store/auth-store'
+import { useAuthStore } from '../src/store/auth-store'
 
 type AuthMode = 'signin' | 'signup'
 type InputMethod = 'email' | 'phone'
 
 export default function LoginScreen() {
-  const { signIn } = useAuth()
+  const { signIn } = useAuthStore()
   const [authMode, setAuthMode] = useState<AuthMode>('signin')
   const [inputMethod, setInputMethod] = useState<InputMethod>('email')
   const [email, setEmail] = useState('')
