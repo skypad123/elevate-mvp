@@ -102,6 +102,7 @@ function RootNavigator() {
           <Stack.Screen name="checkout/[courseId]" />
           <Stack.Screen name="checkout/success" />
           <Stack.Screen name="learn/[enrollmentId]/index" />
+          <Stack.Screen name="learn/[enrollmentId]/lesson/[lessonId]" />
         </Stack.Protected>
         <Stack.Screen name="+not-found" />
       </Stack>

@@ -11,6 +11,7 @@ import { catalogRoutes } from './routes/catalog'
 import { checkoutRoutes } from './routes/checkout'
 import { filesRoutes } from './routes/files'
 import { healthRoutes } from './routes/health'
+import { learningRoutes } from './routes/learning'
 import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
 import { supportRoutes } from './routes/support'
@@ -44,6 +45,7 @@ export function createApp(deps: Deps) {
     .route('/', healthRoutes(deps))
     .route('/auth', authRoutes(deps))
     .route('/me', meRoutes(deps))
+    .route('/me/enrollments', learningRoutes(deps))
     .route('/media', mediaRoutes(deps))
     .route('/files', filesRoutes(deps))
     .route('/webhooks', webhookRoutes(deps))
