@@ -1,0 +1,4 @@
+{
+  "extends": "@elevate/tsconfig/node.json",
+  "include": ["src", "scripts", "test", "drizzle.config.ts"]
+}

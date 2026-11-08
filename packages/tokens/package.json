@@ -1,0 +1,19 @@
+{
+  "name": "@elevate/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./dist/theme.css",
+    "./tokens.css": "./dist/tokens.css"
+  },
+  "scripts": {
+    "build": "node scripts/build-css.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@elevate/tsconfig": "*",
+    "typescript": "~6.0.3"
+  }
+}

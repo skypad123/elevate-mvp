@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@import "@elevate/tokens/theme.css";
+@source "../../../packages/web-ui/src";
+
+html,
+body,
+#root {
+  height: 100%;
+}

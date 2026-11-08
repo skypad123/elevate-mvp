@@ -1,25 +1,36 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
 # dependencies
 node_modules/
 
+# build output
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# local data (uploads, certificates, pglite)
+.data/
+
+# env files (keep the example)
+.env
+.env.*
+!.env.example
+
 # Expo
 .expo/
-dist/
-web-build/
 expo-env.d.ts
+web-build/
+apps/learner/ios
+apps/learner/android
+.metro-health-check*
 
-# Native
-.kotlin/
-*.orig.*
+# native signing
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
-
-# Metro
-.metro-health-check*
+*.orig.*
+.kotlin/
 
 # debug
 npm-debug.*
@@ -29,16 +40,3 @@ yarn-error.*
 # macOS
 .DS_Store
 *.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-# Tamagui compiler output
-.tamagui/
-
-# generated native folders
-/ios
-/android

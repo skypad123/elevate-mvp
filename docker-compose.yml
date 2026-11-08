@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:17
+    container_name: elevate-db
+    environment:
+      POSTGRES_USER: elevate
+      POSTGRES_PASSWORD: elevate
+      POSTGRES_DB: elevate
+    ports:
+      - "5432:5432"
+    volumes:
+      - elevate_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U elevate -d elevate"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mail:
+    image: axllent/mailpit:latest
+    container_name: elevate-mail
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # inbox UI → http://localhost:8025
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+
+volumes:
+  elevate_pgdata:
