@@ -59,3 +59,34 @@ export const updateArtefactSchema = z.object({
 })
 
 export const upsertQuizSchema = quizDefinitionSchema
+
+export const updateTeacherProfileSchema = z.object({
+  displayName: z.string().trim().min(2).max(80).optional(),
+  headline: z.string().trim().min(5).max(120).optional(),
+  bio: z.string().trim().min(50).max(3000).optional(),
+})
+export type UpdateTeacherProfile = z.infer<typeof updateTeacherProfileSchema>
+
+export type TeacherStripeView = {
+  connected: boolean
+  detailsSubmitted: boolean
+  chargesEnabled: boolean
+  payoutsEnabled: boolean
+}
+
+export type TeacherProfileView = {
+  userId: string
+  email: string
+  displayName: string
+  headline: string | null
+  bio: string | null
+  credentials: string | null
+  teachingSampleUrl: string | null
+  teachingSampleMediaId: string | null
+  status: 'applied' | 'approved' | 'rejected'
+  reviewNote: string | null
+  commissionBps: number
+  stripe: TeacherStripeView
+  appliedAt: string
+  reviewedAt: string | null
+}

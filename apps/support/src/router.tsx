@@ -2,7 +2,9 @@ import { RequireAuth, SignInPage, VerifyPage } from '@elevate/web-ui/portal'
 import { createBrowserRouter, Navigate } from 'react-router'
 import { api } from './lib/api'
 import { SupportLayout } from './routes/layout'
-import { People, ReviewQueue, Transactions } from './routes/placeholders'
+import { People } from './routes/people'
+import { Person } from './routes/person'
+import { ReviewQueue, Transactions } from './routes/placeholders'
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +29,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/review" replace /> },
       { path: 'review', element: <ReviewQueue /> },
       { path: 'people', element: <People /> },
+      { path: 'people/:id', element: <Person /> },
       { path: 'transactions', element: <Transactions /> },
     ],
   },

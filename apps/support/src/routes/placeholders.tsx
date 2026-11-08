@@ -1,5 +1,5 @@
 import { EmptyState, PageHeader } from '@elevate/web-ui'
-import { ClipboardCheck, Receipt, Users } from 'lucide-react'
+import { ClipboardCheck, Receipt } from 'lucide-react'
 
 export function ReviewQueue() {
   return (
@@ -13,19 +13,6 @@ export function ReviewQueue() {
         icon={ClipboardCheck}
         title="Queue arrives in Phase 5"
         body="Pending courses with full preview, approve and reject-with-reason."
-      />
-    </>
-  )
-}
-
-export function People() {
-  return (
-    <>
-      <PageHeader eyebrow="People" title="Teachers and learners" />
-      <EmptyState
-        icon={Users}
-        title="People arrives in Phase 4"
-        body="Teacher applications, commission rates and learner search."
       />
     </>
   )

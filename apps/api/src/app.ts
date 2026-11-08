@@ -10,6 +10,8 @@ import { filesRoutes } from './routes/files'
 import { healthRoutes } from './routes/health'
 import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
+import { supportRoutes } from './routes/support'
+import { teachRoutes } from './routes/teach'
 import { webhookRoutes } from './routes/webhooks'
 
 export function createApp(deps: Deps) {
@@ -41,6 +43,8 @@ export function createApp(deps: Deps) {
     .route('/media', mediaRoutes(deps))
     .route('/files', filesRoutes(deps))
     .route('/webhooks', webhookRoutes(deps))
+    .route('/teach', teachRoutes(deps))
+    .route('/support', supportRoutes(deps))
 
   return routes
 }

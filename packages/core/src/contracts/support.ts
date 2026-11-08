@@ -13,3 +13,24 @@ export const peopleQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
 })
+
+export type PersonSummary = {
+  id: string
+  email: string
+  name: string | null
+  avatarUrl: string | null
+  roles: z.infer<typeof roleSchema>[]
+  createdAt: string
+  teacher: {
+    status: 'applied' | 'approved' | 'rejected'
+    displayName: string
+    commissionBps: number
+    stripeChargesEnabled: boolean
+    appliedAt: string
+  } | null
+}
+
+export type PersonDetail = PersonSummary & {
+  teacherProfile: import('./teach').TeacherProfileView | null
+  stats: { enrollments: number; courses: number; liveCourses: number }
+}

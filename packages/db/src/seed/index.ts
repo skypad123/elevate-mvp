@@ -19,7 +19,7 @@ function thumbnailSvg(course: SeedCourse): string {
   const lines: string[] = []
   let current = ''
   for (const w of words) {
-    if ((current + ' ' + w).trim().length > 22) {
+    if (`${current} ${w}`.trim().length > 22) {
       lines.push(current.trim())
       current = w
     } else current = `${current} ${w}`

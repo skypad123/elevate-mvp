@@ -14,6 +14,7 @@
     "@elevate/api": "*",
     "@elevate/core": "*",
     "@elevate/tokens": "*",
+    "@mux/mux-player-react": "3.14.1",
     "@mux/mux-uploader-react": "1.6.1",
     "@tanstack/react-query": "5.107.1",
     "class-variance-authority": "0.7.1",

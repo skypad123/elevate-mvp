@@ -142,5 +142,5 @@ export function RequireRole({
 }) {
   const { hasRole, status } = usePortalAuth()
   if (status === 'loading') return <FullPageSpinner />
-  return hasRole(...roles) ? <>{children}</> : <>{fallback}</>
+  return hasRole(...roles) ? children : fallback
 }

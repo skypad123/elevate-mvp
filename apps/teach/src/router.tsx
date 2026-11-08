@@ -1,8 +1,14 @@
 import { RequireAuth, SignInPage, VerifyPage } from '@elevate/web-ui/portal'
 import { createBrowserRouter } from 'react-router'
 import { api } from './lib/api'
+import { ApplyPage } from './routes/apply'
+import { Dashboard } from './routes/dashboard'
+import { OnboardingLayout, TeachGate } from './routes/gate'
 import { TeachLayout } from './routes/layout'
-import { Courses, Dashboard, Earnings, SettingsPage } from './routes/placeholders'
+import { PendingPage } from './routes/pending'
+import { Courses, Earnings } from './routes/placeholders'
+import { SettingsPage } from './routes/settings'
+import { StripeRefresh, StripeReturn } from './routes/stripe'
 
 export const router = createBrowserRouter([
   {
@@ -20,7 +26,22 @@ export const router = createBrowserRouter([
   {
     element: (
       <RequireAuth>
-        <TeachLayout />
+        <TeachGate>
+          <OnboardingLayout />
+        </TeachGate>
+      </RequireAuth>
+    ),
+    children: [
+      { path: 'apply', element: <ApplyPage /> },
+      { path: 'pending', element: <PendingPage /> },
+    ],
+  },
+  {
+    element: (
+      <RequireAuth>
+        <TeachGate>
+          <TeachLayout />
+        </TeachGate>
       </RequireAuth>
     ),
     children: [
@@ -28,6 +49,8 @@ export const router = createBrowserRouter([
       { path: 'courses', element: <Courses /> },
       { path: 'earnings', element: <Earnings /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'stripe/return', element: <StripeReturn /> },
+      { path: 'stripe/refresh', element: <StripeRefresh /> },
     ],
   },
 ])
