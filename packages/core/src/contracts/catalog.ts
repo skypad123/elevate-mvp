@@ -25,3 +25,52 @@ export type CourseCard = {
   lessonCount: number
   publishedAt: string | null
 }
+
+export type SyllabusArtefact = {
+  id: string
+  type: 'video' | 'audio' | 'text' | 'quiz'
+  title: string
+  durationSeconds: number | null
+}
+
+export type SyllabusLesson = {
+  id: string
+  title: string
+  summary: string | null
+  position: number
+  prerequisiteIds: string[]
+  artefacts: SyllabusArtefact[]
+}
+
+export type CoursePublicView = {
+  id: string
+  slug: string
+  title: string
+  summary: string | null
+  descriptionJson: import('../domain/richtext').RichTextDoc | null
+  category: string
+  priceCents: number
+  currency: string
+  thumbnailUrl: string | null
+  publishedAt: string | null
+  enrolCount: number
+  lessonCount: number
+  artefactCount: number
+  durationSeconds: number
+  teacher: {
+    id: string
+    displayName: string
+    headline: string | null
+    bio: string | null
+    avatarUrl: string | null
+  }
+  lessons: SyllabusLesson[]
+  /** Present when the request is authenticated and the viewer has an enrollment. */
+  viewer: {
+    enrollmentId: string
+    status: 'pending_payment' | 'active' | 'refunded' | 'cancelled'
+    completedAt: string | null
+  } | null
+}
+
+export type CategoryCount = { slug: string; label: string; count: number }

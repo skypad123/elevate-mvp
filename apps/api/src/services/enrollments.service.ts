@@ -1,0 +1,71 @@
+import type { EnrollmentSummary } from '@elevate/core'
+import { schema as s } from '@elevate/db'
+import { asc, desc, eq, inArray } from 'drizzle-orm'
+import type { Deps } from '../deps'
+import { CatalogService } from './catalog.service'
+
+export class EnrollmentsService {
+  private readonly catalog: CatalogService
+  constructor(private readonly deps: Deps) {
+    this.catalog = new CatalogService(deps)
+  }
+
+  async listForUser(userId: string): Promise<EnrollmentSummary[]> {
+    const { db } = this.deps
+    const rows = await db.query.enrollments.findMany({
+      where: eq(s.enrollments.userId, userId),
+      orderBy: [desc(s.enrollments.updatedAt)],
+      with: {
+        course: {
+          with: {
+            thumbnail: true,
+            teacher: { with: { teacherProfile: true } },
+            lessons: { columns: { id: true }, with: { artefacts: { columns: { id: true } } } },
+          },
+        },
+        progress: { orderBy: [asc(s.artefactProgress.updatedAt)] },
+        certificate: true,
+      },
+    })
+    const visible = rows.filter((r) => r.status !== 'pending_payment' || r.stripeCheckoutSessionId)
+    const out: EnrollmentSummary[] = []
+    for (const row of visible) {
+      if (row.status === 'pending_payment') continue
+      const totalArtefacts = row.course.lessons.reduce((n, l) => n + l.artefacts.length, 0)
+      const completedArtefacts = row.progress.filter((p) => p.status === 'completed').length
+      const last = row.progress.at(-1)
+      out.push({
+        id: row.id,
+        status: row.status,
+        enrolledAt: row.enrolledAt?.toISOString() ?? null,
+        completedAt: row.completedAt?.toISOString() ?? null,
+        course: await this.catalog.toCard(row.course),
+        progress: {
+          completedArtefacts,
+          totalArtefacts,
+          percent: totalArtefacts ? Math.round((completedArtefacts / totalArtefacts) * 100) : 0,
+        },
+        certificateId: row.certificate?.id ?? null,
+        lastActivityAt: last?.updatedAt.toISOString() ?? null,
+      })
+    }
+    return out
+  }
+
+  async activeCourseIds(userId: string): Promise<Set<string>> {
+    const rows = await this.deps.db.query.enrollments.findMany({
+      where: eq(s.enrollments.userId, userId),
+      columns: { courseId: true, status: true },
+    })
+    return new Set(rows.filter((r) => r.status === 'active').map((r) => r.courseId))
+  }
+
+  async ensureActive(userId: string, enrollmentId: string) {
+    const enrollment = await this.deps.db.query.enrollments.findFirst({
+      where: eq(s.enrollments.id, enrollmentId),
+    })
+    if (!enrollment || enrollment.userId !== userId) return null
+    if (!inArray) return null
+    return enrollment.status === 'active' ? enrollment : null
+  }
+}

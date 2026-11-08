@@ -7,6 +7,8 @@ import { requestId } from './middleware/request-id'
 import { requestLogger } from './middleware/request-logger'
 import { requestOrigin } from './middleware/request-origin'
 import { authRoutes } from './routes/auth'
+import { catalogRoutes } from './routes/catalog'
+import { checkoutRoutes } from './routes/checkout'
 import { filesRoutes } from './routes/files'
 import { healthRoutes } from './routes/health'
 import { meRoutes } from './routes/me'
@@ -47,6 +49,8 @@ export function createApp(deps: Deps) {
     .route('/webhooks', webhookRoutes(deps))
     .route('/teach', teachRoutes(deps))
     .route('/support', supportRoutes(deps))
+    .route('/catalog', catalogRoutes(deps))
+    .route('/checkout', checkoutRoutes(deps))
 
   return routes
 }

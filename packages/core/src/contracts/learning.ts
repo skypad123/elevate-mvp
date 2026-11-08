@@ -14,3 +14,14 @@ export type ProgressUpdate = z.infer<typeof progressUpdateSchema>
 
 export const quizSubmitSchema = z.object({ answers: quizAnswersSchema })
 export type QuizSubmit = z.infer<typeof quizSubmitSchema>
+
+export type EnrollmentSummary = {
+  id: string
+  status: 'pending_payment' | 'active' | 'refunded' | 'cancelled'
+  enrolledAt: string | null
+  completedAt: string | null
+  course: import('./catalog').CourseCard
+  progress: { completedArtefacts: number; totalArtefacts: number; percent: number }
+  certificateId: string | null
+  lastActivityAt: string | null
+}
