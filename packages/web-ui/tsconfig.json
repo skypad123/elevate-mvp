@@ -1,0 +1,4 @@
+{
+  "extends": "@elevate/tsconfig/react-vite.json",
+  "include": ["src"]
+}

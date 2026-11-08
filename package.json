@@ -1,43 +1,41 @@
 {
-  "name": "elvate-mvp",
-  "version": "1.0.0",
-  "main": "expo-router/entry",
-  "dependencies": {
-    "@expo/vector-icons": "^15.0.2",
-    "@react-native-async-storage/async-storage": "2.2.0",
-    "@tamagui/babel-plugin": "^2.7.7",
-    "@tamagui/colors": "^2.7.7",
-    "@tamagui/config": "^2.7.7",
-    "@tamagui/themes": "^2.7.7",
-    "babel-preset-expo": "~57.0.0",
-    "expo": "~57.0.19",
-    "expo-constants": "~57.0.17",
-    "expo-font": "~57.0.3",
-    "expo-image-picker": "~16.0.2",
-    "expo-linking": "~57.0.9",
-    "expo-router": "~57.0.18",
-    "expo-status-bar": "~57.0.1",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "react-native": "0.86.3",
-    "react-native-gesture-handler": "~2.32.0",
-    "react-native-reanimated": "4.5.1",
-    "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "~4.26.0",
-    "react-native-web": "^0.21.2",
-    "tamagui": "^2.7.7",
-    "zustand": "^5.0.2"
+  "name": "elevate",
+  "private": true,
+  "packageManager": "npm@11.19.1",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "build:types": "turbo run build:types",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "check:dupes": "node scripts/check-dupes.mjs",
+    "db:generate": "npm -w @elevate/db run generate",
+    "db:migrate": "npm -w @elevate/db run migrate",
+    "db:seed": "npm -w @elevate/db run seed",
+    "db:reset": "npm -w @elevate/db run reset"
   },
   "devDependencies": {
-    "@react-navigation/bottom-tabs": "^7.18.18",
-    "@types/react": "~19.2.2",
+    "@biomejs/biome": "2.6.6",
+    "turbo": "2.11.10",
     "typescript": "~6.0.3"
   },
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
-  },
-  "private": true
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "@types/react": "~19.2.2",
+    "hono": "4.13.17",
+    "zod": "4.6.7",
+    "typescript": "~6.0.3",
+    "react-native-svg": "15.15.4"
+  }
 }

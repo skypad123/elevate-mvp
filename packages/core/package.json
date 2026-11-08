@@ -1,0 +1,21 @@
+{
+  "name": "@elevate/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@elevate/tsconfig": "*",
+    "typescript": "~6.0.3",
+    "vitest": "5.1.0"
+  }
+}
