@@ -10,6 +10,7 @@ import { filesRoutes } from './routes/files'
 import { healthRoutes } from './routes/health'
 import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
+import { webhookRoutes } from './routes/webhooks'
 
 export function createApp(deps: Deps) {
   const { env } = deps
@@ -39,6 +40,7 @@ export function createApp(deps: Deps) {
     .route('/me', meRoutes(deps))
     .route('/media', mediaRoutes(deps))
     .route('/files', filesRoutes(deps))
+    .route('/webhooks', webhookRoutes(deps))
 
   return routes
 }

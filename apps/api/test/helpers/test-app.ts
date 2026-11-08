@@ -6,7 +6,9 @@ import type { Deps } from '../../src/deps'
 import { loadEnv } from '../../src/env'
 import { silentLogger } from '../../src/lib/logger'
 import { FakeMailer } from '../../src/providers/mailer'
+import { FakePaymentsProvider } from '../../src/providers/payments'
 import { FakeStorage } from '../../src/providers/storage'
+import { FakeVideoProvider } from '../../src/providers/video'
 
 export type ApiResponse<T = unknown> = { status: number; body: T; res: Response }
 
@@ -25,8 +27,19 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
   const { db, client } = await createPgliteDb()
   const mailer = new FakeMailer()
   const storage = new FakeStorage(env.API_URL)
+  const video = new FakeVideoProvider()
+  const payments = new FakePaymentsProvider()
   let clock = new Date('2026-11-08T04:00:00.000Z')
-  const deps: Deps = { env, db, mailer, storage, log: silentLogger, now: () => clock }
+  const deps: Deps = {
+    env,
+    db,
+    mailer,
+    storage,
+    video,
+    payments,
+    log: silentLogger,
+    now: () => clock,
+  }
   const app = createApp(deps)
 
   // biome-ignore lint/suspicious/noExplicitAny: test helper returns loosely typed JSON on purpose
@@ -89,6 +102,8 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     client,
     mailer,
     storage,
+    video,
+    payments,
     deps,
     api,
     signIn,

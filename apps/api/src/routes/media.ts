@@ -36,5 +36,9 @@ export const mediaRoutes = (deps: Deps) => {
         const asset = await media.getAsset(ensureUser(c.get('user')), c.req.param('id'))
         return c.json({ asset }, 200)
       })
+      .get('/assets/:id/playback', requireUser(), async (c) => {
+        const playback = await media.playback(ensureUser(c.get('user')), c.req.param('id'))
+        return c.json({ playback }, 200)
+      })
   )
 }

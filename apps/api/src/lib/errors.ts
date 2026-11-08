@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
+import { PaymentsNotConfiguredError } from '../providers/payments/types'
 import type { Logger } from './logger'
 
 export class HttpError extends Error {
@@ -37,6 +38,14 @@ export type ErrorBody = {
 export function createErrorHandler(log: Logger) {
   return (err: Error, c: Context) => {
     const requestId = c.get('requestId' as never) as string | undefined
+    if (err instanceof PaymentsNotConfiguredError) {
+      return c.json(
+        {
+          error: { code: 'payments_not_configured', message: err.message, requestId },
+        } satisfies ErrorBody,
+        503,
+      )
+    }
     if (err instanceof HttpError) {
       const body: ErrorBody = { error: { code: err.code, message: err.message, requestId } }
       if (err.details !== undefined) body.error.details = err.details
