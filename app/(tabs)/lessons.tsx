@@ -18,7 +18,7 @@ import {
   weekDays,
   weekdayOf,
 } from '../../src/lib/dates'
-import { isEnrolled } from '../../src/lib/catalog'
+import { useEnrolledCourses } from '../../src/store/planner-selectors'
 import { usePlannerStore } from '../../src/store/planner-store'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useTheme } from 'tamagui'
@@ -30,14 +30,13 @@ function WeekScheduleModal({
   visible: boolean
   onClose: () => void
 }) {
-  const courses = usePlannerStore((state) => state.courses)
+  const enrolledCourses = useEnrolledCourses()
   const days = useMemo(() => weekDays(new Date()), [])
   const [selected, setSelected] = useState(() => toISODate(new Date()))
   const selectedDate = days.find((day) => toISODate(day) === selected) ?? new Date()
   const weekday = weekdayOf(selectedDate)
 
-  const meetings = courses
-    .filter(isEnrolled)
+  const meetings = enrolledCourses
     .flatMap((course) =>
       course.meetings
         .filter((meeting) => meeting.day === weekday)
@@ -125,11 +124,10 @@ function WeekScheduleModal({
 }
 
 export default function LessonsScreen() {
-  const courses = usePlannerStore((state) => state.courses)
+  const enrolledCourses = useEnrolledCourses()
   const tasks = usePlannerStore((state) => state.tasks)
   const [showWeekSchedule, setShowWeekSchedule] = useState(false)
   const theme = useTheme()
-  const enrolledCourses = courses.filter(isEnrolled)
 
   const courseProgress = useMemo(() => {
     return enrolledCourses.map((course) => {

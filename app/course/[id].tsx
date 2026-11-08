@@ -1,61 +1,21 @@
 import { router, useLocalSearchParams } from 'expo-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Alert, Platform } from 'react-native'
-import { Button, Input, Paragraph, Spinner, XStack, YStack } from 'tamagui'
+import { Button, Input, Paragraph, XStack, YStack } from 'tamagui'
 import { AccentButton, Chip, Eyebrow, Surface } from '../../src/components/chrome'
 import { ColorPicker } from '../../src/components/color-picker'
 import { Field, TextField } from '../../src/components/field'
 import { Screen } from '../../src/components/screen'
 import { WEEKDAYS, formatTime, toISODate } from '../../src/lib/dates'
 import { isEnrolled } from '../../src/lib/catalog'
+import { useCourse, useCourseTasks } from '../../src/store/planner-selectors'
 import { usePlannerStore } from '../../src/store/planner-store'
-import type { CourseColor, Weekday } from '../../src/types'
+import type { Course, CourseColor, Weekday } from '../../src/types'
 
 export default function CourseDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>()
   const id = Array.isArray(params.id) ? params.id[0] : params.id
-  const ready = usePlannerStore((state) => state.ready)
-  const getCourse = usePlannerStore((state) => state.getCourse)
-  const updateCourse = usePlannerStore((state) => state.updateCourse)
-  const deleteCourse = usePlannerStore((state) => state.deleteCourse)
-  const enrollCourse = usePlannerStore((state) => state.enrollCourse)
-  const addMeeting = usePlannerStore((state) => state.addMeeting)
-  const removeMeeting = usePlannerStore((state) => state.removeMeeting)
-  const tasks = usePlannerStore((state) => state.tasks)
-  const addTask = usePlannerStore((state) => state.addTask)
-  const course = getCourse(id)
-
-  const [name, setName] = useState('')
-  const [code, setCode] = useState('')
-  const [instructor, setInstructor] = useState('')
-  const [location, setLocation] = useState('')
-  const [color, setColor] = useState<CourseColor>('teal')
-  const [day, setDay] = useState<Weekday>(1)
-  const [start, setStart] = useState('09:00')
-  const [end, setEnd] = useState('10:20')
-  const [taskTitle, setTaskTitle] = useState('')
-
-  useEffect(() => {
-    if (!course) return
-    setName(course.name)
-    setCode(course.code)
-    setInstructor(course.instructor)
-    setLocation(course.location)
-    setColor(course.color)
-  }, [course])
-
-  const courseTasks = useMemo(
-    () => tasks.filter((task) => task.courseId === id),
-    [id, tasks]
-  )
-
-  if (!ready) {
-    return (
-      <Screen justifyContent="center" alignItems="center">
-        <Spinner />
-      </Screen>
-    )
-  }
+  const course = useCourse(id)
 
   if (!course) {
     return (
@@ -65,12 +25,34 @@ export default function CourseDetailScreen() {
     )
   }
 
-  const current = course
+  // Keyed by id so the editor's form state is seeded once per course and
+  // survives store updates (adding a meeting, enrolling) without losing edits.
+  return <CourseEditor key={course.id} course={course} />
+}
+
+function CourseEditor({ course }: { course: Course }) {
+  const updateCourse = usePlannerStore((state) => state.updateCourse)
+  const deleteCourse = usePlannerStore((state) => state.deleteCourse)
+  const enrollCourse = usePlannerStore((state) => state.enrollCourse)
+  const addMeeting = usePlannerStore((state) => state.addMeeting)
+  const removeMeeting = usePlannerStore((state) => state.removeMeeting)
+  const addTask = usePlannerStore((state) => state.addTask)
+  const courseTasks = useCourseTasks(course.id)
+
+  const [name, setName] = useState(course.name)
+  const [code, setCode] = useState(course.code)
+  const [instructor, setInstructor] = useState(course.instructor)
+  const [location, setLocation] = useState(course.location)
+  const [color, setColor] = useState<CourseColor>(course.color)
+  const [day, setDay] = useState<Weekday>(1)
+  const [start, setStart] = useState('09:00')
+  const [end, setEnd] = useState('10:20')
+  const [taskTitle, setTaskTitle] = useState('')
 
   function save() {
     if (!name.trim()) return
     updateCourse({
-      ...current,
+      ...course,
       name: name.trim(),
       code: code.trim(),
       instructor: instructor.trim(),
@@ -81,14 +63,14 @@ export default function CourseDetailScreen() {
 
   function confirmDelete() {
     const remove = () => {
-      deleteCourse(current.id)
+      deleteCourse(course.id)
       router.back()
     }
     if (Platform.OS === 'web') {
-      if (window.confirm(`Delete ${current.name}?`)) remove()
+      if (window.confirm(`Delete ${course.name}?`)) remove()
       return
     }
-    Alert.alert('Delete course', `Remove ${current.name} and its tasks?`, [
+    Alert.alert('Delete course', `Remove ${course.name} and its tasks?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: remove },
     ])
@@ -120,7 +102,7 @@ export default function CourseDetailScreen() {
                   {WEEKDAYS[meeting.day]} {formatTime(meeting.start)}–
                   {formatTime(meeting.end)}
                 </Paragraph>
-                <YStack onPress={() => removeMeeting(current.id, meeting.id)} cursor="pointer">
+                <YStack onPress={() => removeMeeting(course.id, meeting.id)} cursor="pointer">
                   <Paragraph color="$red10">Remove</Paragraph>
                 </YStack>
               </XStack>
@@ -150,7 +132,7 @@ export default function CourseDetailScreen() {
         <Button
           variant="outlined"
           borderRadius="$2"
-          onPress={() => addMeeting(current.id, { day, start, end })}
+          onPress={() => addMeeting(course.id, { day, start, end })}
         >
           Add meeting
         </Button>
@@ -184,7 +166,7 @@ export default function CourseDetailScreen() {
             onPress={() => {
               if (!taskTitle.trim()) return
               addTask({
-                courseId: current.id,
+                courseId: course.id,
                 title: taskTitle.trim(),
                 notes: '',
                 dueAt: toISODate(new Date()),

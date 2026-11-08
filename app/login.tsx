@@ -13,13 +13,13 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { Screen } from '../src/components/screen'
 import { Eyebrow } from '../src/components/chrome'
-import { useAuth } from '../src/store/auth-store'
+import { useAuthStore } from '../src/store/auth-store'
 
 type AuthMode = 'signin' | 'signup'
 type InputMethod = 'email' | 'phone'
 
 export default function LoginScreen() {
-  const { signIn } = useAuth()
+  const signIn = useAuthStore((state) => state.signIn)
   const [authMode, setAuthMode] = useState<AuthMode>('signin')
   const [inputMethod, setInputMethod] = useState<InputMethod>('email')
   const [email, setEmail] = useState('')
@@ -27,24 +27,24 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
 
-  const handleAppleSignIn = async () => {
+  const handleAppleSignIn = () => {
     // Mock Apple SSO - in real app would use expo-apple-authentication
     console.log('Apple Sign In pressed')
-    await signIn()
+    signIn()
     router.replace('/(tabs)')
   }
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = () => {
     // Mock Google SSO - in real app would use @react-native-google-signin/google-signin
     console.log('Google Sign In pressed')
-    await signIn()
+    signIn()
     router.replace('/(tabs)')
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     // Mock authentication
     console.log('Submit pressed', { authMode, inputMethod, email, phone })
-    await signIn()
+    signIn()
     router.replace('/(tabs)')
   }
 

@@ -4,9 +4,8 @@ import { useColorScheme } from 'react-native'
 import { useEffect, useState } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { TamaguiProvider, useTheme } from 'tamagui'
-import { AuthProvider, useAuth } from '../src/store/auth-store'
-import { ProfileProvider } from '../src/store/profile-store'
-import { runStorageMigrations } from '../src/store/store-utils'
+import { selectIsAuthenticated, useAuthStore } from '../src/store/auth-store'
+import { bootstrapStores } from '../src/store/bootstrap'
 import { config } from '../tamagui.config'
 
 function ThemedStack() {
@@ -48,13 +47,11 @@ function ThemedStack() {
 }
 
 function RootNavigator() {
-  const { isAuthenticated, isLoading } = useAuth()
+  const isAuthenticated = useAuthStore(selectIsAuthenticated)
   const segments = useSegments()
   const router = useRouter()
 
   useEffect(() => {
-    if (isLoading) return
-
     const rootSegment = String(segments[0] ?? '')
     const isProtectedRoute =
       rootSegment === '(tabs)' ||
@@ -70,7 +67,7 @@ function RootNavigator() {
       // Redirect to app if authenticated and on login page
       router.replace('/(tabs)')
     }
-  }, [isAuthenticated, segments, isLoading])
+  }, [isAuthenticated, segments])
 
   return <ThemedStack />
 }
@@ -78,27 +75,23 @@ function RootNavigator() {
 export default function RootLayout() {
   const colorScheme = useColorScheme()
   const theme = colorScheme === 'dark' ? 'dark' : 'light'
-  const [migrationsComplete, setMigrationsComplete] = useState(false)
+  const [storesReady, setStoresReady] = useState(false)
 
   useEffect(() => {
-    runStorageMigrations().finally(() => {
-      setMigrationsComplete(true)
+    bootstrapStores().finally(() => {
+      setStoresReady(true)
     })
   }, [])
 
-  // Wait for migrations before rendering providers
-  if (!migrationsComplete) {
+  // Every store is migrated and hydrated before any screen renders
+  if (!storesReady) {
     return null
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <TamaguiProvider config={config} defaultTheme={theme}>
-        <AuthProvider>
-          <ProfileProvider>
-            <RootNavigator />
-          </ProfileProvider>
-        </AuthProvider>
+        <RootNavigator />
       </TamaguiProvider>
     </GestureHandlerRootView>
   )

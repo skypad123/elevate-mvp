@@ -6,10 +6,11 @@ import { Alert, TouchableOpacity } from 'react-native'
 import { Avatar, Button, H4, Input, Paragraph, YStack, XStack } from 'tamagui'
 import { Eyebrow, ScreenHeader } from '../../src/components/chrome'
 import { Screen } from '../../src/components/screen'
-import { useProfile } from '../../src/store/profile-store'
+import { useProfileStore } from '../../src/store/profile-store'
 
 export default function ProfileScreen() {
-  const { profile, updateProfile } = useProfile()
+  const profile = useProfileStore((state) => state.profile)
+  const updateProfile = useProfileStore((state) => state.updateProfile)
   const [isEditing, setIsEditing] = useState(false)
   const [editedName, setEditedName] = useState(profile.name)
 
@@ -29,26 +30,18 @@ export default function ProfileScreen() {
     })
 
     if (!result.canceled && result.assets[0]) {
-      try {
-        await updateProfile({ imageUri: result.assets[0].uri })
-      } catch (error) {
-        Alert.alert('Error', 'Failed to update profile image')
-      }
+      updateProfile({ imageUri: result.assets[0].uri })
     }
   }
 
-  const handleSaveName = async () => {
+  const handleSaveName = () => {
     if (!editedName.trim()) {
       Alert.alert('Error', 'Name cannot be empty')
       return
     }
 
-    try {
-      await updateProfile({ name: editedName.trim() })
-      setIsEditing(false)
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update name')
-    }
+    updateProfile({ name: editedName.trim() })
+    setIsEditing(false)
   }
 
   const handleCancelEdit = () => {

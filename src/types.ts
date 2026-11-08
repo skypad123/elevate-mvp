@@ -48,3 +48,8 @@ export type PlannerState = {
   courses: Course[]
   tasks: Task[]
 }
+
+export type UserProfile = {
+  name: string
+  imageUri?: string
+}

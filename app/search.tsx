@@ -35,7 +35,7 @@ import {
 } from '../src/lib/course-assistant'
 import { createId } from '../src/lib/id'
 import { usePlannerStore } from '../src/store/planner-store'
-import { useProfile } from '../src/store/profile-store'
+import { useProfileStore } from '../src/store/profile-store'
 import type { Course } from '../src/types'
 
 type ChatMessage = {
@@ -114,7 +114,7 @@ export default function SearchScreen() {
   const { height } = useWindowDimensions()
   const courses = usePlannerStore((state) => state.courses)
   const tasks = usePlannerStore((state) => state.tasks)
-  const { profile } = useProfile()
+  const profileName = useProfileStore((state) => state.profile.name)
   const theme = useTheme()
   const scrollRef = useRef<ScrollView>(null)
 
@@ -126,7 +126,7 @@ export default function SearchScreen() {
     {
       id: 'welcome',
       role: 'assistant',
-      text: getWelcomeMessage(profile.name),
+      text: getWelcomeMessage(profileName),
     },
   ])
 
@@ -226,7 +226,7 @@ export default function SearchScreen() {
       const reply = replyToUser(trimmed, {
         courses,
         tasks,
-        profileName: profile.name,
+        profileName,
       })
       setMessages((current) => [
         ...current,

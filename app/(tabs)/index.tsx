@@ -9,7 +9,7 @@ import { Screen } from '../../src/components/screen'
 import { HomeSearchBar } from '../../src/components/search-bar'
 import { getRecommendedCourses, getTrendingCourses } from '../../src/lib/catalog'
 import { usePlannerStore } from '../../src/store/planner-store'
-import { useProfile } from '../../src/store/profile-store'
+import { useProfileStore } from '../../src/store/profile-store'
 import type { Course } from '../../src/types'
 
 function CourseRail({
@@ -59,8 +59,8 @@ function CourseRail({
 
 export default function HomeScreen() {
   const courses = usePlannerStore((state) => state.courses)
-  const { profile } = useProfile()
-  const firstName = profile.name.trim().split(/\s+/)[0] || 'Student'
+  const profileName = useProfileStore((state) => state.profile.name)
+  const firstName = profileName.trim().split(/\s+/)[0] || 'Student'
 
   const recommended = useMemo(() => getRecommendedCourses(courses), [courses])
   const trending = useMemo(() => getTrendingCourses(courses), [courses])

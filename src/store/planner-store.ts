@@ -1,15 +1,16 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { mergeCatalog } from '../lib/catalog'
 import { addDays, toISODate } from '../lib/dates'
 import { createId } from '../lib/id'
-import { persist, storage } from './store-utils'
+import { STORAGE_KEYS, storage } from './store-utils'
 import type { Course, Meeting, PlannerState, Task } from '../types'
 
-const today = new Date()
-
-const seedState: PlannerState = {
-  courses: mergeCatalog([]),
-  tasks: [
+/**
+ * Sample tasks shown on a fresh install, with due dates relative to `today`.
+ */
+export function createSeedTasks(today: Date): Task[] {
+  return [
     {
       id: 'task_ps2',
       courseId: 'course_algo',
@@ -50,11 +51,10 @@ const seedState: PlannerState = {
       dueAt: toISODate(addDays(today, 4)),
       done: false,
     },
-  ],
+  ]
 }
 
-interface PlannerStore extends PlannerState {
-  ready: boolean
+export interface PlannerStore extends PlannerState {
   addCourse: (course: Omit<Course, 'id' | 'meetings'> & { meetings?: Meeting[] }) => string
   enrollCourse: (courseId: string) => void
   updateCourse: (course: Course) => void
@@ -65,14 +65,13 @@ interface PlannerStore extends PlannerState {
   updateTask: (task: Task) => void
   toggleTask: (taskId: string) => void
   deleteTask: (taskId: string) => void
-  getCourse: (courseId?: string) => Course | undefined
 }
 
 export const usePlannerStore = create<PlannerStore>()(
   persist(
-    (set, get) => ({
-      ...seedState,
-      ready: false,
+    (set) => ({
+      courses: mergeCatalog([]),
+      tasks: [],
 
       addCourse: (course) => {
         const id = createId('course')
@@ -162,21 +161,26 @@ export const usePlannerStore = create<PlannerStore>()(
           tasks: state.tasks.filter((task) => task.id !== taskId),
         }))
       },
-
-      getCourse: (courseId) => {
-        if (!courseId) return undefined
-        return get().courses.find((course) => course.id === courseId)
-      },
     }),
     {
-      name: '@elevate/planner',
+      name: STORAGE_KEYS.planner,
       storage,
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.courses = mergeCatalog(state.courses ?? [])
-          state.ready = true
+      // Hydrated by bootstrapStores() once the storage migrations have run
+      skipHydration: true,
+      partialize: (state) => ({ courses: state.courses, tasks: state.tasks }),
+      // Hydration replaces the whole state, so spread `current` to keep the
+      // actions. Pick the persisted fields explicitly: envelopes written by
+      // earlier builds also carry a stale `ready` flag that must not come back.
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<PlannerState> | undefined
+        return {
+          ...current,
+          courses: mergeCatalog(saved?.courses ?? []),
+          // Seed the sample tasks only when nothing was ever persisted
+          tasks: saved ? saved.tasks ?? [] : createSeedTasks(new Date()),
         }
       },
+      // To change the persisted shape later: bump `version` and add `migrate`.
     }
   )
 )

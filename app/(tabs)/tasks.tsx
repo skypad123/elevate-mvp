@@ -10,16 +10,14 @@ import {
 import { EmptyState } from '../../src/components/empty-state'
 import { Screen } from '../../src/components/screen'
 import { dueLabel, formatDate } from '../../src/lib/dates'
+import { useDoneTasks, useOpenTasks } from '../../src/store/planner-selectors'
 import { usePlannerStore } from '../../src/store/planner-store'
 
 export default function TasksScreen() {
-  const tasks = usePlannerStore((state) => state.tasks)
+  const open = useOpenTasks()
+  const done = useDoneTasks()
   const courses = usePlannerStore((state) => state.courses)
   const toggleTask = usePlannerStore((state) => state.toggleTask)
-  const open = tasks
-    .filter((task) => !task.done)
-    .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
-  const done = tasks.filter((task) => task.done)
 
   return (
     <Screen scroll>
@@ -37,7 +35,7 @@ export default function TasksScreen() {
         }
       />
 
-      {tasks.length === 0 ? (
+      {open.length === 0 && done.length === 0 ? (
         <EmptyState
           title="No tasks yet"
           body="Track problem sets, readings, and labs against each course."
