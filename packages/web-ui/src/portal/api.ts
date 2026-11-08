@@ -93,10 +93,25 @@ export function createTokenStore(key: string) {
 
 export type TokenStore = ReturnType<typeof createTokenStore>
 
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+
+/**
+ * Where the API lives. A VITE_API_URL pointing at localhost is treated as "the machine serving
+ * this page", so opening the portal from another device on the LAN still reaches the API.
+ */
 export function apiBaseUrl(): string {
-  const fromEnv = import.meta.env.VITE_API_URL as string | undefined
-  if (fromEnv) return fromEnv.replace(/\/$/, '')
-  return `${window.location.protocol}//${window.location.hostname}:4400`
+  const fromEnv = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
+  const pageHost = window.location.hostname
+  if (fromEnv) {
+    try {
+      const url = new URL(fromEnv)
+      if (LOCAL_HOSTS.has(url.hostname) && !LOCAL_HOSTS.has(pageHost)) url.hostname = pageHost
+      return url.toString().replace(/\/$/, '')
+    } catch {
+      return fromEnv
+    }
+  }
+  return `${window.location.protocol}//${pageHost}:4400`
 }
 
 export function createPortalApi(tokenKey: string) {
