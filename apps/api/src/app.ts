@@ -1,8 +1,45 @@
 import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import type { Deps } from './deps'
+import { createErrorHandler } from './lib/errors'
+import { type AppEnv, authenticate } from './middleware/auth'
+import { requestId } from './middleware/request-id'
+import { requestLogger } from './middleware/request-logger'
+import { authRoutes } from './routes/auth'
+import { filesRoutes } from './routes/files'
+import { healthRoutes } from './routes/health'
+import { meRoutes } from './routes/me'
+import { mediaRoutes } from './routes/media'
 
-export function createApp() {
-  const app = new Hono().basePath('/api')
-  const routes = app.get('/health', (c) => c.json({ ok: true, service: 'elevate-api' }, 200))
+export function createApp(deps: Deps) {
+  const { env } = deps
+  const allowedOrigins = [env.LEARNER_URL, env.TEACH_URL, env.SUPPORT_URL]
+
+  const app = new Hono<AppEnv>()
+    .basePath('/api')
+    .use(requestId())
+    .use(
+      cors({
+        // Dev: any origin (Expo web on a LAN IP, Expo Go). Prod: the three portals only.
+        origin: (origin) =>
+          env.isProd ? (allowedOrigins.includes(origin) ? origin : null) : origin,
+        allowHeaders: ['Authorization', 'Content-Type', 'X-Request-Id'],
+        exposeHeaders: ['X-Request-Id'],
+        maxAge: 600,
+      }),
+    )
+    .use(requestLogger(deps.log))
+    .use(authenticate(deps))
+    .onError(createErrorHandler(deps.log))
+    .notFound((c) => c.json({ error: { code: 'not_found', message: 'Not found' } }, 404))
+
+  const routes = app
+    .route('/', healthRoutes(deps))
+    .route('/auth', authRoutes(deps))
+    .route('/me', meRoutes(deps))
+    .route('/media', mediaRoutes(deps))
+    .route('/files', filesRoutes(deps))
+
   return routes
 }
 

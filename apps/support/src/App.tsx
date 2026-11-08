@@ -1,15 +1,22 @@
+import { ToastProvider } from '@elevate/web-ui'
+import { PortalAuthProvider } from '@elevate/web-ui/portal'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { RouterProvider } from 'react-router'
+import { api, tokenStore } from './lib/api'
+import { router } from './router'
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } },
+})
+
 export function App() {
   return (
-    <main className="flex min-h-full items-center justify-center p-6">
-      <div className="rounded-card border border-border bg-surface p-8 shadow-float">
-        <p className="font-mono text-eyebrow uppercase tracking-[0.08em] text-ink-tertiary">
-          Phase 1
-        </p>
-        <h1 className="mt-2 font-display text-h1 text-ink">Elevate Support</h1>
-        <p className="mt-2 text-body text-ink-secondary">
-          Shell scaffolded. Screens arrive in Phase 2.
-        </p>
-      </div>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <PortalAuthProvider api={api} tokenStore={tokenStore} audience="support">
+        <ToastProvider>
+          <RouterProvider router={router} />
+        </ToastProvider>
+      </PortalAuthProvider>
+    </QueryClientProvider>
   )
 }

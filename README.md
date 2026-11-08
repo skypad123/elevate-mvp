@@ -36,7 +36,7 @@ npm run dev
 | Learner       | http://localhost:8081            |
 | Teach         | http://localhost:5173            |
 | Support       | http://localhost:5174            |
-| API           | http://localhost:4000/api/health |
+| API           | http://localhost:4400/api/health |
 | Mailpit inbox | http://localhost:8025            |
 
 Everything runs locally without third-party accounts (`VIDEO_DRIVER=local`, `STORAGE_DRIVER=local`,

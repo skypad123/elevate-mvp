@@ -15,7 +15,7 @@ docker compose up -d            # Postgres on :5432, Mailpit UI on http://localh
 npm install
 npm run db:migrate
 npm run db:seed
-npm run dev                     # api :4000 · learner web :8081 · teach :5173 · support :5174
+npm run dev                     # api :4400 · learner web :8081 · teach :5173 · support :5174
 ```
 
 ## Signing in
@@ -27,7 +27,7 @@ Magic links are delivered to Mailpit (http://localhost:8025). Each email carries
 
 | Service            | URL                              |
 | ------------------ | -------------------------------- |
-| API                | http://localhost:4000/api/health |
+| API                | http://localhost:4400/api/health |
 | Learner (Expo web) | http://localhost:8081            |
 | Teach              | http://localhost:5173            |
 | Support            | http://localhost:5174            |
@@ -37,7 +37,7 @@ Magic links are delivered to Mailpit (http://localhost:8025). Each email carries
 
 Open the learner app in Expo Go from the Metro QR code. The app targets the API on the same host as
 Metro (port 4000) by default, so a phone on the same Wi-Fi works without configuration. To override,
-create `apps/learner/.env` with `EXPO_PUBLIC_API_URL=http://<lan-ip>:4000`.
+create `apps/learner/.env` with `EXPO_PUBLIC_API_URL=http://<lan-ip>:4400`.
 
 ## Useful commands
 

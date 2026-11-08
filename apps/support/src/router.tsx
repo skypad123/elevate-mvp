@@ -1,0 +1,33 @@
+import { RequireAuth, SignInPage, VerifyPage } from '@elevate/web-ui/portal'
+import { createBrowserRouter, Navigate } from 'react-router'
+import { api } from './lib/api'
+import { SupportLayout } from './routes/layout'
+import { People, ReviewQueue, Transactions } from './routes/placeholders'
+
+export const router = createBrowserRouter([
+  {
+    path: '/sign-in',
+    element: (
+      <SignInPage
+        api={api}
+        audience="support"
+        portalName="Elevate Support"
+        blurb="Internal tools: review courses, approve teachers, manage payments."
+      />
+    ),
+  },
+  { path: '/verify', element: <VerifyPage api={api} /> },
+  {
+    element: (
+      <RequireAuth>
+        <SupportLayout />
+      </RequireAuth>
+    ),
+    children: [
+      { index: true, element: <Navigate to="/review" replace /> },
+      { path: 'review', element: <ReviewQueue /> },
+      { path: 'people', element: <People /> },
+      { path: 'transactions', element: <Transactions /> },
+    ],
+  },
+])
