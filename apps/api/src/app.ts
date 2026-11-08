@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { secureHeaders } from 'hono/secure-headers'
 import type { Deps } from './deps'
 import { createErrorHandler } from './lib/errors'
 import { type AppEnv, authenticate } from './middleware/auth'
@@ -27,6 +28,14 @@ export function createApp(deps: Deps) {
     .basePath('/api')
     .use(requestId())
     .use(requestOrigin())
+    .use(
+      secureHeaders({
+        // Thumbnails, audio and certificate PDFs are loaded by the portals on other origins.
+        crossOriginResourcePolicy: 'cross-origin',
+        crossOriginEmbedderPolicy: false,
+        contentSecurityPolicy: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+      }),
+    )
     .use(
       cors({
         // Dev: any origin (Expo web on a LAN IP, Expo Go). Prod: the three portals only.

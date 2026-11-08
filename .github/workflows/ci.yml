@@ -34,5 +34,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Expo doctor (SDK 57 compatibility of apps/learner)
+        run: npx expo-doctor
+        working-directory: apps/learner
+
       - name: Typecheck, test, build
         run: npx turbo run typecheck test build

@@ -52,7 +52,7 @@ export const enrollments = pgTable(
   },
   (t) => [
     unique().on(t.userId, t.courseId),
-    index().on(t.courseId),
+    index().on(t.courseId, t.status),
     index().on(t.userId, t.status),
   ],
 )
@@ -97,7 +97,13 @@ export const payments = pgTable(
     paidAt: ts().notNull().defaultNow(),
     createdAt: createdAt(),
   },
-  (t) => [index().on(t.teacherId, t.paidAt), index().on(t.courseId), index().on(t.userId)],
+  (t) => [
+    index().on(t.teacherId, t.paidAt),
+    index().on(t.courseId),
+    index().on(t.userId),
+    index().on(t.paidAt),
+    index().on(t.status, t.paidAt),
+  ],
 )
 
 export const refunds = pgTable('refunds', {

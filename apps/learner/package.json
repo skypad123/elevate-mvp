@@ -49,7 +49,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "build": "expo export --platform web --output-dir dist",
+    "build": "expo export --platform all --output-dir dist",
     "doctor": "expo-doctor"
   },
   "private": true

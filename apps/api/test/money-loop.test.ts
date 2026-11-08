@@ -334,4 +334,22 @@ describe('money loop', () => {
       expect.arrayContaining(['payment.succeeded', 'enrollment.completed', 'certificate.issue']),
     )
   })
+
+  it('10. the funnel metrics reflect the loop: completion, drop-off, conversion, first payout', async () => {
+    const res = await t.api('GET', '/api/support/analytics', { token: agent })
+    expect(res.status).toBe(200)
+    const a = res.body.analytics
+    expect(a.completion).toEqual({ enrolled: 1, completed: 1, ratePercent: 100 })
+    expect(a.courses[0]).toMatchObject({ courseId, enrolled: 1, completed: 1, ratePercent: 100 })
+    expect(a.dropOff.lessons).toEqual([
+      { position: 0, starts: 1 },
+      { position: 1, starts: 1 },
+    ])
+    expect(a.dropOff.dropOffIndex).toBeNull()
+    expect(a.checkout.completed).toBe(1)
+    expect(a.checkout.started).toBeGreaterThanOrEqual(1)
+    expect(a.firstPayout.teachersPaid).toBe(1)
+    expect(a.firstPayout.medianDays).toBe(0)
+    expect((await t.api('GET', '/api/support/analytics', { token: learner })).status).toBe(403)
+  })
 })

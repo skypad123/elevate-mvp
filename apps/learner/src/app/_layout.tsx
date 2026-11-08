@@ -23,6 +23,7 @@ import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { RootError } from '@/components/RootError'
 import { queryClient } from '@/lib/query-client'
 import { SessionProvider, useSession } from '@/lib/session'
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
@@ -30,6 +31,8 @@ import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
 SplashScreen.preventAutoHideAsync().catch(() => {})
 
 export const unstable_settings = { anchor: '(tabs)' }
+
+export const ErrorBoundary = RootError
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({

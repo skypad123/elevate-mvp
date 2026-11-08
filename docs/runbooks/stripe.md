@@ -68,4 +68,3 @@ Create two endpoints in Dashboard → Developers → Webhooks, both pointing at
   the Stripe dashboard (Developers → Webhooks → event → Resend) or hit `/api/checkout/sessions/:id/sync`.
 - Partial refunds are not exposed in the UI; if one is made in the dashboard the ledger pro-rates
   the teacher net and marks the payment `partially_refunded`.
-

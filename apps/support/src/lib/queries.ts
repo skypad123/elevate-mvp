@@ -1,4 +1,5 @@
 import type {
+  AnalyticsSummary,
   AuditEntry,
   Page,
   PayoutLedgerRow,
@@ -122,5 +123,13 @@ export function useAuditLog() {
         await api.support['audit-log'].$get({ query: pageParam ? { cursor: pageParam } : {} }),
       )) as Page<AuditEntry>,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+export function useAnalytics() {
+  return useQuery({
+    queryKey: ['support', 'analytics'] as const,
+    queryFn: async () =>
+      (await unwrap(await api.support.analytics.$get())).analytics as AnalyticsSummary,
   })
 }

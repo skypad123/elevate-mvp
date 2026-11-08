@@ -55,10 +55,12 @@ Mailpit for email). Stripe test keys are needed for the real money loop — see
 
 ## Status
 
-Rebuild on `rebuild/elevate-mvp`, phases 1–8 of the plan in `docs/adr/` landed: schema, magic-link
-auth, media pipeline, Stripe Connect scaffold, teacher onboarding, course builder + review queue,
-explore/checkout, lesson player + quiz runtime, certificates, earnings and Support transactions.
-Phase 9 (mobile pass, hardening, runbooks for the money loop and deploy) is next.
+Rebuild on `rebuild/elevate-mvp`, all nine phases of the plan landed: schema, magic-link auth,
+media pipeline, Stripe Connect scaffold, teacher onboarding, course builder + review queue,
+explore/checkout, lesson player + quiz runtime, certificates, earnings, Support transactions,
+insights, and hardening (rate limits, security headers, error boundaries, native bundle exports in
+CI). Runbooks: `docs/runbooks/money-loop.md` (manual acceptance on Stripe test money),
+`docs/runbooks/deploy.md`, `docs/runbooks/analytics.md`.
 
 ### Certificates
 

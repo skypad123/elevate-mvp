@@ -339,6 +339,12 @@ export class LearningService {
       .values({ enrollmentId, quizId, startedAt: now, expiresAt })
       .returning()
     if (!attempt) throw new Error('failed to start attempt')
+    if (!enrollment.progress.some((p) => p.artefactId === artefact.id))
+      await trackEvent(this.deps, {
+        userId: user.id,
+        name: ANALYTICS_EVENTS.lessonStarted,
+        properties: { courseId: enrollment.courseId, lessonId: lesson.id },
+      })
     return {
       attempt: {
         id: attempt.id,

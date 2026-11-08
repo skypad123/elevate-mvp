@@ -1,4 +1,5 @@
 export * from './api'
 export * from './auth'
+export * from './RouteError'
 export * from './SignInPage'
 export * from './VerifyPage'

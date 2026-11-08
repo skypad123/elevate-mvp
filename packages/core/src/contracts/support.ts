@@ -105,3 +105,19 @@ export const transactionsQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
 })
+
+/** Funnel metrics derived from analytics_events and enrolments (spec step 15). */
+export type AnalyticsSummary = {
+  generatedAt: string
+  completion: { enrolled: number; completed: number; ratePercent: number | null }
+  courses: Array<{
+    courseId: string
+    title: string
+    enrolled: number
+    completed: number
+    ratePercent: number | null
+  }>
+  dropOff: { lessons: Array<{ position: number; starts: number }>; dropOffIndex: number | null }
+  checkout: { started: number; completed: number; ratePercent: number | null }
+  firstPayout: { teachersPaid: number; medianDays: number | null }
+}

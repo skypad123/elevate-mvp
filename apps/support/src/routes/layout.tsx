@@ -1,6 +1,14 @@
 import { Avatar, Button, EmptyState, PortalShell } from '@elevate/web-ui'
 import { RequireRole, usePortalAuth } from '@elevate/web-ui/portal'
-import { ClipboardCheck, LogOut, Receipt, ScrollText, ShieldAlert, Users } from 'lucide-react'
+import {
+  ClipboardCheck,
+  LogOut,
+  Receipt,
+  ScrollText,
+  ShieldAlert,
+  TrendingUp,
+  Users,
+} from 'lucide-react'
 import { Outlet } from 'react-router'
 
 export function SupportLayout() {
@@ -31,6 +39,7 @@ export function SupportLayout() {
           { to: '/review', label: 'Review queue', icon: ClipboardCheck },
           { to: '/people', label: 'People', icon: Users },
           { to: '/transactions', label: 'Transactions', icon: Receipt },
+          { to: '/insights', label: 'Insights', icon: TrendingUp },
           { to: '/audit', label: 'Audit log', icon: ScrollText },
         ]}
         footer={

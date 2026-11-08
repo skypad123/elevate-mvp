@@ -341,6 +341,22 @@ export class PaymentsService {
       entityId: enrollment.id,
       metadata: { sessionId: input.sessionId, amountCents },
     })
+    const teacherId = enrollment.course.teacherId
+    if ((await this.deps.db.$count(s.payments, eq(s.payments.teacherId, teacherId))) === 1) {
+      const approvedAt = enrollment.course.teacher.teacherProfile?.reviewedAt ?? null
+      await trackEvent(this.deps, {
+        userId: teacherId,
+        name: ANALYTICS_EVENTS.firstPayout,
+        properties: {
+          courseId: enrollment.courseId,
+          amountCents,
+          teacherNetCents,
+          secondsSinceApproval: approvedAt
+            ? Math.round((now.getTime() - approvedAt.getTime()) / 1000)
+            : null,
+        },
+      })
+    }
     await mailer.send(
       simpleEmail({
         to: input.customerEmail ?? enrollment.user.email,

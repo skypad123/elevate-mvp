@@ -14,7 +14,7 @@
     "android": {
       "package": "sg.elevate.learner",
       "adaptiveIcon": {
-        "backgroundColor": "#FAF7F1",
+        "backgroundColor": "#0F6B52",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
