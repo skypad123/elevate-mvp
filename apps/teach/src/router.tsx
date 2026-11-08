@@ -2,11 +2,13 @@ import { RequireAuth, SignInPage, VerifyPage } from '@elevate/web-ui/portal'
 import { createBrowserRouter } from 'react-router'
 import { api } from './lib/api'
 import { ApplyPage } from './routes/apply'
+import { CourseBuilder } from './routes/courses/builder'
+import { CoursesPage } from './routes/courses/list'
 import { Dashboard } from './routes/dashboard'
 import { OnboardingLayout, TeachGate } from './routes/gate'
 import { TeachLayout } from './routes/layout'
 import { PendingPage } from './routes/pending'
-import { Courses, Earnings } from './routes/placeholders'
+import { Earnings } from './routes/placeholders'
 import { SettingsPage } from './routes/settings'
 import { StripeRefresh, StripeReturn } from './routes/stripe'
 
@@ -46,7 +48,8 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Dashboard /> },
-      { path: 'courses', element: <Courses /> },
+      { path: 'courses', element: <CoursesPage /> },
+      { path: 'courses/:id', element: <CourseBuilder /> },
       { path: 'earnings', element: <Earnings /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'stripe/return', element: <StripeReturn /> },

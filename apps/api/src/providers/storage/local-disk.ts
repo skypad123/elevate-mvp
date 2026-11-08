@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { signExpiring, verifyExpiring } from '../../lib/crypto'
+import { currentRequestOrigin } from '../../lib/request-context'
 import {
   assertSafeKey,
   isPublicKey,
@@ -25,7 +26,13 @@ export class LocalDiskStorage implements StorageProvider {
     private readonly rootDir: string,
     private readonly apiUrl: string,
     private readonly secret: string,
+    /** Dev: build URLs from the origin the client used, so phones on the LAN can fetch files. */
+    private readonly useRequestOrigin = false,
   ) {}
+
+  private base(): string {
+    return (this.useRequestOrigin ? currentRequestOrigin() : null) ?? this.apiUrl
+  }
 
   private pathFor(key: string) {
     assertSafeKey(key)
@@ -41,7 +48,7 @@ export class LocalDiskStorage implements StorageProvider {
     const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60
     const sig = signExpiring(this.secret, 'upload', input.assetId, expiresAt)
     return {
-      url: `${this.apiUrl}/api/media/uploads/${input.assetId}/file?exp=${expiresAt}&sig=${sig}`,
+      url: `${this.base()}/api/media/uploads/${input.assetId}/file?exp=${expiresAt}&sig=${sig}`,
       method: 'PUT',
       headers: { 'Content-Type': input.mimeType },
     }
@@ -95,9 +102,9 @@ export class LocalDiskStorage implements StorageProvider {
 
   async getUrl(key: string, ttlSeconds = DEFAULT_TTL): Promise<string> {
     assertSafeKey(key)
-    if (isPublicKey(key)) return `${this.apiUrl}/api/files/${key}`
+    if (isPublicKey(key)) return `${this.base()}/api/files/${key}`
     const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds
     const sig = signExpiring(this.secret, 'file', key, expiresAt)
-    return `${this.apiUrl}/api/files/${key}?exp=${expiresAt}&sig=${sig}`
+    return `${this.base()}/api/files/${key}?exp=${expiresAt}&sig=${sig}`
   }
 }

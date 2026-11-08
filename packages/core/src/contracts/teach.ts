@@ -90,3 +90,74 @@ export type TeacherProfileView = {
   appliedAt: string
   reviewedAt: string | null
 }
+
+// ── Course builder views ─────────────────────────────────────────────────────
+import type { SubmissionCheck } from '../domain/course-validation'
+import type { QuizDefinition } from '../domain/quiz'
+import type { RichTextDoc } from '../domain/richtext'
+import type { MediaAssetView } from './media'
+
+export type CourseStatus = 'draft' | 'pending_review' | 'live' | 'rejected'
+export type ArtefactType = 'video' | 'audio' | 'text' | 'quiz'
+
+export type ArtefactView = {
+  id: string
+  lessonId: string
+  type: ArtefactType
+  title: string
+  position: number
+  durationSeconds: number | null
+  media: MediaAssetView | null
+  contentJson: RichTextDoc | null
+  quiz: QuizDefinition | null
+}
+
+export type LessonView = {
+  id: string
+  courseId: string
+  title: string
+  summary: string | null
+  position: number
+  prerequisiteIds: string[]
+  artefacts: ArtefactView[]
+}
+
+export type CourseView = {
+  id: string
+  slug: string
+  title: string
+  summary: string | null
+  descriptionJson: RichTextDoc | null
+  category: string
+  priceCents: number
+  currency: string
+  status: CourseStatus
+  rejectionReason: string | null
+  thumbnail: MediaAssetView | null
+  teacher: { id: string; displayName: string; email: string; stripeChargesEnabled: boolean }
+  lessons: LessonView[]
+  checklist: SubmissionCheck
+  enrolCount: number
+  submittedAt: string | null
+  reviewedAt: string | null
+  publishedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type CourseSummary = {
+  id: string
+  slug: string
+  title: string
+  category: string
+  status: CourseStatus
+  priceCents: number
+  thumbnailUrl: string | null
+  lessonCount: number
+  artefactCount: number
+  enrolCount: number
+  teacherName: string
+  teacherEmail: string
+  submittedAt: string | null
+  updatedAt: string
+}

@@ -35,3 +35,26 @@ export function usePerson(id: string) {
         .person as PersonDetail,
   })
 }
+
+export const reviewKeys = {
+  queue: ['support', 'review-queue'] as const,
+  course: (id: string) => ['support', 'course', id] as const,
+}
+
+export function useReviewQueue() {
+  return useQuery({
+    queryKey: reviewKeys.queue,
+    queryFn: async () =>
+      (await unwrap(await api.support['review-queue'].$get()))
+        .items as import('@elevate/core').CourseSummary[],
+  })
+}
+
+export function useReviewCourse(id: string) {
+  return useQuery({
+    queryKey: reviewKeys.course(id),
+    queryFn: async () =>
+      (await unwrap(await api.support.courses[':id'].$get({ param: { id } })))
+        .course as import('@elevate/core').CourseView,
+  })
+}

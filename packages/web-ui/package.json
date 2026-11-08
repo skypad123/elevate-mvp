@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./portal": "./src/portal/index.ts"
+    "./portal": "./src/portal/index.ts",
+    "./editor.css": "./src/styles/editor.css"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
@@ -17,6 +18,12 @@
     "@mux/mux-player-react": "3.14.1",
     "@mux/mux-uploader-react": "1.6.1",
     "@tanstack/react-query": "5.107.1",
+    "@tiptap/core": "3.33.0",
+    "@tiptap/extension-image": "3.33.0",
+    "@tiptap/extension-placeholder": "3.33.0",
+    "@tiptap/pm": "3.33.0",
+    "@tiptap/react": "3.33.0",
+    "@tiptap/starter-kit": "3.33.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "hono": "4.13.17",

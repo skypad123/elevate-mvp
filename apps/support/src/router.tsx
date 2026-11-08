@@ -4,7 +4,9 @@ import { api } from './lib/api'
 import { SupportLayout } from './routes/layout'
 import { People } from './routes/people'
 import { Person } from './routes/person'
-import { ReviewQueue, Transactions } from './routes/placeholders'
+import { Transactions } from './routes/placeholders'
+import { ReviewCourse } from './routes/review-course'
+import { ReviewQueue } from './routes/review-queue'
 
 export const router = createBrowserRouter([
   {
@@ -28,6 +30,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/review" replace /> },
       { path: 'review', element: <ReviewQueue /> },
+      { path: 'review/:courseId', element: <ReviewCourse /> },
       { path: 'people', element: <People /> },
       { path: 'people/:id', element: <Person /> },
       { path: 'transactions', element: <Transactions /> },

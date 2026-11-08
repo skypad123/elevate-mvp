@@ -117,7 +117,7 @@ export function Dashboard() {
           <EmptyState
             icon={BookOpen}
             title="No courses yet"
-            body="The course builder arrives in the next phase."
+            body="Create a course, add lessons and content, then submit it for review."
             action={
               <Link to="/courses">
                 <Button variant="secondary">Go to courses</Button>

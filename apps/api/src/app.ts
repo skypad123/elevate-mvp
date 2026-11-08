@@ -5,6 +5,7 @@ import { createErrorHandler } from './lib/errors'
 import { type AppEnv, authenticate } from './middleware/auth'
 import { requestId } from './middleware/request-id'
 import { requestLogger } from './middleware/request-logger'
+import { requestOrigin } from './middleware/request-origin'
 import { authRoutes } from './routes/auth'
 import { filesRoutes } from './routes/files'
 import { healthRoutes } from './routes/health'
@@ -21,6 +22,7 @@ export function createApp(deps: Deps) {
   const app = new Hono<AppEnv>()
     .basePath('/api')
     .use(requestId())
+    .use(requestOrigin())
     .use(
       cors({
         // Dev: any origin (Expo web on a LAN IP, Expo Go). Prod: the three portals only.
