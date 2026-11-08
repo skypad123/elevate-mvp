@@ -5,10 +5,10 @@ import { ApplyPage } from './routes/apply'
 import { CourseBuilder } from './routes/courses/builder'
 import { CoursesPage } from './routes/courses/list'
 import { Dashboard } from './routes/dashboard'
+import { CourseEarningsPage, EarningsPage } from './routes/earnings'
 import { OnboardingLayout, TeachGate } from './routes/gate'
 import { TeachLayout } from './routes/layout'
 import { PendingPage } from './routes/pending'
-import { Earnings } from './routes/placeholders'
 import { SettingsPage } from './routes/settings'
 import { StripeRefresh, StripeReturn } from './routes/stripe'
 
@@ -50,7 +50,8 @@ export const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       { path: 'courses', element: <CoursesPage /> },
       { path: 'courses/:id', element: <CourseBuilder /> },
-      { path: 'earnings', element: <Earnings /> },
+      { path: 'earnings', element: <EarningsPage /> },
+      { path: 'earnings/:courseId', element: <CourseEarningsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'stripe/return', element: <StripeReturn /> },
       { path: 'stripe/refresh', element: <StripeRefresh /> },

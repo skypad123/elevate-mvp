@@ -48,6 +48,9 @@ const envSchema = z.object({
   STRIPE_FEE_FIXED_CENTS: z.coerce.number().int().min(0).default(50),
   PLATFORM_CURRENCY: z.string().length(3).default('sgd'),
   DEFAULT_COMMISSION_BPS: z.coerce.number().int().min(0).max(10000).default(1500),
+
+  /** Comma-separated .ttf/.otf paths for names the bundled certificate fonts cannot draw. */
+  CERTIFICATE_FALLBACK_FONTS: z.string().optional(),
 })
 
 export type Env = z.infer<typeof envSchema> & {

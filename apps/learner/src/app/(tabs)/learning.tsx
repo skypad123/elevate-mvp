@@ -122,6 +122,7 @@ export default function Learning() {
                         <Text variant="caption" tone="tertiary">
                           {e.progress.percent}% ·{' '}
                           {e.course.priceCents === 0 ? 'Free' : formatSgd(e.course.priceCents)}
+                          {e.certificateId ? ' · Certificate earned' : ''}
                         </Text>
                       </View>
                     </Card>

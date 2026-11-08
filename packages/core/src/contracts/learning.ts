@@ -116,3 +116,23 @@ export type QuizSubmitResult = {
 }
 
 export type ProgressUpdateResult = { artefact: ArtefactProgressView; progress: CourseProgressView }
+
+export type CertificateView = {
+  id: string
+  token: string
+  learnerName: string
+  courseTitle: string
+  teacherName: string
+  issuedAt: string
+  revokedAt: string | null
+  verifyUrl: string
+  pdfUrl: string
+}
+
+export type CertificateVerification =
+  | {
+      valid: true
+      certificate: Omit<CertificateView, 'pdfUrl'> & { pdfUrl: string }
+      courseSlug: string
+    }
+  | { valid: false; reason: 'not_found' | 'revoked'; revokedAt?: string }

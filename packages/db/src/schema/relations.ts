@@ -105,6 +105,8 @@ export const paymentsRelations = relations(payments, ({ one, many }) => ({
   enrollment: one(enrollments, { fields: [payments.enrollmentId], references: [enrollments.id] }),
   course: one(courses, { fields: [payments.courseId], references: [courses.id] }),
   user: one(users, { fields: [payments.userId], references: [users.id] }),
+  teacher: one(users, { fields: [payments.teacherId], references: [users.id] }),
+  promoCode: one(promoCodes, { fields: [payments.promoCodeId], references: [promoCodes.id] }),
   refunds: many(refunds),
 }))
 

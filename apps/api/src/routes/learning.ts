@@ -3,11 +3,18 @@ import { Hono } from 'hono'
 import type { Deps } from '../deps'
 import { validate } from '../lib/validate'
 import { type AppEnv, ensureUser, requireUser } from '../middleware/auth'
+import { CertificatesService } from '../services/certificates.service'
 import { LearningService } from '../services/learning.service'
 
 /** Learner-side player endpoints, mounted at /me/enrollments/:id. */
-export const learningRoutes = (deps: Deps, learning = new LearningService(deps)) =>
-  new Hono<AppEnv>()
+export const learningRoutes = (
+  deps: Deps,
+  learning = new LearningService(deps),
+  certificates = new CertificatesService(deps),
+) => {
+  learning.onCompleted = (enrollmentId) =>
+    certificates.issueForEnrollment(enrollmentId).then(() => undefined)
+  return new Hono<AppEnv>()
     .get('/:id', requireUser(), async (c) =>
       c.json(
         { enrollment: await learning.detail(ensureUser(c.get('user')), c.req.param('id')) },
@@ -67,3 +74,15 @@ export const learningRoutes = (deps: Deps, learning = new LearningService(deps))
           200,
         ),
     )
+    .get('/:id/certificate', requireUser(), async (c) =>
+      c.json(
+        {
+          certificate: await certificates.forEnrollment(
+            ensureUser(c.get('user')),
+            c.req.param('id'),
+          ),
+        },
+        200,
+      ),
+    )
+}

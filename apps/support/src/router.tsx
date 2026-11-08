@@ -1,12 +1,13 @@
 import { RequireAuth, SignInPage, VerifyPage } from '@elevate/web-ui/portal'
 import { createBrowserRouter, Navigate } from 'react-router'
 import { api } from './lib/api'
+import { AuditLogPage } from './routes/audit'
 import { SupportLayout } from './routes/layout'
 import { People } from './routes/people'
 import { Person } from './routes/person'
-import { Transactions } from './routes/placeholders'
 import { ReviewCourse } from './routes/review-course'
 import { ReviewQueue } from './routes/review-queue'
+import { TransactionDetailPage, TransactionsPage } from './routes/transactions'
 
 export const router = createBrowserRouter([
   {
@@ -33,7 +34,9 @@ export const router = createBrowserRouter([
       { path: 'review/:courseId', element: <ReviewCourse /> },
       { path: 'people', element: <People /> },
       { path: 'people/:id', element: <Person /> },
-      { path: 'transactions', element: <Transactions /> },
+      { path: 'transactions', element: <TransactionsPage /> },
+      { path: 'transactions/:id', element: <TransactionDetailPage /> },
+      { path: 'audit', element: <AuditLogPage /> },
     ],
   },
 ])

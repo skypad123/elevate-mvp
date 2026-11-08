@@ -95,6 +95,7 @@ function RootNavigator() {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="course/[slug]" />
+        <Stack.Screen name="c/[token]" />
         <Stack.Protected guard={!isSignedIn}>
           <Stack.Screen name="(auth)" />
         </Stack.Protected>
@@ -103,6 +104,7 @@ function RootNavigator() {
           <Stack.Screen name="checkout/success" />
           <Stack.Screen name="learn/[enrollmentId]/index" />
           <Stack.Screen name="learn/[enrollmentId]/lesson/[lessonId]" />
+          <Stack.Screen name="learn/[enrollmentId]/certificate" />
         </Stack.Protected>
         <Stack.Screen name="+not-found" />
       </Stack>

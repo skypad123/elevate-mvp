@@ -72,3 +72,38 @@ export async function submitQuiz(
     }),
   )) as QuizSubmitResult
 }
+
+// ── certificates ─────────────────────────────────────────────────────────────
+import type { CertificateVerification, CertificateView } from '@elevate/core'
+
+export const certificateKeys = {
+  own: (enrollmentId: string) => ['learning', 'certificate', enrollmentId] as const,
+  verify: (token: string) => ['certificates', 'verify', token] as const,
+}
+
+export function useCertificate(enrollmentId: string) {
+  return useQuery({
+    queryKey: certificateKeys.own(enrollmentId),
+    enabled: !!enrollmentId,
+    retry: false,
+    queryFn: async () =>
+      (
+        await unwrap(
+          await api.me.enrollments[':id'].certificate.$get({ param: { id: enrollmentId } }),
+        )
+      ).certificate as CertificateView,
+  })
+}
+
+/** Public: no session needed, works on a logged-out device. */
+export function useCertificateVerification(token: string) {
+  return useQuery({
+    queryKey: certificateKeys.verify(token),
+    enabled: !!token,
+    retry: false,
+    queryFn: async () =>
+      (await unwrap(
+        await api.certificates.verify[':token'].$get({ param: { token } }),
+      )) as CertificateVerification,
+  })
+}

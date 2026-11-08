@@ -40,3 +40,7 @@ yarn-error.*
 # macOS
 .DS_Store
 *.pem
+
+# certificate fallback fonts are provisioned per host, see apps/api/assets/fonts/fallback/README.md
+apps/api/assets/fonts/fallback/*
+!apps/api/assets/fonts/fallback/README.md

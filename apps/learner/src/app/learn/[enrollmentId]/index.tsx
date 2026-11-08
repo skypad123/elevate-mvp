@@ -107,8 +107,9 @@ export default function EnrollmentTrail() {
               <Text variant="h2">Course complete</Text>
             </View>
             <Text tone="secondary">
-              You finished every lesson and passed every quiz. Your certificate is being prepared
-              and will appear here.
+              {e.certificateId
+                ? 'You finished every lesson and passed every quiz. Your certificate is ready to download and share.'
+                : 'You finished every lesson and passed every quiz. Your certificate is being prepared and will appear here.'}
             </Text>
             {e.certificateId ? (
               <Button

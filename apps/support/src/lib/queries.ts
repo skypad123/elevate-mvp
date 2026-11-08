@@ -1,6 +1,14 @@
-import type { Page, PersonDetail, PersonSummary } from '@elevate/core'
+import type {
+  AuditEntry,
+  Page,
+  PayoutLedgerRow,
+  PersonDetail,
+  PersonSummary,
+  TransactionDetail,
+  TransactionSummary,
+} from '@elevate/core'
 import { unwrap } from '@elevate/web-ui/portal'
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { api } from './api'
 
 export type PeopleFilter = {
@@ -56,5 +64,63 @@ export function useReviewCourse(id: string) {
     queryFn: async () =>
       (await unwrap(await api.support.courses[':id'].$get({ param: { id } })))
         .course as import('@elevate/core').CourseView,
+  })
+}
+
+// ── transactions, payouts, audit ────────────────────────────────────────────
+export type TransactionsFilter = { q?: string; status?: TransactionSummary['status'] }
+
+export const transactionKeys = {
+  all: ['support', 'transactions'] as const,
+  list: (filter: TransactionsFilter) => ['support', 'transactions', 'list', filter] as const,
+  detail: (id: string) => ['support', 'transactions', 'detail', id] as const,
+  payouts: ['support', 'payouts'] as const,
+  audit: ['support', 'audit'] as const,
+}
+
+export function useTransactions(filter: TransactionsFilter) {
+  return useInfiniteQuery({
+    queryKey: transactionKeys.list(filter),
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
+      const query: Record<string, string> = { limit: '25' }
+      if (filter.q) query.q = filter.q
+      if (filter.status) query.status = filter.status
+      if (pageParam) query.cursor = pageParam
+      return (await unwrap(
+        await api.support.transactions.$get({ query }),
+      )) as Page<TransactionSummary>
+    },
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+export function useTransaction(id: string) {
+  return useQuery({
+    queryKey: transactionKeys.detail(id),
+    enabled: !!id,
+    queryFn: async () =>
+      (await unwrap(await api.support.transactions[':id'].$get({ param: { id } })))
+        .transaction as TransactionDetail,
+  })
+}
+
+export function usePayouts() {
+  return useQuery({
+    queryKey: transactionKeys.payouts,
+    queryFn: async () =>
+      (await unwrap(await api.support.payouts.$get())).items as PayoutLedgerRow[],
+  })
+}
+
+export function useAuditLog() {
+  return useInfiniteQuery({
+    queryKey: transactionKeys.audit,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) =>
+      (await unwrap(
+        await api.support['audit-log'].$get({ query: pageParam ? { cursor: pageParam } : {} }),
+      )) as Page<AuditEntry>,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
   })
 }

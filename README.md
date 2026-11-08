@@ -55,5 +55,30 @@ Mailpit for email). Stripe test keys are needed for the real money loop — see
 
 ## Status
 
-Rebuild in progress on `rebuild/elevate-mvp`. Phase 1 (restructure + tooling) lands without a runnable
-app; Phase 2 adds the schema, API, auth and the three portal shells.
+Rebuild on `rebuild/elevate-mvp`, phases 1–8 of the plan in `docs/adr/` landed: schema, magic-link
+auth, media pipeline, Stripe Connect scaffold, teacher onboarding, course builder + review queue,
+explore/checkout, lesson player + quiz runtime, certificates, earnings and Support transactions.
+Phase 9 (mobile pass, hardening, runbooks for the money loop and deploy) is next.
+
+### Certificates
+
+Finishing every lesson and passing every quiz issues a certificate automatically: an A4 PDF
+(pdf-lib, Fraunces/Inter embedded, QR code) stored through the storage provider, a public verify
+page at `/c/{token}` on the learner app, and `GET /api/certificates/verify/:token` /
+`GET /api/certificates/:token/pdf` that need no session. The learner's profile name is printed;
+fixing the name later reprints the PDF under the same token. Names in scripts the bundled fonts
+lack (Chinese, Tamil) need a fallback font, see `apps/api/assets/fonts/fallback/README.md` and
+`CERTIFICATE_FALLBACK_FONTS`.
+
+### Money views
+
+- Teach `/earnings` and `/earnings/:courseId`: gross, discounts, Stripe fee (estimate until the
+  balance transaction reports the actual), commission, net and refunds per course, all derived from
+  stored Stripe events; "Check now" reconciles the ledger net against `transfers.list` on the
+  connected account.
+- Support `/transactions` (+ detail with every Stripe id), payout ledger tab, `/audit`. Super
+  admins can refund in full: `refunds.create` with `reverse_transfer` and `refund_application_fee`,
+  the enrolment becomes `refunded`, and a `charge.refunded` webhook (dashboard refunds) applies the
+  same ledger change idempotently.
+- `apps/api/test/money-loop.test.ts` scripts the whole loop on the fake providers, from teacher
+  application to a reconciled payout.

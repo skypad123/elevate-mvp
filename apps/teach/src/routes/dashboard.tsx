@@ -1,3 +1,4 @@
+import { formatSgd } from '@elevate/core'
 import {
   Badge,
   Button,
@@ -7,15 +8,19 @@ import {
   formatBps,
   PageHeader,
   StatCard,
+  statusLabel,
+  statusTone,
   useToast,
 } from '@elevate/web-ui'
 import { errorMessage, usePortalAuth } from '@elevate/web-ui/portal'
-import { BookOpen, CreditCard, ExternalLink, ShieldCheck } from 'lucide-react'
+import { ArrowRight, BookOpen, CreditCard, ExternalLink, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
+import { useCourses } from '../lib/courses'
 import {
   openStripeDashboard,
   startStripeOnboarding,
+  useEarnings,
   useStripeStatus,
   useTeacherProfile,
 } from '../lib/queries'
@@ -94,6 +99,10 @@ export function StripeCard() {
 export function Dashboard() {
   const { user } = usePortalAuth()
   const { data: profile } = useTeacherProfile()
+  const courses = useCourses()
+  const earnings = useEarnings(!!profile)
+  const list = courses.data ?? []
+  const live = list.filter((c) => c.status === 'live').length
   return (
     <>
       <PageHeader
@@ -102,9 +111,24 @@ export function Dashboard() {
         description={user?.email}
       />
       <div className="grid gap-6 md:grid-cols-3">
-        <StatCard label="Live courses" value="0" hint="Approved and on sale" />
-        <StatCard label="Learners" value="0" hint="Active enrolments" />
-        <StatCard label="Net earnings" value="S$0.00" hint="After Stripe fees and commission" />
+        <StatCard
+          label="Live courses"
+          value={courses.isPending ? '—' : String(live)}
+          hint="Approved and on sale"
+        />
+        <StatCard
+          label="Sales"
+          value={earnings.data ? String(earnings.data.totals.paymentCount) : '—'}
+          hint="Paid enrolments across your courses"
+        />
+        <Link to="/earnings" className="block">
+          <StatCard
+            label="Net earnings"
+            value={earnings.data ? formatSgd(earnings.data.totals.netCents) : '—'}
+            hint="After Stripe fees and commission · see earnings"
+            className="h-full transition-colors hover:border-brand"
+          />
+        </Link>
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <StripeCard />
@@ -114,17 +138,43 @@ export function Dashboard() {
             description="Author a course, then submit it for review."
             action={<ShieldCheck className="size-5 text-brand" />}
           />
-          <EmptyState
-            icon={BookOpen}
-            title="No courses yet"
-            body="Create a course, add lessons and content, then submit it for review."
-            action={
-              <Link to="/courses">
-                <Button variant="secondary">Go to courses</Button>
-              </Link>
-            }
-            className="py-8"
-          />
+          {list.length === 0 ? (
+            <EmptyState
+              icon={BookOpen}
+              title="No courses yet"
+              body="Create a course, add lessons and content, then submit it for review."
+              action={
+                <Link to="/courses">
+                  <Button variant="secondary">Go to courses</Button>
+                </Link>
+              }
+              className="py-8"
+            />
+          ) : (
+            <ul className="divide-y divide-border">
+              {list.slice(0, 5).map((c) => (
+                <li key={c.id}>
+                  <Link
+                    to={`/courses/${c.id}`}
+                    className="flex items-center justify-between gap-3 py-3 hover:text-brand"
+                  >
+                    <span className="min-w-0 truncate font-semibold">{c.title}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <Badge tone={statusTone[c.status]}>{statusLabel(c.status)}</Badge>
+                      <ArrowRight className="size-4 text-ink-tertiary" />
+                    </span>
+                  </Link>
+                </li>
+              ))}
+              {list.length > 5 ? (
+                <li className="pt-3">
+                  <Link to="/courses" className="text-small font-semibold text-brand">
+                    All {list.length} courses
+                  </Link>
+                </li>
+              ) : null}
+            </ul>
+          )}
         </Card>
       </div>
     </>

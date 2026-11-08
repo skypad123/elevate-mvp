@@ -161,3 +161,60 @@ export type CourseSummary = {
   submittedAt: string | null
   updatedAt: string
 }
+
+// ── Earnings ───────────────────────────────────────────────────────────────
+export type MoneyBreakdown = {
+  paymentCount: number
+  grossCents: number
+  discountCents: number
+  stripeFeeCents: number
+  commissionCents: number
+  netCents: number
+  refundedCents: number
+}
+
+export type EarningsView = {
+  totals: MoneyBreakdown
+  courses: Array<MoneyBreakdown & { courseId: string; title: string; slug: string; status: string }>
+  recent: Array<{
+    paymentId: string
+    courseTitle: string
+    learner: string
+    amountCents: number
+    netCents: number
+    status: 'succeeded' | 'refunded' | 'partially_refunded'
+    paidAt: string
+  }>
+  stripe: { connected: boolean; chargesEnabled: boolean; payoutsEnabled: boolean }
+  commissionBps: number
+}
+
+export type ReconciliationView = {
+  stripeTransferTotalCents: number
+  ledgerNetCents: number
+  differenceCents: number
+  checkedAt: string
+}
+
+export type CourseEarningsView = {
+  course: MoneyBreakdown & {
+    courseId: string
+    title: string
+    slug: string
+    status: string
+    priceCents: number
+  }
+  payments: Array<{
+    paymentId: string
+    learner: string
+    amountCents: number
+    discountCents: number
+    stripeFeeCents: number
+    commissionCents: number
+    netCents: number
+    refundedCents: number
+    status: 'succeeded' | 'refunded' | 'partially_refunded'
+    promoCode: string | null
+    paidAt: string
+  }>
+}

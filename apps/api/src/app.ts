@@ -8,6 +8,7 @@ import { requestLogger } from './middleware/request-logger'
 import { requestOrigin } from './middleware/request-origin'
 import { authRoutes } from './routes/auth'
 import { catalogRoutes } from './routes/catalog'
+import { certificateRoutes } from './routes/certificates'
 import { checkoutRoutes } from './routes/checkout'
 import { filesRoutes } from './routes/files'
 import { healthRoutes } from './routes/health'
@@ -53,6 +54,7 @@ export function createApp(deps: Deps) {
     .route('/support', supportRoutes(deps))
     .route('/catalog', catalogRoutes(deps))
     .route('/checkout', checkoutRoutes(deps))
+    .route('/certificates', certificateRoutes(deps))
 
   return routes
 }

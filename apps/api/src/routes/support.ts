@@ -2,8 +2,10 @@ import {
   commissionSchema,
   grantRoleSchema,
   peopleQuerySchema,
+  refundSchema,
   rejectSchema,
   reviewNoteSchema,
+  transactionsQuerySchema,
 } from '@elevate/core'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -13,15 +15,18 @@ import { type AppEnv, ensureUser, requireRole } from '../middleware/auth'
 import { PeopleService } from '../services/people.service'
 import { ReviewService } from '../services/review.service'
 import { TeachersService } from '../services/teachers.service'
+import { TransactionsService } from '../services/transactions.service'
 
 const courseListQuerySchema = z.object({
   status: z.enum(['draft', 'pending_review', 'live', 'rejected']).optional(),
 })
+const auditQuerySchema = z.object({ cursor: z.string().optional() })
 
 export const supportRoutes = (deps: Deps) => {
   const people = new PeopleService(deps)
   const teachers = new TeachersService(deps)
   const review = new ReviewService(deps)
+  const transactions = new TransactionsService(deps)
   return (
     new Hono<AppEnv>()
       .use('*', requireRole('support_agent'))
@@ -104,5 +109,29 @@ export const supportRoutes = (deps: Deps) => {
         )
         return c.json({ course }, 200)
       })
+      // ── transactions, payouts, audit ──
+      .get('/transactions', validate('query', transactionsQuerySchema), async (c) =>
+        c.json(await transactions.list(c.req.valid('query')), 200),
+      )
+      .get('/transactions/:id', async (c) =>
+        c.json({ transaction: await transactions.detail(c.req.param('id')) }, 200),
+      )
+      .post(
+        '/transactions/:id/refund',
+        requireRole('super_admin'),
+        validate('json', refundSchema),
+        async (c) => {
+          const transaction = await transactions.refund(
+            ensureUser(c.get('user')),
+            c.req.param('id'),
+            c.req.valid('json').reason,
+          )
+          return c.json({ transaction }, 200)
+        },
+      )
+      .get('/payouts', async (c) => c.json({ items: await transactions.payouts() }, 200))
+      .get('/audit-log', validate('query', auditQuerySchema), async (c) =>
+        c.json(await transactions.audit(c.req.valid('query').cursor), 200),
+      )
   )
 }

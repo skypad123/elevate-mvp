@@ -34,3 +34,74 @@ export type PersonDetail = PersonSummary & {
   teacherProfile: import('./teach').TeacherProfileView | null
   stats: { enrollments: number; courses: number; liveCourses: number }
 }
+
+export type TransactionSummary = {
+  id: string
+  paidAt: string
+  status: 'succeeded' | 'refunded' | 'partially_refunded'
+  amountCents: number
+  refundedCents: number
+  applicationFeeCents: number
+  teacherNetCents: number
+  learnerEmail: string
+  courseTitle: string
+  courseSlug: string
+  teacherName: string
+}
+
+export type TransactionDetail = TransactionSummary & {
+  listPriceCents: number
+  discountCents: number
+  stripeFeeEstimateCents: number
+  stripeFeeActualCents: number | null
+  commissionCents: number
+  platformNetCents: number | null
+  promoCode: string | null
+  enrollmentId: string
+  enrollmentStatus: 'pending_payment' | 'active' | 'refunded' | 'cancelled'
+  stripe: {
+    checkoutSessionId: string
+    paymentIntentId: string | null
+    chargeId: string | null
+    transferId: string | null
+    applicationFeeId: string | null
+    balanceTransactionId: string | null
+    receiptUrl: string | null
+  }
+  refunds: Array<{
+    id: string
+    stripeRefundId: string
+    amountCents: number
+    reason: string | null
+    requestedBy: string | null
+    createdAt: string
+  }>
+}
+
+export type PayoutLedgerRow = {
+  teacherId: string
+  teacherName: string
+  teacherEmail: string
+  stripeAccountId: string | null
+  payoutsEnabled: boolean
+  transferCount: number
+  transferredCents: number
+  refundedCents: number
+}
+
+export type AuditEntry = {
+  id: string
+  action: string
+  entityType: string
+  entityId: string | null
+  actorEmail: string | null
+  metadata: Record<string, unknown> | null
+  createdAt: string
+}
+
+export const transactionsQuerySchema = z.object({
+  status: z.enum(['succeeded', 'refunded', 'partially_refunded']).optional(),
+  q: z.string().trim().max(100).optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+})

@@ -2,6 +2,7 @@ import type { Deps } from '../deps'
 import type { PaymentsWebhookEvent } from '../providers/payments'
 import { ConnectService } from './connect.service'
 import { type FulfilmentInput, PaymentsService } from './payments.service'
+import { TransactionsService } from './transactions.service'
 
 export type StripeEventOutcome = 'applied' | 'ignored' | 'unmatched'
 export type StripeEventHandler = (
@@ -13,6 +14,7 @@ export type StripeEventHandler = (
 export function createStripeEventHandlers(deps: Deps): Record<string, StripeEventHandler> {
   const connect = new ConnectService(deps)
   const payments = new PaymentsService(deps)
+  const transactions = new TransactionsService(deps)
   const fulfil = async (event: PaymentsWebhookEvent): Promise<StripeEventOutcome> => {
     const session = event.data.object
     if (session.payment_status !== 'paid') return 'ignored'
@@ -35,6 +37,7 @@ export function createStripeEventHandlers(deps: Deps): Record<string, StripeEven
     'account.updated': async (event) => connect.applyAccountUpdated(event.data.object),
     'checkout.session.completed': fulfil,
     'checkout.session.async_payment_succeeded': fulfil,
+    'charge.refunded': async (event) => transactions.applyChargeRefunded(event.data.object),
   }
 }
 

@@ -17,12 +17,14 @@ import { validate } from '../lib/validate'
 import { type AppEnv, ensureUser, requireRole, requireUser } from '../middleware/auth'
 import { ConnectService } from '../services/connect.service'
 import { CoursesService } from '../services/courses.service'
+import { EarningsService } from '../services/earnings.service'
 import { TeachersService } from '../services/teachers.service'
 
 export const teachRoutes = (deps: Deps) => {
   const teachers = new TeachersService(deps)
   const connect = new ConnectService(deps)
   const courses = new CoursesService(deps)
+  const earnings = new EarningsService(deps)
   return (
     new Hono<AppEnv>()
       .get('/profile', requireUser(), async (c) => {
@@ -57,6 +59,19 @@ export const teachRoutes = (deps: Deps) => {
         const link = await connect.loginLink(ensureUser(c.get('user')).id)
         return c.json(link, 200)
       })
+      // ── earnings ──
+      .get('/earnings', requireRole('teacher'), async (c) =>
+        c.json({ earnings: await earnings.forTeacher(ensureUser(c.get('user'))) }, 200),
+      )
+      .get('/earnings/reconcile', requireRole('teacher'), async (c) =>
+        c.json({ reconciliation: await earnings.reconcile(ensureUser(c.get('user'))) }, 200),
+      )
+      .get('/earnings/courses/:id', requireRole('teacher'), async (c) =>
+        c.json(
+          { earnings: await earnings.forCourse(ensureUser(c.get('user')), c.req.param('id')) },
+          200,
+        ),
+      )
       // ── courses ──
       .get('/courses', requireRole('teacher'), async (c) => {
         const items = await courses.listForTeacher(ensureUser(c.get('user')))
