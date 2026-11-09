@@ -10,7 +10,7 @@ import { formatDate } from '@/lib/format'
 import { useBreakpoint } from '@/lib/responsive'
 import { useSession } from '@/lib/session'
 import { useTheme } from '@/theme/ThemeProvider'
-import { Badge, Button, Card, EmptyState, ProgressBar, Screen, Skeleton, Text } from '@/ui'
+import { Badge, Button, Card, EmptyState, Grid, ProgressBar, Screen, Skeleton, Text } from '@/ui'
 
 export default function Learning() {
   const theme = useTheme()
@@ -84,10 +84,10 @@ export default function Learning() {
                 </View>
               </Card>
             ) : null}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[4] }}>
+            <Grid columns={isMd ? 2 : 1} gap={theme.space[4]}>
               {items.map((e) => (
                 <Link key={e.id} href={`/learn/${e.id}`} asChild>
-                  <Pressable style={{ flexBasis: isMd ? '48%' : '100%', flexGrow: 1 }}>
+                  <Pressable>
                     <Card padded={false} style={{ flexDirection: 'row' }}>
                       <View style={{ width: 120, backgroundColor: theme.colors.surfaceSunken }}>
                         {e.course.thumbnailUrl ? (
@@ -129,7 +129,7 @@ export default function Learning() {
                   </Pressable>
                 </Link>
               ))}
-            </View>
+            </Grid>
           </>
         )}
       </View>
