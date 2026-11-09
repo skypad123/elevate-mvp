@@ -1,8 +1,8 @@
 import type { RichTextBlock, RichTextDoc, RichTextInline } from '@elevate/core'
 import { Image } from 'expo-image'
 import type { ReactNode } from 'react'
-import { Linking, Text, type TextStyle, View } from 'react-native'
-import type { Theme } from '@/theme'
+import { Linking, Text, View } from 'react-native'
+import type { MutableTextStyle, Theme } from '@/theme'
 import { useTheme } from '@/theme/ThemeProvider'
 
 function inlineNodes(nodes: readonly RichTextInline[] | undefined, theme: Theme): ReactNode {
@@ -10,7 +10,7 @@ function inlineNodes(nodes: readonly RichTextInline[] | undefined, theme: Theme)
   return nodes.map((node, i) => {
     const key = `${i}-${node.type}`
     if (node.type === 'hardBreak') return <Text key={key}>{'\n'}</Text>
-    const style: TextStyle = {}
+    const style: MutableTextStyle = {}
     let href: string | null = null
     for (const mark of node.marks ?? []) {
       if (mark.type === 'bold') style.fontFamily = theme.text.bodyStrong.fontFamily

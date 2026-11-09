@@ -11,7 +11,7 @@ The product spec is in [`docs/spec.md`](docs/spec.md); architecture decisions ar
 ## Repository
 
 ```
-apps/learner    Elevate — Expo SDK 57 (expo-router) · web + iOS + Android
+apps/learner    Elevate — Expo SDK 58 (expo-router) · web + iOS + Android
 apps/teach      Elevate Teach — Vite + React 19 + React Router 7 + Tailwind v4
 apps/support    Elevate Support — Vite + React 19 (review queue · people · transactions)
 apps/api        Hono API — Drizzle ORM · Postgres · Stripe Connect · Mux · certificates
