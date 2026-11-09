@@ -11,7 +11,7 @@ no backend.
 ## Decision
 
 - npm workspaces + Turborepo monorepo: `apps/{learner,teach,support,api}`, `packages/{core,db,tokens,web-ui,tsconfig}`.
-- **Learner** is one Expo SDK 57 app (expo-router) targeting web, iOS and Android. Checkout is web-only;
+- **Learner** is one Expo SDK 58 app (expo-router) targeting web, iOS and Android. Checkout is web-only;
   native deep-links to the web course page.
 - **Teach** and **Support** are Vite + React 19 + React Router 7 web apps. The course builder needs
   web-native libraries (Tiptap, dnd-kit, React Flow, Mux uploader) that do not fit react-native-web.

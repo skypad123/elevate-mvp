@@ -63,6 +63,6 @@ without a native build as long as only Expo's bundled modules are used, which is
    (Download PDF opens the system browser; Share uses the native share sheet).
 4. Dark mode follows the system setting; the pill tab bar respects the home-indicator inset.
 
-`npx expo-doctor` in `apps/learner` checks the dependency set against SDK 57, and
+`npx expo-doctor` in `apps/learner` checks the dependency set against SDK 58, and
 `npm run build -w apps/learner` exports the iOS and Android bundles as well as web, so a
 native-only bundling error fails CI even though CI has no simulator.
