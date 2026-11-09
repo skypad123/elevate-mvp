@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from 'react'
+import { Platform } from 'react-native'
 import { preferencesStorage } from './preferences-storage'
 
 export type PreferencesContextValue = {
@@ -43,6 +44,12 @@ export function PreferencesProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (ready) void preferencesStorage.write(preferences)
   }, [preferences, ready])
+
+  // Web only: keep <html lang> in step with the language preference (the template ships "en").
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined')
+      document.documentElement.lang = preferences.locale
+  }, [preferences.locale])
 
   const setPreference = useCallback(<K extends PreferenceKey>(key: K, value: Preferences[K]) => {
     setPreferences((prev) => (prev[key] === value ? prev : { ...prev, [key]: value }))
