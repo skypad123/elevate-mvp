@@ -24,6 +24,7 @@ import { useEffect } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { RootError } from '@/components/RootError'
+import { PreferencesProvider, usePreferences } from '@/lib/preferences'
 import { queryClient } from '@/lib/query-client'
 import { SessionProvider, useSession } from '@/lib/session'
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
@@ -51,13 +52,15 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider>
-          <QueryClientProvider client={queryClient}>
-            <SessionProvider>
-              <RootNavigator />
-            </SessionProvider>
-          </QueryClientProvider>
-        </ThemeProvider>
+        <PreferencesProvider>
+          <ThemeProvider>
+            <QueryClientProvider client={queryClient}>
+              <SessionProvider>
+                <RootNavigator />
+              </SessionProvider>
+            </QueryClientProvider>
+          </ThemeProvider>
+        </PreferencesProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )
@@ -66,12 +69,15 @@ export default function RootLayout() {
 function RootNavigator() {
   const theme = useTheme()
   const { isLoading, isSignedIn } = useSession()
+  const { ready: preferencesReady } = usePreferences()
+  // Keep the splash up until the stored theme is known, so the app never flashes the wrong scheme.
+  const booting = isLoading || !preferencesReady
 
   useEffect(() => {
-    if (!isLoading) SplashScreen.hideAsync().catch(() => {})
-  }, [isLoading])
+    if (!booting) SplashScreen.hideAsync().catch(() => {})
+  }, [booting])
 
-  if (isLoading) return null
+  if (booting) return null
 
   const base = theme.scheme === 'dark' ? DarkTheme : DefaultTheme
   const navTheme = {

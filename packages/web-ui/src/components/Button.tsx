@@ -14,7 +14,7 @@ const button = cva(
         accent:
           'border-accent bg-accent text-accent-ink hover:bg-accent-hover hover:border-accent-hover',
         secondary: 'border-border-strong bg-surface text-ink hover:bg-surface-muted',
-        ghost: 'border-transparent bg-transparent text-brand hover:bg-brand-tint',
+        ghost: 'border-transparent bg-transparent text-brand-fg hover:bg-brand-tint',
         danger: 'border-danger bg-danger text-white hover:opacity-90',
         subtle: 'border-transparent bg-surface-muted text-ink hover:bg-surface-sunken',
       },

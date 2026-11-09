@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./portal": "./src/portal/index.ts",
+    "./preferences": "./src/preferences/index.ts",
     "./editor.css": "./src/styles/editor.css"
   },
   "scripts": {
@@ -14,6 +15,7 @@
   "dependencies": {
     "@elevate/api": "*",
     "@elevate/core": "*",
+    "@elevate/i18n": "*",
     "@elevate/tokens": "*",
     "@mux/mux-player-react": "3.14.1",
     "@mux/mux-uploader-react": "1.6.1",

@@ -166,7 +166,7 @@ export function MediaUploader({
           {kind === 'image' && value.url ? (
             <img src={value.url} alt="" className="size-16 rounded-sm object-cover" />
           ) : (
-            <span className="flex size-12 items-center justify-center rounded-sm bg-brand-tint text-brand">
+            <span className="flex size-12 items-center justify-center rounded-sm bg-brand-tint text-brand-fg">
               <Icon className="size-6" />
             </span>
           )}
@@ -247,13 +247,13 @@ export function MediaUploader({
           )}
         >
           {phase.kind === 'requesting' || phase.kind === 'processing' ? (
-            <Loader2 className="size-6 animate-spin text-brand" />
+            <Loader2 className="size-6 animate-spin text-brand-fg" />
           ) : phase.kind === 'error' ? (
             <CircleAlert className="size-6 text-danger" />
           ) : phase.kind === 'uploading' ? (
-            <Upload className="size-6 text-brand" />
+            <Upload className="size-6 text-brand-fg" />
           ) : (
-            <Icon className="size-6 text-brand" />
+            <Icon className="size-6 text-brand-fg" />
           )}
           <span className="text-small-strong font-semibold text-ink">
             {phase.kind === 'requesting'

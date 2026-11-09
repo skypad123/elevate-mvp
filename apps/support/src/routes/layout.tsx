@@ -1,10 +1,12 @@
 import { Avatar, Button, EmptyState, PortalShell } from '@elevate/web-ui'
 import { RequireRole, usePortalAuth } from '@elevate/web-ui/portal'
+import { useT } from '@elevate/web-ui/preferences'
 import {
   ClipboardCheck,
   LogOut,
   Receipt,
   ScrollText,
+  Settings,
   ShieldAlert,
   TrendingUp,
   Users,
@@ -13,6 +15,7 @@ import { Outlet } from 'react-router'
 
 export function SupportLayout() {
   const { user, signOut } = usePortalAuth()
+  const t = useT()
   return (
     <RequireRole
       roles={['support_agent']}
@@ -25,7 +28,7 @@ export function SupportLayout() {
             body={`${user?.email ?? 'This account'} does not have Support access.`}
             action={
               <Button variant="secondary" onClick={signOut}>
-                Sign out
+                {t('nav.signOut')}
               </Button>
             }
           />
@@ -34,13 +37,14 @@ export function SupportLayout() {
     >
       <PortalShell
         portal="Support"
-        tone="neutral"
+        tone="brand"
         items={[
-          { to: '/review', label: 'Review queue', icon: ClipboardCheck },
-          { to: '/people', label: 'People', icon: Users },
-          { to: '/transactions', label: 'Transactions', icon: Receipt },
-          { to: '/insights', label: 'Insights', icon: TrendingUp },
-          { to: '/audit', label: 'Audit log', icon: ScrollText },
+          { to: '/review', label: t('nav.reviewQueue'), icon: ClipboardCheck },
+          { to: '/people', label: t('nav.people'), icon: Users },
+          { to: '/transactions', label: t('nav.transactions'), icon: Receipt },
+          { to: '/insights', label: t('nav.insights'), icon: TrendingUp },
+          { to: '/audit', label: t('nav.auditLog'), icon: ScrollText },
+          { to: '/settings', label: t('nav.settings'), icon: Settings },
         ]}
         footer={
           <div className="flex items-center gap-3 px-2 py-1">
@@ -50,10 +54,12 @@ export function SupportLayout() {
                 {user?.name ?? 'Support'}
               </p>
               <p className="truncate text-caption text-ink-tertiary">
-                {user?.roles.includes('super_admin') ? 'Super admin' : 'Support agent'}
+                {user?.roles.includes('super_admin')
+                  ? t('role.superAdmin')
+                  : t('role.supportAgent')}
               </p>
             </div>
-            <Button variant="ghost" size="icon" aria-label="Sign out" onClick={signOut}>
+            <Button variant="ghost" size="icon" aria-label={t('nav.signOut')} onClick={signOut}>
               <LogOut className="size-4" />
             </Button>
           </div>

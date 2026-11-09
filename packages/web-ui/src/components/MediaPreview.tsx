@@ -45,8 +45,12 @@ export function MediaPreview({
             playbackId={playback.playbackId}
             tokens={{ playback: playback.tokens.playback, thumbnail: playback.tokens.thumbnail }}
             streamType="on-demand"
-            accentColor="#0F6B52"
-            style={{ aspectRatio: '16 / 9', width: '100%' }}
+            style={{
+              aspectRatio: '16 / 9',
+              width: '100%',
+              // Follows the portal palette instead of a fixed hex.
+              '--media-accent-color': 'var(--brand)',
+            }}
           />
         ) : (
           <video
@@ -84,7 +88,7 @@ export function MediaPreview({
       target="_blank"
       rel="noreferrer"
       className={cn(
-        'inline-flex items-center gap-2 rounded-control border border-border bg-surface px-3 py-2 text-small font-semibold text-brand hover:bg-brand-tint',
+        'inline-flex items-center gap-2 rounded-control border border-border bg-surface px-3 py-2 text-small font-semibold text-brand-fg hover:bg-brand-tint',
         className,
       )}
     >

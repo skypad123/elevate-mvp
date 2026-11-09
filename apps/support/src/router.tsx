@@ -8,6 +8,7 @@ import { People } from './routes/people'
 import { Person } from './routes/person'
 import { ReviewCourse } from './routes/review-course'
 import { ReviewQueue } from './routes/review-queue'
+import { SettingsPage } from './routes/settings'
 import { TransactionDetailPage, TransactionsPage } from './routes/transactions'
 
 export const router = createBrowserRouter([
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
           { path: 'transactions/:id', element: <TransactionDetailPage /> },
           { path: 'audit', element: <AuditLogPage /> },
           { path: 'insights', element: <InsightsPage /> },
+          { path: 'settings', element: <SettingsPage /> },
         ],
       },
     ],

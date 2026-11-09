@@ -12,8 +12,10 @@ with `npx expo install <pkg>` so versions come from SDK 57's bundled module list
 - `apps/teach` — Vite + React teacher portal. `apps/support` — Vite + React internal portal.
 - `apps/api` — Hono API (Drizzle, Stripe, Mux, pdf-lib). Exports `@elevate/api/client` for typed RPC.
 - `packages/core` — zod contracts + pure domain logic (DAG, money, grading, lesson states).
-- `packages/db` — Drizzle schema, migrations, seed. `packages/tokens` — design tokens → CSS.
-- `packages/web-ui` — Radix + Tailwind components for the two web portals.
+- `packages/db` — Drizzle schema, migrations, seed. `packages/tokens` — design tokens → CSS, plus
+  per-portal palette overrides (`portal-teach.css`, `portal-support.css`).
+- `packages/web-ui` — Radix + Tailwind components for the two web portals; `./preferences` holds the
+  shared PreferencesProvider/PreferencesCard. `packages/i18n` — typed message catalogs (`en`, `zh`).
 - `docs/spec.md` is the product spec; `docs/adr/` records the architecture decisions.
 
 ## Rules
@@ -23,6 +25,11 @@ with `npx expo install <pkg>` so versions come from SDK 57's bundled module list
 - Every API handler returns `c.json(body, 200)` with an explicit status so RPC response types narrow.
 - Money is integer cents; the only fee computation lives in `packages/core/src/domain/money.ts`.
 - Course status can reach `live` only through the Support approve route.
+- Brand colour as text/icon is `text-brand-fg`; as a fill it is `bg-brand` + `text-brand-ink`.
+  Never `text-brand` (Support's yellow fails contrast as text). See `docs/adr/005-*`.
+- New user preference = a field with a `.default()` in `packages/core/src/contracts/preferences.ts`
+  plus a row in `PreferencesCard` (web) and the learner Profile card. New UI string in a translated
+  area = a key in `packages/i18n/src/messages/en.ts` and `zh.ts`.
 - Run `npm run lint` (Biome) and `npx turbo run typecheck test` before committing.
 
 ## Expo conventions (apps/learner)

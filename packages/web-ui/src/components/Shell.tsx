@@ -41,7 +41,7 @@ export function PortalShell({
                 cn(
                   'flex items-center gap-3 rounded-control px-3 py-2.5 text-small font-semibold transition-colors',
                   isActive
-                    ? 'bg-surface text-brand shadow-float'
+                    ? 'bg-surface text-brand-fg shadow-float'
                     : 'text-ink-secondary hover:bg-surface/70 hover:text-ink',
                 )
               }
@@ -65,7 +65,7 @@ export function PortalShell({
                 className={({ isActive }) =>
                   cn(
                     'rounded-control p-2',
-                    isActive ? 'bg-brand-tint text-brand' : 'text-ink-secondary',
+                    isActive ? 'bg-brand-tint text-brand-fg' : 'text-ink-secondary',
                   )
                 }
                 aria-label={item.label}

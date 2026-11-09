@@ -11,6 +11,7 @@ import {
   useToast,
 } from '@elevate/web-ui'
 import { errorMessage, fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
+import { PreferencesCard, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useState } from 'react'
 import { api } from '../lib/api'
@@ -22,6 +23,7 @@ export function SettingsPage() {
   const { data: profile } = useTeacherProfile()
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const t = useT()
   const [form, setForm] = useState({ displayName: '', headline: '', bio: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -55,9 +57,9 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Settings"
-        title="Your teacher profile"
-        description="What learners see on your course pages."
+        eyebrow={t('settings.eyebrow')}
+        title={t('settings.teach.title')}
+        description={t('settings.teach.description')}
       />
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <form onSubmit={save}>
@@ -92,14 +94,18 @@ export function SettingsPage() {
           </Card>
         </form>
         <div className="space-y-6">
+          <PreferencesCard />
           <StripeCard />
           <Card as="section">
-            <CardHeader title="Account" />
+            <CardHeader title={t('account.title')} />
             <DescriptionList
               items={[
-                { label: 'Email', value: user?.email },
-                { label: 'Commission', value: profile ? formatBps(profile.commissionBps) : '—' },
-                { label: 'Approved', value: formatDate(profile?.reviewedAt) },
+                { label: t('account.email'), value: user?.email },
+                {
+                  label: t('account.commission'),
+                  value: profile ? formatBps(profile.commissionBps) : '—',
+                },
+                { label: t('account.approved'), value: formatDate(profile?.reviewedAt) },
               ]}
             />
           </Card>

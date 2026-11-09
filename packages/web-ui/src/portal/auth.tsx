@@ -111,7 +111,7 @@ export function usePortalAuth(): PortalSession {
 export function FullPageSpinner({ label = 'Loading…' }: { label?: string }) {
   return (
     <div className="flex min-h-full flex-col items-center justify-center gap-3 text-ink-secondary">
-      <Spinner className="size-6 text-brand" />
+      <Spinner className="size-6 text-brand-fg" />
       <p className="text-small">{label}</p>
     </div>
   )

@@ -147,7 +147,7 @@ export function ReviewPanel({
               href={learnerUrl(`/course/${course.slug}`)}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 text-small font-semibold text-brand hover:underline"
+              className="inline-flex items-center gap-2 text-small font-semibold text-brand-fg hover:underline"
             >
               View the live course page <ExternalLink className="size-3.5" />
             </a>

@@ -194,7 +194,7 @@ function PersonView({ person }: { person: PersonDetail }) {
                     href={teacher.teachingSampleUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-3 inline-flex items-center gap-2 text-small font-semibold text-brand hover:underline"
+                    className="mt-3 inline-flex items-center gap-2 text-small font-semibold text-brand-fg hover:underline"
                   >
                     {teacher.teachingSampleUrl} <ExternalLink className="size-3.5" />
                   </a>

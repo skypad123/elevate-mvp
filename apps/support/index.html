@@ -2,8 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Apply the stored theme/language before first paint so there is no flash.
+      // Key and shape mirror PREFERENCES_STORAGE_KEY / preferencesSchema in @elevate/core.
+      try {
+        const p = JSON.parse(localStorage.getItem('elevate.preferences') || '{}')
+        if (p.theme === 'light' || p.theme === 'dark')
+          document.documentElement.setAttribute('data-theme', p.theme)
+        if (typeof p.locale === 'string') document.documentElement.lang = p.locale
+      } catch {}
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#F5C400" />
     <title>Elevate Support</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

@@ -136,7 +136,7 @@ export function Dashboard() {
           <CardHeader
             title="Courses"
             description="Author a course, then submit it for review."
-            action={<ShieldCheck className="size-5 text-brand" />}
+            action={<ShieldCheck className="size-5 text-brand-fg" />}
           />
           {list.length === 0 ? (
             <EmptyState
@@ -156,7 +156,7 @@ export function Dashboard() {
                 <li key={c.id}>
                   <Link
                     to={`/courses/${c.id}`}
-                    className="flex items-center justify-between gap-3 py-3 hover:text-brand"
+                    className="flex items-center justify-between gap-3 py-3 hover:text-brand-fg"
                   >
                     <span className="min-w-0 truncate font-semibold">{c.title}</span>
                     <span className="flex shrink-0 items-center gap-2">
@@ -168,7 +168,7 @@ export function Dashboard() {
               ))}
               {list.length > 5 ? (
                 <li className="pt-3">
-                  <Link to="/courses" className="text-small font-semibold text-brand">
+                  <Link to="/courses" className="text-small font-semibold text-brand-fg">
                     All {list.length} courses
                   </Link>
                 </li>

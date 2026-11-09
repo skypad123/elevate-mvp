@@ -176,7 +176,7 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
                           className="flex min-w-0 flex-1 items-center gap-2 text-left"
                           onClick={() => setArtefactId(a.id)}
                         >
-                          <Icon className="size-4 shrink-0 text-brand" />
+                          <Icon className="size-4 shrink-0 text-brand-fg" />
                           <span className="truncate text-small font-semibold text-ink">
                             {a.title}
                           </span>
@@ -214,7 +214,7 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
                     type="button"
                     disabled={locked}
                     onClick={() => void addArtefact(type)}
-                    className="flex flex-col items-center gap-1 rounded-control px-2 py-2 text-caption font-semibold text-ink-secondary transition-colors hover:bg-brand-tint hover:text-brand disabled:opacity-50"
+                    className="flex flex-col items-center gap-1 rounded-control px-2 py-2 text-caption font-semibold text-ink-secondary transition-colors hover:bg-brand-tint hover:text-brand-fg disabled:opacity-50"
                   >
                     <meta.icon className="size-4" /> {meta.label}
                   </button>
@@ -340,7 +340,7 @@ function ArtefactEditor({
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <meta.icon className="size-5 text-brand" />
+        <meta.icon className="size-5 text-brand-fg" />
         <p className="font-mono text-eyebrow uppercase tracking-[0.08em] text-ink-tertiary">
           {meta.label}
         </p>

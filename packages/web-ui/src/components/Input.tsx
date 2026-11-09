@@ -3,7 +3,7 @@ import { useId } from 'react'
 import { cn } from '../lib/cn'
 
 const fieldBase =
-  'w-full rounded-control border border-border-strong bg-surface px-3.5 text-body text-ink placeholder:text-ink-tertiary transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25 disabled:bg-surface-muted disabled:text-ink-tertiary aria-invalid:border-danger aria-invalid:focus:ring-danger/25'
+  'w-full rounded-control border border-border-strong bg-surface px-3.5 text-body text-ink placeholder:text-ink-tertiary transition-colors focus:border-focus focus:outline-none focus:ring-2 focus:ring-focus/25 disabled:bg-surface-muted disabled:text-ink-tertiary aria-invalid:border-danger aria-invalid:focus:ring-danger/25'
 
 export type FieldProps = {
   label?: ReactNode

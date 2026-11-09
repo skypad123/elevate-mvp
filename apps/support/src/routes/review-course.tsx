@@ -284,7 +284,7 @@ function ArtefactPreview({ artefact }: { artefact: ArtefactView }) {
   return (
     <li className="rounded-card border border-border bg-surface-muted/40 p-4">
       <div className="mb-3 flex items-center gap-2">
-        <Icon className="size-4 text-brand" />
+        <Icon className="size-4 text-brand-fg" />
         <span className="font-semibold text-ink">{artefact.title}</span>
         <Badge>{statusLabel(artefact.type)}</Badge>
         {artefact.media ? (
