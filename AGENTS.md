@@ -30,6 +30,8 @@ with `npx expo install <pkg>` so versions come from SDK 57's bundled module list
 - New user preference = a field with a `.default()` in `packages/core/src/contracts/preferences.ts`
   plus a row in `PreferencesCard` (web) and the learner Profile card. New UI string in a translated
   area = a key in `packages/i18n/src/messages/en.ts` and `zh.ts`.
+- Learner unit tests use jest-expo (`npm -w @elevate/learner test`, files under `src/**/__tests__`); the
+  AsyncStorage jest mock is wired in `apps/learner/jest.setup.ts`. Device flows live in `.maestro/` (manual).
 - Run `npm run lint` (Biome) and `npx turbo run typecheck test` before committing.
 
 ## Expo conventions (apps/learner)

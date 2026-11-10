@@ -1,0 +1,26 @@
+# Signs the learner app in with a seeded account, using the API's dev magic-link endpoint
+# (DEV_ENDPOINTS_ENABLED=true in .env) so no email is involved.
+#
+# Env: EMAIL (default learner@example.com), API_URL (default http://localhost:4400).
+appId: ${APP_ID}
+env:
+  EMAIL: ${EMAIL}
+  API_URL: ${API_URL}
+---
+- tapOn: "Sign in"
+- tapOn:
+    text: "you@example.com"
+- inputText: ${EMAIL}
+- hideKeyboard
+- tapOn: "Email me a sign-in code"
+- assertVisible: "Enter the 6-digit code"
+# Ask the API for a second code for the same address; any unconsumed code verifies.
+- runScript:
+    file: scripts/request-code.js
+    env:
+      EMAIL: ${EMAIL}
+      API_URL: ${API_URL}
+- inputText: ${output.code}
+- extendedWaitUntil:
+    visible: "Profile"
+    timeout: 15000

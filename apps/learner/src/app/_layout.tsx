@@ -21,6 +21,7 @@ import {
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
+import { View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { RootError } from '@/components/RootError'
@@ -96,27 +97,30 @@ function RootNavigator() {
   return (
     <NavigationThemeProvider value={navTheme}>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: theme.colors.canvas },
-        }}
-      >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="course/[slug]" />
-        <Stack.Screen name="c/[token]" />
-        <Stack.Protected guard={!isSignedIn}>
-          <Stack.Screen name="(auth)" />
-        </Stack.Protected>
-        <Stack.Protected guard={isSignedIn}>
-          <Stack.Screen name="checkout/[courseId]" />
-          <Stack.Screen name="checkout/success" />
-          <Stack.Screen name="learn/[enrollmentId]/index" />
-          <Stack.Screen name="learn/[enrollmentId]/lesson/[lessonId]" />
-          <Stack.Screen name="learn/[enrollmentId]/certificate" />
-        </Stack.Protected>
-        <Stack.Screen name="+not-found" />
-      </Stack>
+      {/* testID exposes the resolved scheme to end-to-end tests (Maestro asserts it after relaunch). */}
+      <View style={{ flex: 1 }} testID={`app-root-${theme.scheme}`}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.colors.canvas },
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="course/[slug]" />
+          <Stack.Screen name="c/[token]" />
+          <Stack.Protected guard={!isSignedIn}>
+            <Stack.Screen name="(auth)" />
+          </Stack.Protected>
+          <Stack.Protected guard={isSignedIn}>
+            <Stack.Screen name="checkout/[courseId]" />
+            <Stack.Screen name="checkout/success" />
+            <Stack.Screen name="learn/[enrollmentId]/index" />
+            <Stack.Screen name="learn/[enrollmentId]/lesson/[lessonId]" />
+            <Stack.Screen name="learn/[enrollmentId]/certificate" />
+          </Stack.Protected>
+          <Stack.Screen name="+not-found" />
+        </Stack>
+      </View>
     </NavigationThemeProvider>
   )
 }

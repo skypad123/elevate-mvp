@@ -37,7 +37,9 @@ export class FakeStorage implements StorageProvider {
     const obj = this.objects.get(key)
     if (!obj) return null
     return {
-      body: new Response(obj.body).body as ReadableStream<Uint8Array>,
+      // The cast keeps this compiling whether `Response` comes from undici (Node types) or lib.dom
+      // (pulled in by vitest's optional jsdom types once @types/jsdom is installed).
+      body: new Response(obj.body as Uint8Array<ArrayBuffer>).body as ReadableStream<Uint8Array>,
       size: obj.body.byteLength,
       mimeType: obj.mimeType,
     }
