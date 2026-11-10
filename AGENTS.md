@@ -2,9 +2,9 @@
 
 ## Expo HAS CHANGED
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any Expo code.
-npm `latest` for `expo` is SDK 58. This repo is on **SDK 57**: inside `apps/learner`, add packages only
-with `npx expo install <pkg>` so versions come from SDK 57's bundled module list.
+Read the exact versioned docs at https://docs.expo.dev/versions/v58.0.0/ before writing any Expo code.
+This repo is on **SDK 58** (React Native 0.88, React 19.3): inside `apps/learner`, add packages only
+with `npx expo install <pkg>` so versions come from SDK 58's bundled module list.
 
 ## Repo map
 
@@ -20,7 +20,8 @@ with `npx expo install <pkg>` so versions come from SDK 57's bundled module list
 
 ## Rules
 
-- One copy of `react`, `react-dom`, `hono`, `zod`: pinned via root `overrides`; `npm run check:dupes` verifies.
+- One copy of `react`, `react-dom`, `react-native`, `react-native-svg`, `react-native-worklets`, `hono`, `zod`:
+  pinned via root `overrides` (React versions follow the Expo SDK); `npm run check:dupes` and `expo-doctor` verify.
 - `react-router` stays on 7.x (8.x needs a newer React than Expo ships). `typescript` stays `~6.0.3`.
 - Every API handler returns `c.json(body, 200)` with an explicit status so RPC response types narrow.
 - Money is integer cents; the only fee computation lives in `packages/core/src/domain/money.ts`.
@@ -41,3 +42,6 @@ with `npx expo install <pkg>` so versions come from SDK 57's bundled module list
 - `npx expo install <pkg>` for anything Expo/React Native; `npx expo install --fix` and `npx expo-doctor` to diagnose.
 - `ios/` and `android/` are generated (CNG). Configure native behaviour in `app.json` and config plugins only.
 - Expo Go only has its bundled native modules; a library with native code needs a dev build.
+- React Native's strict TypeScript API is on: style types are readonly (build styles up with
+  `MutableTextStyle` from `src/theme`), refs use instance types such as `TextInputInstance`, and
+  `react-native/Libraries/*` deep imports are off-limits.
