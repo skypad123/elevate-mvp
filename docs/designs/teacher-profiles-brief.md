@@ -430,3 +430,10 @@ Decided by the author on 2026-11-11, after this brief was written. The design
 - **Staff acting in Teach:** narrowed to content editing and read access (decision 7).
 - **ADRs:** two, one for profiles and one for payout accounts.
 - **Course-review emails:** to the owner and every manager.
+- **Refunds made in the Stripe dashboard** email the learner and the profile owner, the same as a
+  Support refund.
+- **A rejected corporate application** can be edited and resubmitted by its owner; the UEN stays
+  with that profile.
+- **Role changes** (writer to manager and back) are made by the owner only, on corporate profiles.
+- **Unapproved profiles** (applied or rejected) give their owner and members only read and edit of
+  the profile itself, as applicants have today.

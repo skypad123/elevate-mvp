@@ -421,6 +421,8 @@ request ──► authenticate (unchanged: user rebuilt from the session on ever
   | `members.manageManagers` | yes | no | no | no |
   | `stripe.links` | yes | no | no | no |
 
+- **Unapproved profiles.** While a profile is `applied` or `rejected`, its owner and members get
+  only `profile.read` and `profile.edit`, whatever their role, as applicants have today.
 - **Staff** is one named row in the table, not an exception on each route. Staff fix content to
   help a teacher and can read the profile, its members and its earnings. Money, publishing and
   membership stay with the teacher: staff cannot set prices, submit or delete courses, approve
@@ -576,8 +578,9 @@ and draft versions, lets them pick one for each conflict, then approve or discar
   - Removing a lesson, artefact or quiz is recorded as `removed` on its draft row.
   - `source_id` is set to null if its live row is deleted. A `copied_from_live` flag, set when the
     draft is copied, lets the conflict check tell such a draft apart from a new one.
-  - Prerequisite links are handled as a whole set per course, as the editor saves them today, so
-    they need no `source_id` or `removed` flag.
+  - Prerequisite links are saved per lesson, as the editor saves them today (one lesson's links
+    replaced at a time), so they need no `source_id` or `removed` flag: a lesson's draft links
+    replace its live links on approval.
 - **Opening a change set:** when a writer first edits a live course, the API copies that course's
   lessons, artefacts, quizzes and prerequisite links into draft rows in one transaction. It sets
   `source_id` on each copy, and records the latest `updated_at` among the live rows as
@@ -598,14 +601,19 @@ and draft versions, lets them pick one for each conflict, then approve or discar
   exist in their types. This does not block `select().from(...)` on a raw table, so the types alone
   are not the guard.
 - **A test is the guard.** Only `courses.service.ts` and `change-sets.service.ts` may refer to the
-  raw `lessons`, `artefacts`, `quizzes` or `lessonPrerequisites` tables (as `s.lessons` or a named
-  import). The test fails on any other file under `apps/api/src/services/`.
+  raw `lessons`, `artefacts`, `quizzes` or `lessonPrerequisites` tables, either as `s.lessons` or a
+  named import, or as a relation key in a relational query (`lessons:`, `artefacts:`, `quiz:`,
+  `prerequisites:` inside `with`). The learner relations use different keys (`liveLessons`,
+  `liveArtefacts`, `liveQuiz`, `livePrerequisites`), so a learner read through `learnerDb` never
+  uses the raw keys, and a raw-`db` read of course content outside the two allowed files fails the
+  test.
 - **Teach and Support reads** (the course editor and Support's course preview, both through
   `CoursesService`) read the raw tables, filtering `change_set_id is null` unless they ask for the
   draft. This is the one place a code filter is used, and it is inside the allowed file.
 - **Learner writes go to the raw tables.** Progress and quiz attempts reference `artefacts` and
-  `quizzes`, so before writing, the learning service looks the ID up in the matching view. A draft
-  ID returns 404.
+  `quizzes`. The learning service already finds the artefact or quiz inside the enrolment's loaded
+  course and returns 404 when it is absent; once that load reads the views, a draft ID returns 404
+  with no extra lookup.
 
 **Approval**
 - **What approval guarantees:**
@@ -615,9 +623,10 @@ and draft versions, lets them pick one for each conflict, then approve or discar
   - references between draft rows are rewritten to live IDs before any draft row is deleted, so
     nothing a writer added is lost to a cascade;
   - conflicts are reported, not merged.
-- **Conflicts:** a live row edited after `opened_at_snapshot`, a draft whose live row was deleted
-  (null `source_id` where one was set), or live prerequisite links that differ from
-  `opened_prerequisites`. The approver picks the live or draft version of each.
+- **Conflicts:** a live row edited after `opened_at_snapshot`, a draft whose live row was deleted,
+  or a lesson whose live prerequisite links differ from `opened_prerequisites`. Live rows the owner
+  added during the change set are not conflicts and stay. The approver picks the live or draft
+  version of each conflict; the choices are stored on the change set until approval.
 - The ordered apply procedure is in the Detailed Implementation Plan, item 2.8.
 - **Quiz changes:** an attempt in progress is graded against the quiz as it is at submission. This
   is today's behaviour when an owner edits a live quiz, and this design does not change it.
@@ -694,22 +703,24 @@ Stripe enables charges → Support compares legal names → payout account: acti
 - **A new command, `seed`,** runs the demo seed on staging and the super-admin-only seed on
   production. The choice comes from an argument.
 - **Order in each environment.** `reset-schema` exists only in the new image, and the Deploy
-  workflow builds that image and then migrates at once. So:
-  1. Push the commit to the environment branch. Deploy builds the image and registers the task
+  workflow builds that image and then migrates at once. The procedure has four parts, (a) to (d),
+  lettered so they are not confused with the plan's steps:
+  a. Push the commit to the environment branch. Deploy builds the image and registers the task
      definition, then **fails at the migration step, as expected**, because the new `0000` meets
      the old tables. The workflow leaves the running API on the old version.
-  2. Run `reset-schema` as a one-off task with the task definition that deploy just registered,
+  b. Run `reset-schema` as a one-off task with the task definition that deploy just registered,
      overriding the command and setting `ALLOW_SCHEMA_RESET=yes` for that task only.
-  3. Re-run Deploy for the branch (`workflow_dispatch`). It reuses the image, applies the new
+  c. Re-run Deploy for the branch (`workflow_dispatch`). It reuses the image, applies the new
      `0000` and rolls the service.
-  4. Run `seed --demo` (staging) or `seed --admin-only` (production) as a one-off task.
+  d. Run `seed --demo` (staging) or `seed --admin-only` (production) as a one-off task.
 
-  The old API serves errors between steps 2 and 3; this is accepted because there are no users.
-  On production, steps 1 and 3 need the reviewer's approval.
+  The old API serves errors between (b) and (c); this is accepted because there are no users.
+  On production, (a) and (c) wait for approval by the required reviewer of the `production` GitHub Environment, the
+  same approval every production deploy needs today.
 - **Seed images:** the seed writes thumbnails through the storage provider, so S3 is used on
   staging.
 - **The deploy workflow is unchanged.** The procedure uses it as it is, including its expected
-  failure in step 1. `infra/README.md` documents the procedure, and notes that this change cannot
+  failure in (a). `infra/README.md` documents the procedure, and notes that this change cannot
   be undone with `git revert`.
 - **Extensions:** dropping `public` also drops the `citext` and `pg_trgm` extensions; the new
   `0000` creates them again (item 1.8a).
@@ -749,7 +760,7 @@ Mitigations).
 | Drizzle `1.0.0-rc.5` changes before 1.0 is final | the rewritten query layer may need follow-up changes | exact pins; Step 0 lands on its own with every suite passing; the RC is moved only on purpose |
 | `drizzle-kit` RC does not emit views, or changes its migration layout | the single `0000` cannot be generated as planned | tested in item 0.10 before step 2; fallback: the generate wrapper (item 1.8a) adds the view SQL |
 | Stripe company accounts behave differently from the assumptions in Open Questions | step 3 is blocked or changes | tested in Stripe test mode before step 3 starts |
-| The reset cannot be undone | staging and production data are lost | accepted: no real data exists; production is reset only after staging passes, with the author's go-ahead (section 12) |
+| The reset cannot be undone | staging and production data are lost | accepted: no real data exists; production is reset only after staging passes, and its deploys wait for the required reviewer of the `production` GitHub Environment (section 12) |
 | A forged or out-of-date registry document | a company that is not who it claims, or has been struck off, is approved | accepted by the author; remaining safeguards are Stripe's own verification and the legal-name check |
 | Anyone holding a company's registry document can apply as that company | as above | accepted; Elevate cannot prove the applicant is connected to the company |
 | Any Support staff member can approve a company and its payee | more people can approve a forged application | accepted by the author; each check is audited under the staff member's own user ID |
@@ -1037,21 +1048,22 @@ These are not alternatives to this design. They are options for the later promot
 ## Detailed Implementation Plan
 
 The work lands in four steps, in this order. Each step ends with `npm run lint` and
-`npx turbo run typecheck test` passing. Nothing is deployed until step 3 is done.
+`npx turbo run typecheck test` passing. Nothing is deployed until step 3 is done; staging and
+production are then reset with the procedure in section 12.
 
 | Step | Contents | Ends when |
 |---|---|---|
 | **0. Drizzle 1.0** | the ORM upgrade on today's schema, no behaviour change | all suites pass on `1.0.0-rc.5` |
-| **1. Structure** | profiles, payout accounts, permissions, profile URLs, reset and seed | Goals 1–8 pass |
+| **1. Structure** | profiles, payout accounts, permissions, profile URLs, staff acting, reset and seed | Goals 1–7 and 15 pass; Goal 8's local migration check passes |
 | **2. Helpers** | writers, managers, invitations, change sets, profile media | Goals 9–12 pass |
-| **3. Corporate** | corporate application, legal entities, company Stripe, name check | Goals 13–14 pass, after the Stripe test in Open Questions |
+| **3. Corporate** | corporate application, legal entities, company Stripe, name check, owner recovery | Goals 13–14 pass, after the Stripe test in Open Questions; then Goal 8 on staging |
 
 Steps 1–3 are slices 1–3 of the Overview; this plan calls them steps. Step 0 is separate from step 1
 so that a failure in the upgrade is not mixed up with a failure in the new model. The squashed
 `0000` is first generated at the end of step 1, then regenerated at the end of steps 2 and 3 with
 their tables added. That is allowed because no environment has applied it yet. Once staging is
 reset (end of step 3), later changes are normal additive migrations. "Done" for a step means merged
-with its checks passing, not deployed.
+with its checks passing.
 
 ### Target Files to Create/Modify
 
@@ -1061,7 +1073,8 @@ with its checks passing, not deployed.
 
 *   **Type / Scope**: dependency manifests.
 *   **Proposed Changes**: pin `drizzle-orm` to exactly `1.0.0-rc.5`, and `drizzle-kit` to the exact
-    RC version published with it (looked up on npm at the start of Step 0 and written here). Add
+    RC version published with it. Gate at the start of Step 0: look both up on npm (and check
+    whether 1.0 has gone stable) and write them into this item before any other change. Add
     `drizzle-orm` to the root `overrides`, so one copy is installed. Move `@electric-sql/pglite`
     from `0.5.15` to `0.5.16`, the version the scratch test used, in both `packages/db` and
     `apps/api` (dev dependency).
@@ -1135,8 +1148,8 @@ with its checks passing, not deployed.
     - where a filter value may be `undefined`, the key is left out of the filter object.
 
     The exact `RAW` syntax is checked against the Drizzle 1.0 docs at the start of Step 0.
-*   **Why**: the RQB v2 syntax. Intended to change syntax only; the existing suites confirm the
-    results are unchanged.
+*   **Why**: the RQB v2 syntax. Intended to change syntax only; the existing suites must pass
+    unchanged to confirm this.
 
 ##### 0.9 `packages/db/drizzle/meta/*` (Modify)
 
@@ -1184,7 +1197,9 @@ with its checks passing, not deployed.
 
     `legal_entity_id` is declared here as a nullable unique UUID; its foreign key is added in step
     3, with the `legal_entities` table. `profile_memberships` and `profile_invitations` are added in
-    step 2.
+    step 2. The commission check carries over as `profiles_commission_bps_range`
+    (`commission_bps between 0 and 10000`, today's `teacher_profiles_commission_bps_range`).
+    `avatar_media_id` references `media_assets` with `on delete set null`, like the teaching sample.
 *   **Why**: the profile becomes its own record (Goal 1, Goal 2).
 
 ##### 1.3 `packages/db/src/schema/courses.ts` (Modify)
@@ -1228,9 +1243,11 @@ with its checks passing, not deployed.
       `mediaAssets.profile`.
     - Removed: `users.teacherProfile`, `users.courses`, `teacherProfiles.*`, `courses.teacher`,
       `payments.teacher`, `mediaAssets.owner`.
-    - Every query that uses `teacher: { with: { teacherProfile: true } }` (about 8, in the catalogue,
-      certificates, enrolments, learning, payments, review and transactions services) becomes
-      `profile: { with: { owner: true } }`, or `profile: true` where the owner is not needed.
+    - Every query that uses `teacher: { with: { teacherProfile: true } }` or reads
+      `course.teacher.teacherProfile` (about 13 places, in the catalogue, certificates, courses,
+      enrolments, learning, payments, review and transactions services; `git grep teacherProfile
+      apps/api/src` lists them) becomes `profile: { with: { owner: true } }`, or `profile: true`
+      where the owner is not needed.
 *   **Why**: the services query through these names.
 
 ##### 1.8 `packages/db/drizzle/0000_init.sql`, `0001_payment_enrollment_indexes.sql`, `meta/*` (Delete, then regenerate `0000_init.sql` and `meta/*`)
@@ -1248,8 +1265,10 @@ with its checks passing, not deployed.
     if 0.10 shows the kit does not emit views, appends the four `CREATE VIEW` statements.
     `packages/db/package.json`'s `generate` script calls it, so regenerating never loses these
     lines. `migration-guard.test.ts` reads `0000` and fails if the extension lines are missing, or
-    if any foreign key from `courses`, `payments` or `media_assets.profile_id` points at `users`
-    (Goal 1 and Goal 8).
+    if any of `courses.profile_id`, `payments.profile_id`, `payments.payout_account_id` or
+    `media_assets.profile_id` references `users`, or if `courses.teacher_id` or
+    `payments.teacher_id` still exists (Goal 1). Other foreign keys to `users` are correct and not
+    checked: `courses.reviewed_by` (the Support reviewer) and `payments.user_id` (the learner).
 *   **Why**: hand edits to a generated file are lost when it is regenerated.
 
 ##### 1.9 `packages/core/src/domain/permissions.ts` (Create)
@@ -1273,8 +1292,17 @@ with its checks passing, not deployed.
     can(actor, capability) -> boolean
     ```
 
-    Step 1 uses only `owner` and `staff`; the table for `manager` and `writer` is written now so
-    step 2 only adds routes. Invitation capabilities also require `profileStatus = approved`.
+    UNAPPROVED = { profile.read, profile.edit }
+    can(actor, capability):
+      if actor.profileStatus != approved and actor.role != staff:
+        return capability in UNAPPROVED
+      return capability in TABLE[actor.role][actor.profileType]
+
+    On a profile that is `applied` or `rejected`, members get only `profile.read` and
+    `profile.edit`, matching today, where an applicant has no `teacher` role and cannot reach
+    course, price, earnings, member or Stripe routes. Inviting and removing members therefore also
+    need an approved profile. Step 1 uses only `owner` and `staff`; the table for `manager` and
+    `writer` is written now so step 2 only adds routes.
 *   **Why**: Goal 3; section 2.
 
 ##### 1.10 `packages/core/src/domain/index.ts` (Modify), `packages/core/test/permissions.test.ts` (Create)
@@ -1291,7 +1319,8 @@ with its checks passing, not deployed.
 *   **Proposed Changes**:
     - `auth.ts`: `AuthUser.teacher` is replaced by `profiles: ProfileSummary[]`. `TeacherSummary`
       (line 24) becomes `ProfileSummary = { id, type, displayName, status, role }`, where `role` is
-      `owner`, `manager` or `writer`;
+      `owner`, `manager` or `writer`. A separate exported type, `ActorRole`, adds `staff` and is
+      what the Teach client uses for the current profile (1.30);
     - `common.ts`: `roleSchema` (line 6) loses `teacher`.
 *   **Why**: section 3.
 
@@ -1310,7 +1339,9 @@ with its checks passing, not deployed.
       - `CourseSummary.teacherName` and `teacherEmail` become `profileName` and `ownerEmail`.
     - `support.ts`: people filters lose `role: 'teacher'`; `PersonSummary.teacher` and
       `PersonDetail.teacherProfile` become `profiles: ProfileSummary[]`; new profile list and
-      profile detail types; ledger rows carry `payoutAccountId` and `profileName`.
+      profile detail types; `PayoutLedgerRow` (`support.ts:81–90`) becomes `{ payoutAccountId,
+      stripeAccountId, payoutsEnabled, profileId, profileName, ownerEmail, transferCount,
+      transferredCents, refundedCents }`, replacing `teacherId`, `teacherName` and `teacherEmail`.
     - `catalog.ts`: the public teacher card (line 60) keeps its shape and field names
       (`teacher.displayName`, `teacherName`), so the learner app does not change for it.
       `teacher.id` becomes the profile ID.
@@ -1322,9 +1353,14 @@ with its checks passing, not deployed.
 *   **Proposed Changes**:
     - `AuthService.buildAuthUser` (lines 206–230) builds `profiles` in place of `teacherProfile`:
       owned profiles in step 1, plus member profiles from step 2, in one query;
-    - new `requireProfile(capability?)` middleware in `middleware/auth.ts`: reads `:profileId`,
-      resolves the actor as in section 2 (owner, member, `super_admin` as staff, else 404), stores
-      it on the context, and answers 403 when a capability is given and `can` is false;
+    - new exported function `loadActor(deps, user, profileId): Promise<Actor | null>` resolves the
+      actor as in section 2 (owner, member, `super_admin` as staff, else `null`);
+    - new `requireProfile(deps, capability?)` middleware in `middleware/auth.ts`, built like
+      `authenticate(deps)`: reads `:profileId`, calls `loadActor` (404 on `null`), stores the actor
+      on the context, and answers 403 when a capability is given and `can` is false. Services
+      outside the profile path (media, 1.26) call `loadActor` directly;
+    - `createSession` writes `createdAt: deps.now()` explicitly, so the sign-in time uses the same
+      clock as the checks in 1.38 (today the column takes the database default);
     - `requireRole` keeps its `super_admin` bypass for Support routes only.
 *   **Why**: Goal 3, Goal 6, section 10.
 
@@ -1354,7 +1390,7 @@ with its checks passing, not deployed.
     |---|---|
     | `GET profile` | `profile.read` |
     | `PATCH profile` | `profile.edit` |
-    | `GET stripe/status` | `profile.read` (read only, so managers and staff see it) |
+    | `GET stripe/status` | `profile.read`. Not read-only: it calls `syncStatus`, which asks Stripe and may update the flags and activate an account through `applyAccountState`. Accepted, because the result is the same state the webhook would set; any member can trigger the refresh, and it is rate-limited by the existing per-user limiter |
     | `POST stripe/onboarding-link`, `POST stripe/login-link` | `stripe.links`, plus recent sign-in (1.38) |
     | `GET earnings`, `GET earnings/reconcile`, `GET earnings/courses/:id` | `earnings.read` |
     | `GET courses`, `GET courses/:id` | `profile.read` |
@@ -1388,12 +1424,23 @@ with its checks passing, not deployed.
 ##### 1.17 `apps/api/src/services/courses.service.ts` (Modify)
 
 *   **Type / Scope**: API service.
-*   **Proposed Changes**: every function takes `profileId` in place of a user. Lesson, artefact and
-    quiz lookups join to `courses` and filter by `profile_id` in the same query; not found gives
-    404. The ownership check in the course loader and its `support_agent` bypass are removed. Price
-    is set only through a new `setPrice`, which writes an audit entry with the old and new price.
-    `loadCourseView` passes `payable` (the profile has an active payout account with charges
-    enabled) to `validateCourseForSubmission` in place of `teacherStripeChargesEnabled`.
+*   **Proposed Changes**:
+    - every Teach-facing function takes `(actor: Actor, …)` in place of a user, for example
+      `update(actor, courseId, input)`; the actor carries `profileId`, the role and the profile
+      status, so the service can call `can(actor, …)` for status-dependent checks (1.15);
+    - lesson, artefact and quiz lookups join to `courses` and filter by `actor.profileId` in the
+      same query; not found gives 404;
+    - the ownership check in the course loader and its `support_agent` bypass are removed;
+    - price is set only through a new `setPrice`, which writes an audit entry with the old and new
+      price;
+    - the queries that join `teacher: { with: { teacherProfile: true } }` (lines 42 and 150) use
+      `profile` instead;
+    - `loadCourseView` passes `payable` (the profile has an active payout account with charges
+      enabled) to `validateCourseForSubmission`. The input field `teacherStripeChargesEnabled` is
+      renamed `payable` in `packages/core/src/domain/course-validation.ts` (lines 28 and 118) and
+      in `packages/core/test/course-validation.test.ts`, which are added to this item;
+    - Support's course reads (`review.service.ts`) call the loader without an actor, through a
+      separate `loadForSupport(courseId)`.
 *   **Why**: section 2 and section 10.
 
 ##### 1.18 `apps/api/src/services/connect.service.ts` (Modify)
@@ -1419,8 +1466,12 @@ with its checks passing, not deployed.
     - `createConnectedAccount({ businessType, profileId, payoutAccountId, email, displayName })`,
       with metadata `elevateProfileId` and `elevatePayoutAccountId`; `displayName` is still sent as
       `business_profile.name`;
-    - `createCheckoutSession` takes `payoutAccountId` and `profileId`, writes them to metadata, and
-      the idempotency key becomes `checkout:${enrollmentId}:${amountCents}:${payoutAccountId}`;
+    - `createCheckoutSession` takes `payoutAccountId` and `profileId` and writes the metadata it is
+      given; the caller (`payments.service.ts`, 1.20) builds the metadata. The idempotency key comes
+      from a new exported function, `checkoutIdempotencyKey({ enrollmentId, amountCents,
+      payoutAccountId })` in `providers/payments/types.ts`, which returns
+      `checkout:${enrollmentId}:${amountCents}:${payoutAccountId}`; `stripe.ts` calls it, and a
+      unit test checks it directly;
     - `retrieveAccount` also returns `legalName` (company name or `null`);
     - the fake provider mirrors this, and records `businessType` so tests can assert on it.
 *   **Why**: sections 4 and 5.
@@ -1432,7 +1483,9 @@ with its checks passing, not deployed.
     - payability (the check before checkout): the course's profile has an `active` payout account
       with charges enabled; otherwise `teacher_not_payable`, as today (the error code keeps its old
       name so clients do not change);
-    - checkout uses that account's Stripe ID as the destination and passes both IDs;
+    - checkout uses that account's Stripe ID as the destination and builds the session metadata:
+      the existing `enrollmentId` and other keys, `elevatePayoutAccountId` and `elevateProfileId`
+      added, and `teacherId` (line 205) removed. Fulfilment no longer reads `teacherId` (line 288);
     - `fulfilCheckout` reads `elevatePayoutAccountId` and `elevateProfileId` from session metadata.
       Its return type gains `'unattributed'`, returned when either is missing or the account does
       not exist; no payment is written. The webhook path throws on it, so it is stored in
@@ -1460,14 +1513,23 @@ with its checks passing, not deployed.
       grouped by `course_id`;
     - reconciliation calls `listTransferAmountCents` for the profile's payout account;
     - the Support ledger and payouts group by payout account and show the profile name;
-    - `analytics.service.ts` keeps only the median of `secondsSinceApproval` over stored
-      `firstPayout` events; the event itself is written in fulfilment (1.20);
-    - refunds: `refund` (Support) and `applyChargeRefunded` (refunds made in the Stripe
-      dashboard, `transactions.service.ts:244–278`) both email the owner of the payment's profile,
-      in addition to today's learner email.
+    - `analytics.service.ts` needs no step 1 change: it already takes the median of
+      `secondsSinceApproval` over stored `firstPayout` events (lines 62–72); the event itself is
+      written in fulfilment (1.20). Its step 2 change is in 2.6;
+    - refunds: `refund` (Support, `transactions.service.ts:156`) emails the learner today and also
+      emails the owner of the payment's profile. Refunds made in the Stripe dashboard arrive
+      through `applyChargeRefunded` (lines 244–278), which sends no email today. After this change
+      it sends the same two emails as a Support refund, to the learner and to the profile owner
+      (decided by the author, 2026-11-11). To avoid sending them twice for a Support refund, whose
+      `charge.refunded` webhook also arrives: `applyRefund` (lines 206–241) returns whether it
+      inserted a new refund row (it already uses `onConflictDoNothing` on the Stripe refund ID),
+      and `applyChargeRefunded` emails only when it did. A Support refund records its row first,
+      so its webhook inserts nothing and sends nothing;
+    - `payout-accounts.test.ts` (1.36) gains: a dashboard refund emails the learner and the owner
+      once; a Support refund followed by its webhook emails each of them once.
 *   **Why**: Goal 5; section 6; [brief](teacher-profiles-brief.md) "Refund notices".
 
-##### 1.23 `apps/api/src/services/catalog.service.ts`, `certificates.service.ts`, `enrollments.service.ts`, `review.service.ts` (Modify)
+##### 1.23 `apps/api/src/services/catalog.service.ts`, `certificates.service.ts`, `enrollments.service.ts`, `learning.service.ts`, `review.service.ts` (Modify)
 
 *   **Type / Scope**: API services.
 *   **Proposed Changes**:
@@ -1495,7 +1557,9 @@ with its checks passing, not deployed.
     - `/support/teachers/:id/*` becomes `/support/profiles/:id/{approve,reject,commission}`; the
       commission route keeps `requireRole('super_admin')` (`support.ts:76–79`);
     - `PeopleService.setRole`'s `teacher` branch and the `role: 'teacher'` list filters are
-      removed;
+      removed. The `role: 'learner'` filter (today "has no teacher profile",
+      `people.service.ts:94–102`) becomes "owns no profile and has no membership"; the
+      teacher-status filter (`status`, lines 89–92) moves to the profiles list;
     - each change writes an audit entry with `profile_id`.
 *   **Why**: Goal 15; the support portal must reach profiles directly.
 
@@ -1504,8 +1568,10 @@ with its checks passing, not deployed.
 *   **Type / Scope**: audit writes.
 *   **Proposed Changes**: `recordAudit(deps, {...})` takes an optional `profileId`. A new helper
     records a staff actor's changes, called by `requireProfile` after a non-GET request from a
-    `staff` actor succeeds, with `action: 'staff.<method> <route>'`, `entityType: 'profile'`,
-    `entityId` the profile ID, and `metadata: { method, path }`.
+    `staff` actor succeeds, with `action: 'staff.<method> <route pattern>'` (Hono's
+    `c.req.routePath`, for example `staff.PATCH /teach/profiles/:profileId/courses/:id`),
+    `entityType: 'profile'`, `entityId` the profile ID, and `metadata: { method, path }` where
+    `path` is the concrete path.
 *   **Why**: Goal 15; section 10.
 
 ##### 1.26 `apps/api/src/services/media.service.ts`, `apps/api/src/routes/media.ts`, `packages/core/src/contracts/media.ts`, `packages/web-ui/src/components/MediaUploader.tsx` (Modify)
@@ -1517,8 +1583,11 @@ with its checks passing, not deployed.
       caller must have `media.upload` on it, and the asset is stored with that `profileId`;
     - `MediaUploader` takes an optional `profileId` prop and sends it; the Teach builder passes it;
     - the ownership rule in `getOwnedAsset` (`media.service.ts:197`), used by `getOwnedReadyAsset`
-      and the course service, becomes: the uploader, any member of the asset's profile, or staff;
-      learners keep the existing course-content rules.
+      and the course service, becomes: the uploader; any member of the asset's profile (checked
+      with `loadActor`, 1.13); or any user with `hasRole(user, 'support_agent')`, which includes
+      `super_admin`, as today. Support's previews of course media and teaching samples
+      (`review-course.tsx`, `person.tsx`) keep working. Learners keep the existing course-content
+      rules.
 *   **Why**: Goal 12, made ready in step 1 so the Teach builder sends `profileId` from the start.
 
 ##### 1.27 Emails (no change to `apps/api/src/emails/templates.ts`)
@@ -1548,16 +1617,19 @@ with its checks passing, not deployed.
 
 *   **Type / Scope**: seed.
 *   **Proposed Changes**:
-    - `seedDatabase` takes a `writeFile(key, bytes, contentType)` function in place of
-      `storageDir`; the local script passes a disk writer, and the API command passes the storage
-      provider;
+    - `seedDatabase` takes `storage: { provider: 'local' | 's3', put(key, bytes, contentType) }` in
+      place of `storageDir`; `put` has the signature of `StorageProvider.put`
+      (`providers/storage/types.ts:22`). The local script passes a disk writer with `provider:
+      'local'`; the API command passes the configured storage provider and its name. Seed media
+      rows use `storage.provider`, and course thumbnails get the course's `profile_id`;
+    - promo codes (`WELCOME10`, and `CERAMICS20`, which needs the demo course) are created only in
+      `demo` mode;
     - a `mode` option: `admin-only` creates only the super admin (no support agent, no demo
       learner); `demo` also creates the support agent, the demo learner, the demo teachers as
       personal profiles **with no payout account**, and the demo courses. Demo courses are
       therefore unpayable, as today, and staging checkout refuses them cleanly with
       `teacher_not_payable` instead of sending Stripe an unknown destination;
-    - media rows take `provider` from the storage writer passed in, not the hard-coded `'local'`
-      (`seed/index.ts:109`).
+    - this replaces the hard-coded `provider: 'local'` at `seed/index.ts:109`.
 *   **Why**: section 12, and the "Seeding" known gap in `infra/README.md`.
 
 ##### 1.30 `apps/teach/src/router.tsx`, `apps/teach/src/lib/urls.ts` (Modify), `apps/teach/src/lib/profile.tsx` (Create)
@@ -1567,12 +1639,16 @@ with its checks passing, not deployed.
     - routes: `/apply` stays outside profiles; all profile pages move under `/p/:profileId/`;
     - `/` opens the profile stored in `localStorage` if it is still in the user's list, else the
       first approved profile, else the first profile, else `/apply`;
-    - any page under `/p/:profileId` shows the pending page when that profile is not approved;
+    - any page under `/p/:profileId` shows the pending page when that profile is not approved, or
+      when it is a corporate profile whose payout account is not yet active (3.10);
     - the switcher lists every profile with its status, so a writer on an approved profile whose
       own application is pending can use both;
-    - `profile.tsx`: `ProfileProvider` reads `:profileId`, finds it in `user.profiles`, and exposes
-      `profileId`, `role` and `can(capability)` using the core table, so screens hide what the API
-      would refuse;
+    - `profile.tsx`: `ProfileProvider` reads `:profileId` and looks it up in `user.profiles`. If it
+      is not there, it calls `GET profile`: a `200` with `actingAsStaff: true` gives role `staff`
+      (this is how a `super_admin` acting in Teach is recognised, CUJ 5); a `404` shows "profile
+      not found". It exposes `profileId`, `role: ActorRole` (1.11), `profileStatus` and
+      `can(capability)` using the core table, so screens hide what the API would refuse;
+    - `gate.tsx` lets a `super_admin` through on `/p/*` even with an empty `user.profiles`;
     - `urls.ts`: create helpers that build profile-scoped paths (today it has only `learnerUrl`).
 *   **Why**: section 3; Goal 6.
 
@@ -1646,7 +1722,8 @@ with its checks passing, not deployed.
     - create `payout-accounts.test.ts`:
       - Goal 4: fulfilment writes the payout account and profile from metadata; fulfilment with
         missing metadata returns `unattributed`, writes no payment and stores the webhook error;
-        `syncSession` reports pending; the idempotency key includes the payout account;
+        `syncSession` reports pending; `checkoutIdempotencyKey` includes the payout account (a
+        direct unit test of the exported function, since the fake provider builds no key);
       - Goal 5: earnings, reconciliation and the ledger equal the sum of the fixture's payments for
         the account; `firstPayout` fires once per profile with the owner's user ID;
       - onboarding twice reuses the same account; `syncStatus` activates an individual account
@@ -1654,23 +1731,16 @@ with its checks passing, not deployed.
         stores an error;
     - create `staff-acting.test.ts`: `super_admin` edits a quiz, the audit row has the staff user
       and the profile; price, delete, submit, change-set, member and Stripe link routes give 403
-      (Goal 15, CUJ 5).
-*   **Why**: each slice-1 goal has a named test: Goal 1 (`migration-guard.test.ts`, 1.8a), Goal 2
-    (`profiles.test.ts`), Goal 3 (`permissions.test.ts`, 1.10, and `role-routes.test.ts`, 2.16),
-    Goals 4 and 5 (`payout-accounts.test.ts`), Goal 6 (`profile-isolation.test.ts`), Goal 7 (the
-    existing suites), Goal 8 (the migration check in the Verification Plan), Goal 15
-    (`staff-acting.test.ts`).
-
-##### 1.37 `apps/api/test/schema-guard.test.ts` (Create in step 2)
-
-*   **Type / Scope**: static test.
-*   **Proposed Changes**: the learner-read guard from section 8. It scans every file under
-    `apps/api/src/services/` and fails if any file other than `courses.service.ts` and
-    `change-sets.service.ts` refers to `s.lessons`, `s.artefacts`, `s.quizzes`,
-    `s.lessonPrerequisites`, or a named import of those tables from `@elevate/db`. Goal 1's check
-    moved to `migration-guard.test.ts` (1.8a), which reads the generated SQL instead of guessing
-    from column names.
-*   **Why**: the types alone do not stop a raw-table read (section 8).
+      (Goal 15, CUJ 5);
+    - create `role-routes.test.ts` for the step 1 roles: every route in the 1.15 table against
+      owner, staff, a signed-in non-member (404) and the owner of an `applied` profile (only
+      `profile.read` and `profile.edit` allowed), with the table as expected values (Goal 3).
+      Step 2 extends it with managers and writers (2.16).
+*   **Why**: each step 1 goal has a named test: Goal 1 (`migration-guard.test.ts`, 1.8a), Goal 2
+    (`profiles.test.ts`), Goal 3 (`permissions.test.ts`, 1.10, and `role-routes.test.ts`), Goals 4
+    and 5 (`payout-accounts.test.ts`), Goal 6 (`profile-isolation.test.ts`), Goal 7 (the existing
+    suites), Goal 8 (the local migration check in the Verification Plan; the staging and
+    production runs follow at the end of step 3), Goal 15 (`staff-acting.test.ts`).
 
 ##### 1.38 Recent sign-in for Stripe links: `apps/api/src/services/auth.service.ts`, `apps/api/src/middleware/auth.ts`, `apps/api/src/routes/teach.ts`, `apps/teach/src/routes/stripe.tsx`, `apps/teach/src/routes/settings.tsx` (Modify); `apps/api/test/stripe-reauth.test.ts` (Create)
 
@@ -1678,7 +1748,8 @@ with its checks passing, not deployed.
 *   **Proposed Changes**:
     - the authenticated user on the context carries `signedInAt`, read from `sessions.created_at`
       (sessions are created only at sign-in, `auth.service.ts:150, 168–183`, and renewal changes
-      only `last_seen_at` and `expires_at`);
+      only `last_seen_at` and `expires_at`). `createSession` writes `createdAt: deps.now()` (1.13),
+      so tests with a fixed clock can create a session 25 hours old;
     - new middleware `requireRecentSignIn(24h)` on the Stripe onboarding-link and login-link
       routes answers `401 { code: 'reauth_required' }` when it is older;
     - Teach catches `reauth_required` and sends the owner to sign-in with a redirect path back to
@@ -1701,8 +1772,9 @@ with its checks passing, not deployed.
 
 *   **Type / Scope**: Drizzle tables and views.
 *   **Proposed Changes**:
-    - new `courseChangeSets` table (including `openedPrerequisites`, JSON), `change_set_status`
-      enum, and the partial unique index on `course_id` where status is `open`;
+    - new `courseChangeSets` table (including `openedPrerequisites` and `resolutions`, both JSON),
+      `change_set_status` enum, and the partial unique index on `course_id` where status is
+      `open`;
     - `lessons`, `artefacts`, `quizzes`, `lessonPrerequisites` gain `changeSetId` (cascade) and,
       except prerequisites, `sourceId` (self-reference, `on delete set null`), `removed` and
       `copiedFromLive` (booleans, default false; `copiedFromLive` tells a draft whose live row was
@@ -1710,8 +1782,11 @@ with its checks passing, not deployed.
     - four views, `liveLessons`, `liveArtefacts`, `liveQuizzes`, `liveLessonPrerequisites`, each
       `snakeCase.view(...)` selecting rows where `change_set_id` is null;
     - the position indexes on lessons and artefacts are not unique today, so draft copies do not
-      collide with them; `quizzes.artefact_id` is unique, which still holds, because a draft quiz
-      points at its draft artefact, not the live one.
+      collide with them; `quizzes.artefact_id` is unique, and the apply order in 2.8 (steps 5 and 6)
+      never writes a live artefact's ID onto a draft quiz, so it still holds;
+    - `lesson_prerequisites` keeps its primary key `(lesson_id, prerequisite_lesson_id)`; draft
+      links use draft lesson IDs, so they cannot collide with live links, and 2.8 step 7 removes
+      draft links before inserting their mapped copies.
 *   **Why**: section 8.
 
 ##### 2.3 `packages/db/src/schema/relations.ts`, `packages/db/src/learner-relations.ts` (Modify, Create), `packages/db/src/index.ts` (Modify)
@@ -1719,12 +1794,15 @@ with its checks passing, not deployed.
 *   **Type / Scope**: relations and a second relations set.
 *   **Proposed Changes**: the main relations gain memberships, invitations and change sets.
     `learner-relations.ts` defines relations over `courses`, the four views, `mediaAssets`,
-    `profiles`, `users`, `userRoles`, enrolments, progress, attempts and certificates. The views use
-    the key names the learner services use today (`lessons`, `artefacts`, `quizzes`,
-    `prerequisites`), and `courses.thumbnail`, `artefacts.media` and `courses.profile` are
-    included, so the learner services' `with:` trees stay the same apart from the profile rename.
-    It exports `createLearnerDb(client)`, which takes the same client object as `createDb` and
-    `createPgliteDb` and returns `LearnerDb`. `index.ts` exports both.
+    `profiles`, `users`, `userRoles`, enrolments, progress, attempts and certificates. The view
+    relations get their own keys: `courses.liveLessons`, `liveLessons.liveArtefacts`,
+    `liveArtefacts.liveQuiz`, `liveLessons.livePrerequisites`. `courses.thumbnail`,
+    `liveArtefacts.media` and `courses.profile` are included. The learner services' `with:` trees
+    change only by these key names (`lessons` → `liveLessons`, `artefacts` → `liveArtefacts`,
+    `quiz` → `liveQuiz`, `prerequisites` → `livePrerequisites`), which is what lets the guard in
+    2.17 tell learner reads from raw reads. It exports `createLearnerDb(client)`, which takes the
+    pool returned by `createDb` or the PGlite client returned by `createPgliteDb`, and returns
+    `LearnerDb`. `index.ts` exports both.
 *   **Why**: section 8.
 
 ##### 2.4 `apps/api/src/deps.ts`, `apps/api/test/helpers/test-app.ts` (Modify)
@@ -1733,15 +1811,19 @@ with its checks passing, not deployed.
 *   **Proposed Changes**: `Deps` gains `learnerDb: LearnerDb`, built from the same client as `db`
     (the node-postgres pool in `deps.ts`, the PGlite client in `test-app.ts`). It is passed to the
     catalogue, learning, certificate, enrolment, analytics and checkout-quote services. The raw `db`
-    stays in `Deps`, because learner writes need it. So the types remove `db.query.lessons` from
-    these services but do not stop `select().from(s.lessons)`; the guard is the test in 1.37.
+    stays in `Deps`, because learner writes and non-content reads (enrolments, payments, promo
+    codes) need it. The types do not stop a raw content read from these services; the guard is the
+    test in 2.17.
 *   **Why**: section 8.
 
 ##### 2.5 `apps/api/src/services/catalog.service.ts`, `learning.service.ts`, `certificates.service.ts` (Modify)
 
 *   **Type / Scope**: learner services.
-*   **Proposed Changes**: take `learnerDb` for reads. Progress and quiz-attempt writes first look the
-    artefact or quiz up in the view; not found is 404. Raw-table imports are removed.
+*   **Proposed Changes**: course-content reads go through `learnerDb` with the `live*` keys (2.3).
+    Progress and quiz-attempt writes need no extra lookup: `updateProgress`, `startAttempt` and
+    `submitAttempt` already find the artefact or quiz in the loaded enrolment graph and return 404
+    when it is absent (`learning.service.ts:268–273, 316–321, 365–369`), and that graph is now
+    loaded from the views. Raw-table imports are removed.
 *   **Why**: Goal 11.
 
 ##### 2.6 `apps/api/src/services/payments.service.ts`, `enrollments.service.ts`, `analytics.service.ts` (Modify)
@@ -1764,9 +1846,23 @@ with its checks passing, not deployed.
     - `remove`: the owner removes anyone; a manager removes writers only;
     - managers only on corporate profiles (409 otherwise);
     - invite only when the profile is approved;
-    - the token is 32 random bytes, stored as a SHA-256 hash, valid for 7 days;
+    - the token is made and stored as sign-in tokens are today: `randomToken(32)`, stored as its
+      HMAC keyed by `SESSION_SECRET` (`lib/crypto.ts`), valid for 7 days;
+    - `profile_invitations` rows are inserted with `createdAt: deps.now()`, so the 24-hour limit
+      (2.10) and expiry use the same clock as tests;
+    - **expiry** is applied when an invitation is read: an invitation whose `expires_at` is before
+      `deps.now()` counts as expired, and `invite`, `list` and `accept` first set such rows to
+      `expired`. So an expired invitation never blocks a new one under the "one pending per email"
+      index;
+    - a second `invite` to an email with a pending invitation resends it (new token and expiry)
+      instead of failing; resends count toward the limit of 20;
     - acceptance follows the diagram in section 7;
-    - the owner cannot be added as a member, and a user already a member gets 409.
+    - the owner cannot be added as a member, and a user already a member gets 409;
+    - `changeRole(actor, userId, role)` (decided by the author, 2026-11-11): only the owner can
+      change a role, in either direction (writer to manager, manager to writer), and only on an
+      approved corporate profile. On a personal profile it returns `409 managers_corporate_only`.
+      Managers and staff cannot change roles. The member is already on the profile, so no
+      confirmation step applies. Each change is audited and emails the member.
 *   **Why**: Goals 9 and 10.
 
 ##### 2.8 `apps/api/src/services/change-sets.service.ts` (Create)
@@ -1780,34 +1876,62 @@ with its checks passing, not deployed.
       `artefact_id` to the new draft IDs; copy the prerequisite links with both ends rewritten to
       draft lesson IDs; store the live links in `opened_prerequisites` and the latest live
       `updated_at` in `opened_at_snapshot`.
+    - **Terms used below.** A *copied* draft has `copied_from_live = true`; its `source_id` points
+      at the live row, or is null if that live row was deleted since. A *new* draft has
+      `copied_from_live = false` and keeps its own ID when it goes live. The *map* sends each draft
+      ID to a live ID: a copied draft's `source_id`, or a new draft's own ID.
     - **`approve`**, in one transaction, in this order:
       1. lock the change set and the course row (`select ... for update`);
-      2. **conflict check.** It is a conflict if a live lesson, artefact or quiz has `updated_at`
-         after `opened_at_snapshot`; or a draft row was copied from a live row that no longer
-         exists (its `source_id` is now null, which the draft records by keeping
-         `copied_from_live = true`); or the live prerequisite links differ from
-         `opened_prerequisites`. If any conflict has no stored choice, return
-         `409 change_set_conflict` with the list and change nothing;
-      3. build a map from each draft ID to its live ID: `source_id` where set, else the draft's own
-         ID (new rows keep their ID and become live);
-      4. lessons: for each draft with `source_id`, update the live lesson from it (every column
-         except `id`, `course_id`, `change_set_id`, `source_id`, `removed`); for each new draft,
-         clear `change_set_id` and `source_id`;
-      5. artefacts: rewrite each draft's `lesson_id` through the map, then update or promote as in
-         step 4;
-      6. quizzes: rewrite each draft's `artefact_id` through the map, then update or promote;
-      7. prerequisites: delete the course's live links, then insert the draft links with both ends
-         rewritten through the map (the same replace-the-set rule `setPrerequisites` uses,
-         `courses.service.ts:360`);
-      8. delete each live row whose draft is marked `removed` (its cascades remove its own
-         children, as an owner's delete does today);
+      2. **conflict check.** A conflict is any of:
+         - a copied draft whose live row has `updated_at` after `opened_at_snapshot` (kind
+           `edited`);
+         - a copied draft with `source_id` null, because its live row was deleted (kind `deleted`);
+         - a lesson whose live prerequisite links differ from its links in
+           `opened_prerequisites` (kind `prerequisites`, keyed by the live lesson ID).
+
+         Live rows the owner added after opening have no draft, are not conflicts, and stay as they
+         are. If any conflict has no entry in `resolutions`, return `409 change_set_conflict` with
+         the list and change nothing;
+      3. apply the stored resolutions (see `resolveConflicts`): for each `keep: 'live'` on an
+         `edited` row, mark the draft so step 5 skips its own fields; for each `keep: 'live'` on a
+         `deleted` row, delete the draft and its draft children, accepting the owner's deletion;
+         for each `keep: 'draft'` on a `deleted` row, treat the draft as new from here on;
+      4. build the map;
+      5. **update copied rows**, parents first (lessons, then artefacts, then quizzes): for each
+         copied draft not marked `removed` and not skipped in step 3, update its live row from it.
+         Every column is copied except `id`, `course_id`, `change_set_id`, `source_id`, `removed`
+         and `copied_from_live`. Foreign keys are written through the map: an artefact's
+         `lesson_id`, a quiz's `artefact_id`. The draft row itself is not changed, so no unique
+         index sees two rows with the same value (a copied quiz's draft keeps pointing at its draft
+         artefact until step 9);
+      6. **promote new rows**, parents first: for each new draft not marked `removed`, rewrite its
+         foreign keys through the map and clear `change_set_id`, `source_id` and
+         `copied_from_live`. A new quiz on a copied artefact now points at the live artefact; it
+         can only exist if the writer removed the old quiz, and that live quiz is deleted first, in
+         this step, before the new one is promoted;
+      7. **prerequisites**, per lesson, as the editor saves them today (`setPrerequisites` replaces
+         one lesson's links, `courses.service.ts:381`): first delete every draft prerequisite row
+         of this change set into memory; then, for each lesson that has a draft, delete its live
+         links and insert its draft links with both ends written through the map. Lessons with no
+         draft keep their live links;
+      8. delete each live row whose copied draft is marked `removed` (quizzes were already handled
+         in step 6); its cascades remove its live children, as an owner's delete does today;
       9. delete every row still carrying this `change_set_id`. No live row points at a draft row
          by now, so the cascade removes only drafts;
       10. set the change set to `approved` with `decided_by` and `decided_at`, and email the writer.
-    - **`resolveConflicts(choices)`** stores `{ draftId | 'prerequisites', keep: 'live' | 'draft' }`
-      for each conflict. `keep: 'live'` drops that draft row (or keeps the live links) before
-      `approve` runs; `keep: 'draft'` applies it. `approve` then succeeds.
+    - **`resolveConflicts(choices)`** writes the choices into `course_change_sets.resolutions`
+      (JSON), one entry per conflict: `{ kind, id, keep: 'live' | 'draft' }`, where `id` is the
+      draft ID for `edited` and `deleted`, and the live lesson ID for `prerequisites`. It changes no
+      rows; `approve` applies them (step 3). After resolving, `approve` no longer reports those
+      conflicts; a live edit made after resolving is a new conflict.
+      - `keep: 'live'` on `edited`: the live row keeps its own fields, but the writer's new children
+        under it are still promoted;
+      - `keep: 'live'` on `deleted`: the draft and its draft children are discarded; the conflict
+        list shows the approver how many new children that drops;
+      - `keep: 'live'` on `prerequisites`: that lesson's live links stay.
     - **`discard`** deletes the change set; its draft rows cascade.
+    - **Removing a new draft** while editing deletes it at once; only copied drafts are kept with
+      `removed = true`.
 *   **Why**: Goal 11; section 8's guarantees.
 
 ##### 2.9 `apps/api/src/services/courses.service.ts` (Modify)
@@ -1819,15 +1943,39 @@ with its checks passing, not deployed.
     filter `change_set_id is null`, unless the request asks for the draft (`?draft=1`, 2.10).
     These reads serve the Teach editor and Support's course preview (`review.service.ts`), and are
     the one place a code filter hides drafts (section 8).
+
+    Which row an edit reaches while a change set is open:
+    - an actor without `course.editLive` (a writer) may send a live ID or a draft ID. A live ID is
+      mapped to its copied draft through `source_id`; a draft ID is used as is. Either way the edit
+      lands on the draft;
+    - an actor with `course.editLive` (owner, manager, staff) edits live rows. A draft ID from them
+      gives 404, because the lookup for these actors filters `change_set_id is null`;
+    - the lesson, artefact and quiz lookups from 1.17 (joined to `courses`, filtered by
+      `profile_id`) add that filter: `change_set_id is null` for editors of live rows, and
+      `change_set_id = <open set>` for writers.
+
+    The builder loads `?draft=1` whenever the course has an open change set and the user is a
+    writer (2.14).
 *   **Why**: section 8.
 
 ##### 2.10 `apps/api/src/routes/teach.ts` (Modify)
 
 *   **Type / Scope**: Hono routes.
 *   **Proposed Changes**:
-    - `members` routes under the profile (`members.read`, `members.manageWriters`,
-      `members.manageManagers`), including `POST invitations/:id/resend` and `DELETE members/me`
-      (leave, which needs membership only, no capability);
+    - member and invitation routes under `/teach/profiles/:profileId` (each needs an approved
+      profile, 1.9):
+
+      | Route | Capability |
+      |---|---|
+      | `GET members` (members and pending invitations) | `members.read` |
+      | `POST invitations` `{ email, role }` | `members.manageWriters` for `writer`; `members.manageManagers` for `manager` |
+      | `POST invitations/:id/resend` | same as inviting that role |
+      | `DELETE invitations/:id` (revoke) | same as inviting that role |
+      | `POST invitations/:id/confirm` (a manager accepted from another email) | `members.manageManagers` |
+      | `DELETE members/:userId` (remove) | `members.manageWriters` for a writer; `members.manageManagers` for a manager |
+      | `PATCH members/:userId` `{ role }` (change role) | `members.manageManagers` (owner only); corporate profiles only |
+      | `DELETE members/me` (leave) | membership only; the owner gets 409 `owner_cannot_leave` |
+
     - `GET /teach/invitations/:token` (shows profile and role, no sign-in needed) and
       `POST /teach/invitations/:token/accept` (signed in);
     - change-set routes:
@@ -1838,11 +1986,11 @@ with its checks passing, not deployed.
         builder switches to draft IDs from then on;
       - `GET courses/:id/change-set` (`profile.read`): status, author, changed items;
       - `POST courses/:id/change-set/approve` (`changeSet.review`): `200` with the course, or
-        `409 { code: 'change_set_conflict', conflicts: [{ kind: 'lesson' | 'artefact' | 'quiz' |
-        'prerequisites', liveId, draftId }] }`;
+        `409 { code: 'change_set_conflict', conflicts: [{ kind: 'edited' | 'deleted' |
+        'prerequisites', item: 'lesson' | 'artefact' | 'quiz' | null, id, liveId, draftId,
+        droppedChildren }] }`;
       - `POST courses/:id/change-set/resolve` (`changeSet.review`), body
-        `{ choices: [{ draftId, keep: 'live' | 'draft' }] }` (`draftId` is `'prerequisites'` for
-        the link set);
+        `{ choices: [{ kind, id, keep: 'live' | 'draft' }] }`, stored in `resolutions` (2.8);
       - `POST courses/:id/change-set/discard` (`changeSet.review`);
     - invitations are limited to 20 per profile in any 24 hours, counted in the database
       (`profile_invitations` rows for the profile with `created_at` after `deps.now()` minus 24
@@ -1868,7 +2016,16 @@ with its checks passing, not deployed.
 ##### 2.13 `packages/core/src/contracts/teach.ts` (Modify)
 
 *   **Type / Scope**: zod contracts.
-*   **Proposed Changes**: invitation, member and change-set request and response schemas.
+*   **Proposed Changes**:
+    - `inviteSchema = { email, role: 'manager' | 'writer' }`;
+    - `MemberView = { userId, name, email, role, addedAt, addedBy }`;
+    - `InvitationView = { id, email, role, status, invitedBy, expiresAt, createdAt }`;
+    - `GET members` returns `{ members: MemberView[], invitations: InvitationView[] }`;
+    - `InvitationPreview` (for `GET /teach/invitations/:token`) `= { profileName, profileType,
+      role, invitedByName, expiresAt, status }`;
+    - change-set schemas: `ChangeSetView = { id, status, openedBy, openedAt, items: [{ kind,
+      liveId, draftId, change: 'added' | 'edited' | 'removed' }] }`, the conflict list and the
+      resolve body from 2.10.
 *   **Why**: typed RPC for Teach.
 
 ##### 2.14 Teach screens: `apps/teach/src/routes/members.tsx`, `invitation.tsx` (Create); `courses/builder.tsx`, `courses/list.tsx`, `components/review-panel.tsx` (Modify); `apps/teach/src/components/change-set-review.tsx` (Create)
@@ -1877,8 +2034,8 @@ with its checks passing, not deployed.
 *   **Proposed Changes**:
     - `members.tsx`: list, invite, revoke, remove, confirm pending managers;
     - `invitation.tsx` at `/invitations/:token`, outside the profile layout: sign in, then accept;
-    - the builder shows a "Changes waiting for approval" bar for writers on live courses, and
-      greys out details, price and submit;
+    - for a writer on a live course, the builder loads `?draft=1` whenever a change set is open,
+      shows a "Changes waiting for approval" bar, and greys out details, price and submit;
     - `change-set-review.tsx`: owners and managers see each changed item, its live and draft
       version, conflicts with a live/draft choice, then approve or discard;
     - the course list shows a pending-changes badge.
@@ -1896,23 +2053,53 @@ with its checks passing, not deployed.
 *   **Proposed Changes**:
     - `members.test.ts`: invite, accept as existing and as new user, expiry, revoke, manager email
       mismatch waits for confirmation, managers refused on personal profiles, 21st invite in a day
-      gives 429; resend makes the old link fail; a writer leaves, the owner cannot; a manager
-      cannot remove another manager (Goals 9, CUJ 2);
-    - `role-routes.test.ts`: every route in the 1.15 and 2.10 tables against every role and
-      course status, with the tables as expected values; writers get 403 on price, submit, delete,
+      gives 429; resend makes the old link fail; an expired invitation is marked `expired` and a
+      new one to the same email succeeds; a second invite to a pending email resends it; a writer
+      leaves, the owner cannot; a manager cannot remove another manager; the owner changes a
+      writer to manager and back on a corporate profile; a manager changing a role gets 403; a role
+      change on a personal profile gets 409; nothing works on an `applied` profile (Goal 9,
+      CUJ 2);
+    - `role-routes.test.ts` (from 1.36), extended: every route in the 1.15 and 2.10 tables against
+      every role, including manager and writer, and every course status, with the tables as
+      expected values; writers get 403 on price, submit, delete,
       earnings, members and Stripe routes (Goals 3 and 10);
     - `change-sets.test.ts` (Goal 11, CUJ 3):
       - writer edits a live lesson and adds an artefact to an existing lesson; the learner sees no
         change; after approval the learner sees both, and the new artefact still exists;
       - learner progress on the edited artefact survives approval;
-      - a prerequisite added and one removed both apply;
+      - a change set on a course with a quiz approves (no unique-index error), and an edited quiz
+        keeps its ID;
+      - a prerequisite added and one removed both apply; a link between two new lessons applies
+        without a primary-key error;
       - an owner editing a live lesson, and an owner deleting a live lesson, while the change set
-        is open are both reported as conflicts; resolving them lets approval succeed;
+        is open are both reported as conflicts; resolving them makes approval succeed; `keep:
+        'live'` on the deleted lesson drops its draft children and reports how many;
+      - a lesson the owner adds while the change set is open is not a conflict and survives
+        approval with its links;
+      - a new artefact the writer adds and then removes does not go live;
+      - a writer sending a stale live ID edits the draft; an owner sending a draft ID gets 404;
       - a progress write to a draft artefact ID gives 404;
       - My Learning progress and the checkout quote are unchanged while a change set is open;
     - `profile-media.test.ts`: a removed writer's upload stays readable by the profile (Goal 12);
-    - `schema-guard.test.ts` (1.37): the learner-read guard.
-*   **Why**: each slice-2 goal has a named test.
+    - `schema-guard.test.ts` (2.17): the learner-read guard.
+*   **Why**: each step 2 goal has a named test: Goal 9 `members.test.ts`, Goal 10
+    `role-routes.test.ts`, Goal 11 `change-sets.test.ts`, Goal 12 `profile-media.test.ts`.
+
+##### 2.17 `apps/api/test/schema-guard.test.ts` (Create)
+
+*   **Type / Scope**: static test.
+*   **Proposed Changes**: the learner-read guard from section 8. It scans every file under
+    `apps/api/src/services/` and fails if any file other than `courses.service.ts` and
+    `change-sets.service.ts` contains:
+    - `s.lessons`, `s.artefacts`, `s.quizzes`, `s.lessonPrerequisites`, or a named import of those
+      tables from `@elevate/db`;
+    - a raw relation key in a relational query: the regular expression
+      `\b(lessons|artefacts|quiz|prerequisites)\s*:` inside a `with:` block.
+
+    The learner relations' keys (`liveLessons`, `liveArtefacts`, `liveQuiz`, `livePrerequisites`)
+    do not match. The test includes one fixture file that breaks each rule, to show the guard
+    fires.
+*   **Why**: the types alone do not stop a raw-table read (section 8).
 
 #### Step 3: Corporate
 
@@ -1954,15 +2141,29 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
     `applied`), the legal entity (`pending`) and links the document, in one transaction. It
     refuses a UEN already used (409 `uen_in_use`). The document must be a `document` media asset
     uploaded by the caller.
+
+    **Re-applying after a rejection** (decided by the author, 2026-11-11): only the owner of the
+    rejected corporate profile can resubmit, through `PUT /teach/profiles/:profileId/apply/corporate`
+    with the same body. It updates the profile and its legal entity in place (UEN, legal name,
+    entity type, document, teaching fields) and sets them back to `applied` and `pending`, so the
+    application returns to the review queue. The UEN stays with that profile: a new
+    `POST /teach/apply/corporate` with it still gets `409 uen_in_use`, even when the holder is
+    rejected. Changing the UEN on resubmit is allowed only to a UEN no other profile holds. The
+    previous rejection reason stays in the audit log for Support to see.
 *   **Why**: Goal 13.
 
 ##### 3.5 `apps/api/src/services/connect.service.ts` (Modify)
 
 *   **Type / Scope**: Stripe.
 *   **Proposed Changes**: corporate profiles create `company` accounts (from the profile type,
-    1.18). `applyAccountState` gains its company rule: a `company` account stays `onboarding` when
-    charges are enabled, until Support records the name match. Because both the webhook and
-    `syncStatus` use it, neither path can activate a company account early.
+    1.18). `applyAccountState` gains its company rule: a `company` account is `active` only when
+    charges are enabled **and** `name_verified_at` is set; otherwise it is `onboarding`. The rule
+    is evaluated on every webhook, `syncStatus` call and name-check decision, so the order does not
+    matter: a name match recorded before charges are enabled activates the account when Stripe
+    enables them. The same function sets any account (individual or company) back to `onboarding`
+    if Stripe disables charges, which makes its courses unpayable until they are enabled again.
+    Because both the webhook and `syncStatus` use it, neither path can activate a company account
+    early.
 *   **Why**: Goal 14.
 
 ##### 3.6 `apps/api/src/services/legal-entities.service.ts` (Create), `apps/api/src/routes/support.ts` (Modify)
@@ -1974,9 +2175,10 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
     - `GET /support/profiles/:id/payout-account/name-check` returns the Stripe legal name (or
       `null` when Stripe returns none) beside the entity's legal name, plus the Stripe dashboard URL
       for the account;
-    - `POST .../name-check` takes `{ match, source: 'api' | 'dashboard', note? }`. `match: true`
-      sets `name_verified_by`, `name_verified_at` and `active`; `match: false` keeps it in
-      `onboarding` and stores the note. The audit entry stores both names as seen and the source;
+    - `POST .../name-check` takes `{ match, source: 'api' | 'dashboard', note? }` and needs no
+      particular Stripe state. `match: true` sets `name_verified_by` and `name_verified_at`, then
+      calls `applyAccountState` (3.5), which activates the account if charges are already enabled;
+      `match: false` keeps it in `onboarding` and stores the note. The audit entry stores both names as seen and the source;
       `source: 'api'` is refused when Stripe returned no name;
     - the review queue includes corporate applications with a type label;
     - all of these routes use `requireRole('support_agent')`, so any Support staff can run them
@@ -1994,7 +2196,10 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
 
 *   **Type / Scope**: Support API, `super_admin` only.
 *   **Proposed Changes**: `POST /support/profiles/:id/recover-owner`:
-    - personal: `{ newEmail }` changes the owner's email; 409 when the email is taken;
+    - personal: `{ newEmail }` changes the owner's email; 409 when the email is taken. The
+      owner's email identity row is updated too (`identities.providerSubject`, which is set from
+      the email at sign-up, `auth.service.ts:161–164`), so the new address signs in to the same
+      user;
     - corporate: `{ newOwnerUserId, authorisationMediaId, removePreviousOwner }` sets the owner,
       deletes the new owner's membership row, and adds the previous owner as manager unless removed;
     - both audited and both email the old and new addresses;
@@ -2002,7 +2207,7 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
       changed); on a corporate recovery, all sessions of the previous owner. The new owner's
       sessions are kept.
 *   **Why**: section 11. This is in the MVP because a corporate profile whose owner cannot sign in
-    otherwise cannot get a working owner back.
+    has no other way to get a new owner.
 
 ##### 3.9 Emails (no change to `apps/api/src/emails/templates.ts`)
 
@@ -2015,7 +2220,8 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
 *   **Type / Scope**: Teach UI.
 *   **Proposed Changes**: the apply page offers "Personal" or "Company"; the company form takes UEN,
     legal name, entity type and the registry document upload; `pending.tsx` shows the step the
-    company is on (review, Stripe, name check); the "Create a company profile" entry lives in the
+    company is on: review while the profile is `applied`; then, once approved, Stripe onboarding
+    and the name check while the payout account is not yet `active` (the routing rule in 1.30); the "Create a company profile" entry lives in the
     profile switcher.
 *   **Why**: CUJ 4.
 
@@ -2041,12 +2247,15 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
 *   **Proposed Changes**:
     - `corporate.test.ts`: apply, approve, onboard, webhook enables charges, checkout still refuses
       with `teacher_not_payable`, name check passes, checkout succeeds (Goals 13–14, CUJ 4); UEN in
-      use gives 409; rejection stores the reason;
+      use gives 409; rejection stores the reason; the owner of a rejected application resubmits
+      and it returns to the queue as `applied`; another user applying with that UEN still gets
+      409;
     - `owner-recovery.test.ts`: personal email change, corporate owner change with previous owner
       kept as manager, non-`super_admin` gets 403, the right sessions revoked in each case;
     - `uen.test.ts` (core, 3.2): valid and invalid examples of each pattern, and a company UEN
       from after 2009 accepted.
-*   **Why**: each slice-3 goal has a test.
+*   **Why**: each step 3 goal has a named test: Goals 13 and 14 `corporate.test.ts`; owner
+    recovery (CUJ 7) `owner-recovery.test.ts`.
 
 #### Documentation and infrastructure
 
@@ -2086,16 +2295,20 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
 *   **Type / Scope**: operations docs.
 *   **Proposed Changes**:
     - the one-time reset procedure from section 12, written out as commands:
-      1. push to the branch, and expect Deploy to fail at "Run database migrations";
-      2. find the task definition it registered
-         (`aws ecs list-task-definitions --family-prefix <family> --sort DESC --max-items 1`) and
-         run `reset-schema` with `aws ecs run-task`, overriding the container command to
-         `["node", "dist/reset-schema.js"]` and adding `ALLOW_SCHEMA_RESET=yes` to its environment;
-      3. re-run Deploy for the branch with `workflow_dispatch`;
-      4. run `seed` the same way as step 2, with `["node", "dist/seed.js", "--demo"]` on staging or
+      a. push to the branch, and expect Deploy to fail at "Run database migrations";
+      b. find the task definition it registered
+         (`aws ecs list-task-definitions --family-prefix "$ECS_TASK_FAMILY" --sort DESC
+         --max-items 1`) and run `reset-schema` with the same `aws ecs run-task` flags the
+         workflow's migration step uses (`--cluster "$ECS_CLUSTER"`, `--launch-type FARGATE`,
+         `--network-configuration` with `$ECS_SUBNETS` and `$ECS_SECURITY_GROUP`,
+         `deploy.yml:90–97`; the values come from `terraform output github_environment_variables`),
+         overriding the container command to `["node", "dist/reset-schema.js"]` and adding
+         `ALLOW_SCHEMA_RESET=yes` to its environment;
+      c. re-run Deploy for the branch with `workflow_dispatch`;
+      d. run `seed` the same way as (b), with `["node", "dist/seed.js", "--demo"]` on staging or
          `"--admin-only"` on production;
-    - that the old API serves errors between steps 2 and 3, and that production needs the
-      reviewer's approval in steps 1 and 3;
+    - that the old API serves errors between (b) and (c), and that on production (a) and (c) wait
+      for approval by the required reviewer of the `production` GitHub Environment;
     - the note that `git revert` cannot undo the reset; remove the "Seeding" known gap;
     - local dev uses `npm run db:reset`, `db:migrate`, `db:seed` as today.
 *   **Why**: section 12.
@@ -2121,10 +2334,10 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
 *   **Compilation/Build**: `npx turbo run typecheck build`. `npm run build:types -w @elevate/api`
     must pass, since Teach and Support depend on the RPC types.
 *   **Unit Tests**: `npx turbo run test`. New core tests: `permissions.test.ts`, `uen.test.ts`.
-*   **Integration Tests**: the API suite on PGlite, including the new tests in 1.8a, 1.36, 1.37,
-    1.38, 2.16 and 3.13. The goal-to-test mapping for steps 1–3 is listed in the "Why" of 1.36,
-    2.16 and 3.13; Goals 9–14 map to `members`, `role-routes`, `change-sets`, `profile-media` and
-    `corporate` tests.
+*   **Integration Tests**: the API suite on PGlite, including the new tests in 1.8a, 1.36, 1.38,
+    2.16, 2.17 and 3.13. Goal-to-test mapping: step 1 goals are listed in the "Why" of 1.36;
+    Goal 9 `members.test.ts`; Goal 10 `role-routes.test.ts`; Goal 11 `change-sets.test.ts`; Goal 12
+    `profile-media.test.ts`; Goals 13 and 14 `corporate.test.ts`; Goal 15 `staff-acting.test.ts`.
 *   **Static Analysis & Linting**: `npm run lint` (Biome); `npm run check:dupes` with `drizzle-orm`
     added; `npx expo-doctor` in `apps/learner`.
 *   **Test Coverage Requirement**: no numeric target, as the repo has none today. The requirement is
@@ -2137,7 +2350,7 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
     provider; CUJ 4 again against Stripe test mode with made-up company details.
 *   **Staging**: after step 3, run the reset procedure in D.4, then CUJs 1, 2, 3 and 5 on staging
     with Stripe test mode. Production is reset with `seed --admin-only` only after staging passes,
-    and only with the author's go-ahead.
+    and its deploys wait for the required reviewer of the `production` GitHub Environment.
 
 --------------------------------------------------------------------------------
 
