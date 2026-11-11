@@ -4,8 +4,7 @@ import type {
   MoneyBreakdown,
   ReconciliationView,
 } from '@elevate/core'
-import { schema as s } from '@elevate/db'
-import { and, desc, eq } from 'drizzle-orm'
+import type { schema as s } from '@elevate/db'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
 import type { SessionUser } from '../middleware/auth'
@@ -43,12 +42,10 @@ export class EarningsService {
 
   async forTeacher(user: SessionUser): Promise<EarningsView> {
     const { db } = this.deps
-    const profile = await db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, user.id),
-    })
+    const profile = await db.query.teacherProfiles.findFirst({ where: { userId: user.id } })
     const rows = await db.query.payments.findMany({
-      where: eq(s.payments.teacherId, user.id),
-      orderBy: [desc(s.payments.paidAt), desc(s.payments.createdAt)],
+      where: { teacherId: user.id },
+      orderBy: { paidAt: 'desc', createdAt: 'desc' },
       with: {
         course: { columns: { id: true, title: true, slug: true, status: true } },
         user: { columns: { email: true } },
@@ -57,7 +54,7 @@ export class EarningsService {
     const byCourse = new Map<string, typeof rows>()
     for (const row of rows) byCourse.set(row.courseId, [...(byCourse.get(row.courseId) ?? []), row])
     const ownCourses = await db.query.courses.findMany({
-      where: eq(s.courses.teacherId, user.id),
+      where: { teacherId: user.id },
       columns: { id: true, title: true, slug: true, status: true },
     })
     const courses = ownCourses
@@ -93,7 +90,7 @@ export class EarningsService {
   async forCourse(user: SessionUser, courseId: string): Promise<CourseEarningsView> {
     const { db } = this.deps
     const course = await db.query.courses.findFirst({
-      where: eq(s.courses.id, courseId),
+      where: { id: courseId },
       columns: {
         id: true,
         title: true,
@@ -105,8 +102,8 @@ export class EarningsService {
     })
     if (!course || course.teacherId !== user.id) throw errors.notFound('Course')
     const rows = await db.query.payments.findMany({
-      where: and(eq(s.payments.courseId, courseId), eq(s.payments.teacherId, user.id)),
-      orderBy: [desc(s.payments.paidAt), desc(s.payments.createdAt)],
+      where: { courseId, teacherId: user.id },
+      orderBy: { paidAt: 'desc', createdAt: 'desc' },
       with: { user: { columns: { email: true } }, promoCode: { columns: { code: true } } },
     })
     return {
@@ -137,13 +134,11 @@ export class EarningsService {
   /** Compares Σ teacher net in our ledger with Stripe's transfers to the connected account. */
   async reconcile(user: SessionUser): Promise<ReconciliationView> {
     const profile = await this.deps.db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, user.id),
+      where: { userId: user.id },
     })
     if (!profile?.stripeAccountId)
       throw errors.conflict('stripe_not_connected', 'Connect Stripe to reconcile earnings')
-    const rows = await this.deps.db.query.payments.findMany({
-      where: eq(s.payments.teacherId, user.id),
-    })
+    const rows = await this.deps.db.query.payments.findMany({ where: { teacherId: user.id } })
     const ledgerNetCents = breakdown(rows).netCents
     const stripeTransferTotalCents = await this.deps.payments.listTransferAmountCents(
       profile.stripeAccountId,

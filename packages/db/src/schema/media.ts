@@ -1,9 +1,9 @@
-import { bigint, index, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core'
+import { bigint, index, integer, snakeCase, text, uuid } from 'drizzle-orm/pg-core'
 import { users } from './auth'
 import { createdAt, id, updatedAt } from './columns'
 import { mediaKindEnum, mediaProviderEnum, mediaStatusEnum } from './enums'
 
-export const mediaAssets = pgTable(
+export const mediaAssets = snakeCase.table(
   'media_assets',
   {
     id: id(),

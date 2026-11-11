@@ -16,11 +16,11 @@ export class ReviewService {
   }
 
   async queue(): Promise<CourseSummary[]> {
-    return this.courses.listSummaries(eq(s.courses.status, 'pending_review'), 'submitted')
+    return this.courses.listSummaries({ status: 'pending_review' }, 'submitted')
   }
 
   async all(status?: 'draft' | 'pending_review' | 'live' | 'rejected'): Promise<CourseSummary[]> {
-    return this.courses.listSummaries(status ? eq(s.courses.status, status) : undefined)
+    return this.courses.listSummaries({ status })
   }
 
   async view(courseId: string): Promise<CourseView> {
@@ -30,7 +30,7 @@ export class ReviewService {
   async approve(actor: SessionUser, courseId: string): Promise<CourseView> {
     const { db, env, mailer } = this.deps
     const course = await db.query.courses.findFirst({
-      where: eq(s.courses.id, courseId),
+      where: { id: courseId },
       with: { teacher: { with: { teacherProfile: true } } },
     })
     if (!course) throw errors.notFound('Course')
@@ -75,7 +75,7 @@ export class ReviewService {
   async reject(actor: SessionUser, courseId: string, reason: string): Promise<CourseView> {
     const { db, env, mailer } = this.deps
     const course = await db.query.courses.findFirst({
-      where: eq(s.courses.id, courseId),
+      where: { id: courseId },
       with: { teacher: { with: { teacherProfile: true } } },
     })
     if (!course) throw errors.notFound('Course')

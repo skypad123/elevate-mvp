@@ -6,7 +6,7 @@ import type {
   VerifyResponse,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { magicLinkEmail } from '../emails/templates'
 import { hmacHex, randomCode, randomToken } from '../lib/crypto'
@@ -92,14 +92,11 @@ export class AuthService {
     const link =
       'token' in input
         ? await db.query.magicLinks.findFirst({
-            where: and(
-              eq(s.magicLinks.tokenHash, this.hash(input.token)),
-              isNull(s.magicLinks.consumedAt),
-            ),
+            where: { tokenHash: this.hash(input.token), consumedAt: { isNull: true } },
           })
         : await db.query.magicLinks.findFirst({
-            where: and(eq(s.magicLinks.email, input.email), isNull(s.magicLinks.consumedAt)),
-            orderBy: desc(s.magicLinks.createdAt),
+            where: { email: input.email, consumedAt: { isNull: true } },
+            orderBy: { createdAt: 'desc' },
           })
 
     if (!link)
@@ -153,10 +150,10 @@ export class AuthService {
 
   private async findOrCreateUser(email: string) {
     const { db } = this.deps
-    const existing = await db.query.users.findFirst({ where: eq(s.users.email, email) })
+    const existing = await db.query.users.findFirst({ where: { email } })
     if (existing) return existing
     const [created] = await db.insert(s.users).values({ email }).onConflictDoNothing().returning()
-    const user = created ?? (await db.query.users.findFirst({ where: eq(s.users.email, email) }))
+    const user = created ?? (await db.query.users.findFirst({ where: { email } }))
     if (!user) throw new Error('failed to create user')
     await db
       .insert(s.identities)
@@ -186,7 +183,7 @@ export class AuthService {
     const { db, now } = this.deps
     const current = now()
     const session = await db.query.sessions.findFirst({
-      where: and(eq(s.sessions.tokenHash, this.hash(token)), gt(s.sessions.expiresAt, current)),
+      where: { tokenHash: this.hash(token), expiresAt: { gt: current } },
     })
     if (!session) return null
     if (current.getTime() - session.lastSeenAt.getTime() > SESSION_TOUCH_MS) {
@@ -205,7 +202,7 @@ export class AuthService {
 
   async buildAuthUser(userId: string): Promise<AuthUser> {
     const user = await this.deps.db.query.users.findFirst({
-      where: eq(s.users.id, userId),
+      where: { id: userId },
       with: { roles: true, teacherProfile: true },
     })
     if (!user) throw errors.notFound('User')

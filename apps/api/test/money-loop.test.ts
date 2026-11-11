@@ -1,5 +1,3 @@
-import { schema as s } from '@elevate/db'
-import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -82,7 +80,7 @@ describe('money loop', () => {
     expect(link.status).toBe(200)
     expect(link.body.url).toContain('connect.fake-stripe.test')
     const profile = await t.db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, teacherId),
+      where: { userId: teacherId },
     })
     const accountId = profile?.stripeAccountId as string
     expect(accountId).toMatch(/^acct_fake_/)
@@ -162,7 +160,7 @@ describe('money loop', () => {
       body: { kind: 'image', filename: 'cover.png', mimeType: 'image/png', sizeBytes: 10 },
     })
     const asset = await t.db.query.mediaAssets.findFirst({
-      where: eq(s.mediaAssets.id, upload.body.asset.id),
+      where: { id: upload.body.asset.id },
     })
     await t.storage.put(asset?.storageKey as string, new Uint8Array([1]), 'image/png')
     await t.api('POST', `/api/media/assets/${upload.body.asset.id}/complete`, { token: teacher })
@@ -218,7 +216,7 @@ describe('money loop', () => {
 
     // S$79.00 at 3.4% + S$0.50 and 15% commission on the net after fees
     const payment = await t.db.query.payments.findFirst({
-      where: eq(s.payments.stripeCheckoutSessionId, start.body.sessionId),
+      where: { stripeCheckoutSessionId: start.body.sessionId },
     })
     expect(payment).toMatchObject({
       listPriceCents: 7900,

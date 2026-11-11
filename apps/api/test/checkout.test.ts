@@ -21,7 +21,7 @@ beforeAll(async () => {
   await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', storageDir: null })
   learner = (await t.signIn('buyer@example.com')).token as string
   const course = await t.db.query.courses.findFirst({
-    where: eq(s.courses.slug, 'sourdough-from-scratch'),
+    where: { slug: 'sourdough-from-scratch' },
   })
   sourdoughId = course?.id as string
   sourdoughTeacherId = course?.teacherId as string
@@ -138,7 +138,7 @@ describe('checkout', () => {
     expect(await hook.json()).toMatchObject({ outcome: 'applied' })
 
     const payment = await t.db.query.payments.findFirst({
-      where: eq(s.payments.stripeCheckoutSessionId, sessionId),
+      where: { stripeCheckoutSessionId: sessionId },
     })
     expect(payment?.amountCents).toBe(8010)
     expect(payment?.discountCents).toBe(890)
@@ -149,10 +149,10 @@ describe('checkout', () => {
     expect(payment?.stripeTransferId).toContain('tr_')
     expect(t.mailer.last()?.subject).toContain("You're enrolled")
 
-    const course = await t.db.query.courses.findFirst({ where: eq(s.courses.id, sourdoughId) })
+    const course = await t.db.query.courses.findFirst({ where: { id: sourdoughId } })
     expect(course?.enrolCount).toBe(2) // seed learner + this purchase
     const promo = await t.db.query.promoCodes.findFirst({
-      where: eq(s.promoCodes.code, 'WELCOME10'),
+      where: { code: 'WELCOME10' },
     })
     expect(promo?.redeemedCount).toBe(1)
 
@@ -181,7 +181,7 @@ describe('checkout', () => {
 
   it('refuses teachers who cannot be paid, and enrols free courses directly', async () => {
     const figma = await t.db.query.courses.findFirst({
-      where: eq(s.courses.slug, 'figma-to-prototype'),
+      where: { slug: 'figma-to-prototype' },
     })
     const blocked = await t.api('POST', `/api/checkout/courses/${figma?.id}`, {
       token: learner,

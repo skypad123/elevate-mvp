@@ -1,0 +1,6676 @@
+{
+  "type": "base",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "c67592af-c65a-4c26-aa21-28325ed09a21",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "artefact_type"
+      ],
+      "writes": [
+        "s|enum|public.artefact_type",
+        "n|enum|public.artefact_type",
+        "e|enum|public.artefact_type",
+        "n|type|public.artefact_type"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "audience"
+      ],
+      "writes": [
+        "s|enum|public.audience",
+        "n|enum|public.audience",
+        "e|enum|public.audience",
+        "n|type|public.audience"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "course_status"
+      ],
+      "writes": [
+        "s|enum|public.course_status",
+        "n|enum|public.course_status",
+        "e|enum|public.course_status",
+        "n|type|public.course_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "enrollment_mode"
+      ],
+      "writes": [
+        "s|enum|public.enrollment_mode",
+        "n|enum|public.enrollment_mode",
+        "e|enum|public.enrollment_mode",
+        "n|type|public.enrollment_mode"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "enrollment_status"
+      ],
+      "writes": [
+        "s|enum|public.enrollment_status",
+        "n|enum|public.enrollment_status",
+        "e|enum|public.enrollment_status",
+        "n|type|public.enrollment_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "identity_provider"
+      ],
+      "writes": [
+        "s|enum|public.identity_provider",
+        "n|enum|public.identity_provider",
+        "e|enum|public.identity_provider",
+        "n|type|public.identity_provider"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "media_kind"
+      ],
+      "writes": [
+        "s|enum|public.media_kind",
+        "n|enum|public.media_kind",
+        "e|enum|public.media_kind",
+        "n|type|public.media_kind"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "media_provider"
+      ],
+      "writes": [
+        "s|enum|public.media_provider",
+        "n|enum|public.media_provider",
+        "e|enum|public.media_provider",
+        "n|type|public.media_provider"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "media_status"
+      ],
+      "writes": [
+        "s|enum|public.media_status",
+        "n|enum|public.media_status",
+        "e|enum|public.media_status",
+        "n|type|public.media_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "payment_status"
+      ],
+      "writes": [
+        "s|enum|public.payment_status",
+        "n|enum|public.payment_status",
+        "e|enum|public.payment_status",
+        "n|type|public.payment_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "progress_status"
+      ],
+      "writes": [
+        "s|enum|public.progress_status",
+        "n|enum|public.progress_status",
+        "e|enum|public.progress_status",
+        "n|type|public.progress_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "promo_type"
+      ],
+      "writes": [
+        "s|enum|public.promo_type",
+        "n|enum|public.promo_type",
+        "e|enum|public.promo_type",
+        "n|type|public.promo_type"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "teacher_status"
+      ],
+      "writes": [
+        "s|enum|public.teacher_status",
+        "n|enum|public.teacher_status",
+        "e|enum|public.teacher_status",
+        "n|type|public.teacher_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "user_role"
+      ],
+      "writes": [
+        "s|enum|public.user_role",
+        "n|enum|public.user_role",
+        "e|enum|public.user_role",
+        "n|type|public.user_role"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "webhook_provider"
+      ],
+      "writes": [
+        "s|enum|public.webhook_provider",
+        "n|enum|public.webhook_provider",
+        "e|enum|public.webhook_provider",
+        "n|type|public.webhook_provider"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "identities"
+      ],
+      "writes": [
+        "s|tbl|public.identities",
+        "n|tbl|public.identities",
+        "e|tbl|public.identities",
+        "n|rel|public.identities",
+        "n|type|public.identities",
+        "n|rel|public.identities_pkey",
+        "n|rel|public.identities_provider_providerSubject_unique"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.identity_provider"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "magic_links"
+      ],
+      "writes": [
+        "s|tbl|public.magic_links",
+        "n|tbl|public.magic_links",
+        "e|tbl|public.magic_links",
+        "n|rel|public.magic_links",
+        "n|type|public.magic_links",
+        "n|rel|public.magic_links_pkey",
+        "n|rel|public.magic_links_tokenHash_unique"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.audience"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "sessions"
+      ],
+      "writes": [
+        "s|tbl|public.sessions",
+        "n|tbl|public.sessions",
+        "e|tbl|public.sessions",
+        "n|rel|public.sessions",
+        "n|type|public.sessions",
+        "n|rel|public.sessions_pkey",
+        "n|rel|public.sessions_tokenHash_unique"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.audience"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "user_roles"
+      ],
+      "writes": [
+        "s|tbl|public.user_roles",
+        "n|tbl|public.user_roles",
+        "e|tbl|public.user_roles",
+        "n|rel|public.user_roles",
+        "n|type|public.user_roles",
+        "n|rel|public.user_roles_user_id_role_pk"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.user_role"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "users"
+      ],
+      "writes": [
+        "s|tbl|public.users",
+        "n|tbl|public.users",
+        "e|tbl|public.users",
+        "n|rel|public.users",
+        "n|type|public.users",
+        "n|rel|public.users_pkey",
+        "n|rel|public.users_email_unique"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "enrollments"
+      ],
+      "writes": [
+        "s|tbl|public.enrollments",
+        "n|tbl|public.enrollments",
+        "e|tbl|public.enrollments",
+        "n|rel|public.enrollments",
+        "n|type|public.enrollments",
+        "n|rel|public.enrollments_pkey",
+        "n|rel|public.enrollments_stripeCheckoutSessionId_unique",
+        "n|rel|public.enrollments_userId_courseId_unique"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.enrollment_mode",
+        "n|enum|public.enrollment_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "payments"
+      ],
+      "writes": [
+        "s|tbl|public.payments",
+        "n|tbl|public.payments",
+        "e|tbl|public.payments",
+        "n|rel|public.payments",
+        "n|type|public.payments",
+        "n|rel|public.payments_pkey",
+        "n|rel|public.payments_stripeCheckoutSessionId_unique",
+        "n|rel|public.payments_stripePaymentIntentId_unique"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.payment_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "promo_codes"
+      ],
+      "writes": [
+        "s|tbl|public.promo_codes",
+        "n|tbl|public.promo_codes",
+        "e|tbl|public.promo_codes",
+        "n|rel|public.promo_codes",
+        "n|type|public.promo_codes",
+        "n|rel|public.promo_codes_pkey",
+        "n|rel|public.promo_codes_code_unique"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.promo_type"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "refunds"
+      ],
+      "writes": [
+        "s|tbl|public.refunds",
+        "n|tbl|public.refunds",
+        "e|tbl|public.refunds",
+        "n|rel|public.refunds",
+        "n|type|public.refunds",
+        "n|rel|public.refunds_pkey",
+        "n|rel|public.refunds_stripeRefundId_unique"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "artefacts"
+      ],
+      "writes": [
+        "s|tbl|public.artefacts",
+        "n|tbl|public.artefacts",
+        "e|tbl|public.artefacts",
+        "n|rel|public.artefacts",
+        "n|type|public.artefacts",
+        "n|rel|public.artefacts_pkey"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.artefact_type"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "courses"
+      ],
+      "writes": [
+        "s|tbl|public.courses",
+        "n|tbl|public.courses",
+        "e|tbl|public.courses",
+        "n|rel|public.courses",
+        "n|type|public.courses",
+        "n|rel|public.courses_pkey",
+        "n|rel|public.courses_slug_unique"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.course_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "lesson_prerequisites"
+      ],
+      "writes": [
+        "s|tbl|public.lesson_prerequisites",
+        "n|tbl|public.lesson_prerequisites",
+        "e|tbl|public.lesson_prerequisites",
+        "n|rel|public.lesson_prerequisites",
+        "n|type|public.lesson_prerequisites",
+        "n|rel|public.lesson_prerequisites_lesson_id_prerequisite_lesson_id_pk"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "lessons"
+      ],
+      "writes": [
+        "s|tbl|public.lessons",
+        "n|tbl|public.lessons",
+        "e|tbl|public.lessons",
+        "n|rel|public.lessons",
+        "n|type|public.lessons",
+        "n|rel|public.lessons_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "quizzes"
+      ],
+      "writes": [
+        "s|tbl|public.quizzes",
+        "n|tbl|public.quizzes",
+        "e|tbl|public.quizzes",
+        "n|rel|public.quizzes",
+        "n|type|public.quizzes",
+        "n|rel|public.quizzes_pkey",
+        "n|rel|public.quizzes_artefactId_unique"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "artefact_progress"
+      ],
+      "writes": [
+        "s|tbl|public.artefact_progress",
+        "n|tbl|public.artefact_progress",
+        "e|tbl|public.artefact_progress",
+        "n|rel|public.artefact_progress",
+        "n|type|public.artefact_progress",
+        "n|rel|public.artefact_progress_enrollment_id_artefact_id_pk"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.progress_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "certificates"
+      ],
+      "writes": [
+        "s|tbl|public.certificates",
+        "n|tbl|public.certificates",
+        "e|tbl|public.certificates",
+        "n|rel|public.certificates",
+        "n|type|public.certificates",
+        "n|rel|public.certificates_pkey",
+        "n|rel|public.certificates_enrollmentId_unique",
+        "n|rel|public.certificates_token_unique"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "quiz_attempts"
+      ],
+      "writes": [
+        "s|tbl|public.quiz_attempts",
+        "n|tbl|public.quiz_attempts",
+        "e|tbl|public.quiz_attempts",
+        "n|rel|public.quiz_attempts",
+        "n|type|public.quiz_attempts",
+        "n|rel|public.quiz_attempts_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "media_assets"
+      ],
+      "writes": [
+        "s|tbl|public.media_assets",
+        "n|tbl|public.media_assets",
+        "e|tbl|public.media_assets",
+        "n|rel|public.media_assets",
+        "n|type|public.media_assets",
+        "n|rel|public.media_assets_pkey"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.media_kind",
+        "n|enum|public.media_provider",
+        "n|enum|public.media_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "analytics_events"
+      ],
+      "writes": [
+        "s|tbl|public.analytics_events",
+        "n|tbl|public.analytics_events",
+        "e|tbl|public.analytics_events",
+        "n|rel|public.analytics_events",
+        "n|type|public.analytics_events",
+        "n|rel|public.analytics_events_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "audit_log"
+      ],
+      "writes": [
+        "s|tbl|public.audit_log",
+        "n|tbl|public.audit_log",
+        "e|tbl|public.audit_log",
+        "n|rel|public.audit_log",
+        "n|type|public.audit_log",
+        "n|rel|public.audit_log_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "webhook_events"
+      ],
+      "writes": [
+        "s|tbl|public.webhook_events",
+        "n|tbl|public.webhook_events",
+        "e|tbl|public.webhook_events",
+        "n|rel|public.webhook_events",
+        "n|type|public.webhook_events",
+        "n|rel|public.webhook_events_provider_event_id_pk"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.webhook_provider"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "teacher_profiles"
+      ],
+      "writes": [
+        "s|tbl|public.teacher_profiles",
+        "n|tbl|public.teacher_profiles",
+        "e|tbl|public.teacher_profiles",
+        "n|rel|public.teacher_profiles",
+        "n|type|public.teacher_profiles",
+        "n|rel|public.teacher_profiles_pkey",
+        "n|rel|public.teacher_profiles_stripeAccountId_unique"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.teacher_status"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "identities",
+        "identities_user_id_index"
+      ],
+      "writes": [
+        "s|idx|public.identities_user_id_index",
+        "n|idx|public.identities_user_id_index",
+        "e|idx|public.identities_user_id_index",
+        "n|rel|public.identities_user_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.identities",
+        "n|sch|public",
+        "n|col|public.identities.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "magic_links",
+        "magic_links_email_created_at_index"
+      ],
+      "writes": [
+        "s|idx|public.magic_links_email_created_at_index",
+        "n|idx|public.magic_links_email_created_at_index",
+        "e|idx|public.magic_links_email_created_at_index",
+        "n|rel|public.magic_links_email_created_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.magic_links",
+        "n|sch|public",
+        "n|col|public.magic_links.email",
+        "n|col|public.magic_links.created_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "sessions",
+        "sessions_user_id_index"
+      ],
+      "writes": [
+        "s|idx|public.sessions_user_id_index",
+        "n|idx|public.sessions_user_id_index",
+        "e|idx|public.sessions_user_id_index",
+        "n|rel|public.sessions_user_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.sessions",
+        "n|sch|public",
+        "n|col|public.sessions.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "sessions",
+        "sessions_expires_at_index"
+      ],
+      "writes": [
+        "s|idx|public.sessions_expires_at_index",
+        "n|idx|public.sessions_expires_at_index",
+        "e|idx|public.sessions_expires_at_index",
+        "n|rel|public.sessions_expires_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.sessions",
+        "n|sch|public",
+        "n|col|public.sessions.expires_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "enrollments",
+        "enrollments_course_id_index"
+      ],
+      "writes": [
+        "s|idx|public.enrollments_course_id_index",
+        "n|idx|public.enrollments_course_id_index",
+        "e|idx|public.enrollments_course_id_index",
+        "n|rel|public.enrollments_course_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.enrollments",
+        "n|sch|public",
+        "n|col|public.enrollments.course_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "enrollments",
+        "enrollments_user_id_status_index"
+      ],
+      "writes": [
+        "s|idx|public.enrollments_user_id_status_index",
+        "n|idx|public.enrollments_user_id_status_index",
+        "e|idx|public.enrollments_user_id_status_index",
+        "n|rel|public.enrollments_user_id_status_index"
+      ],
+      "reads": [
+        "n|tbl|public.enrollments",
+        "n|sch|public",
+        "n|col|public.enrollments.user_id",
+        "n|col|public.enrollments.status"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "payments",
+        "payments_teacher_id_paid_at_index"
+      ],
+      "writes": [
+        "s|idx|public.payments_teacher_id_paid_at_index",
+        "n|idx|public.payments_teacher_id_paid_at_index",
+        "e|idx|public.payments_teacher_id_paid_at_index",
+        "n|rel|public.payments_teacher_id_paid_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|col|public.payments.teacher_id",
+        "n|col|public.payments.paid_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "payments",
+        "payments_course_id_index"
+      ],
+      "writes": [
+        "s|idx|public.payments_course_id_index",
+        "n|idx|public.payments_course_id_index",
+        "e|idx|public.payments_course_id_index",
+        "n|rel|public.payments_course_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|col|public.payments.course_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "payments",
+        "payments_user_id_index"
+      ],
+      "writes": [
+        "s|idx|public.payments_user_id_index",
+        "n|idx|public.payments_user_id_index",
+        "e|idx|public.payments_user_id_index",
+        "n|rel|public.payments_user_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|col|public.payments.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "artefacts",
+        "artefacts_lesson_id_position_index"
+      ],
+      "writes": [
+        "s|idx|public.artefacts_lesson_id_position_index",
+        "n|idx|public.artefacts_lesson_id_position_index",
+        "e|idx|public.artefacts_lesson_id_position_index",
+        "n|rel|public.artefacts_lesson_id_position_index"
+      ],
+      "reads": [
+        "n|tbl|public.artefacts",
+        "n|sch|public",
+        "n|col|public.artefacts.lesson_id",
+        "n|col|public.artefacts.position"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "courses",
+        "courses_teacher_id_index"
+      ],
+      "writes": [
+        "s|idx|public.courses_teacher_id_index",
+        "n|idx|public.courses_teacher_id_index",
+        "e|idx|public.courses_teacher_id_index",
+        "n|rel|public.courses_teacher_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|col|public.courses.teacher_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "courses",
+        "courses_status_published_at_index"
+      ],
+      "writes": [
+        "s|idx|public.courses_status_published_at_index",
+        "n|idx|public.courses_status_published_at_index",
+        "e|idx|public.courses_status_published_at_index",
+        "n|rel|public.courses_status_published_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|col|public.courses.status",
+        "n|col|public.courses.published_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "courses",
+        "courses_status_enrol_count_index"
+      ],
+      "writes": [
+        "s|idx|public.courses_status_enrol_count_index",
+        "n|idx|public.courses_status_enrol_count_index",
+        "e|idx|public.courses_status_enrol_count_index",
+        "n|rel|public.courses_status_enrol_count_index"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|col|public.courses.status",
+        "n|col|public.courses.enrol_count"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "lessons",
+        "lessons_course_id_position_index"
+      ],
+      "writes": [
+        "s|idx|public.lessons_course_id_position_index",
+        "n|idx|public.lessons_course_id_position_index",
+        "e|idx|public.lessons_course_id_position_index",
+        "n|rel|public.lessons_course_id_position_index"
+      ],
+      "reads": [
+        "n|tbl|public.lessons",
+        "n|sch|public",
+        "n|col|public.lessons.course_id",
+        "n|col|public.lessons.position"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "artefact_progress",
+        "artefact_progress_enrollment_id_updated_at_index"
+      ],
+      "writes": [
+        "s|idx|public.artefact_progress_enrollment_id_updated_at_index",
+        "n|idx|public.artefact_progress_enrollment_id_updated_at_index",
+        "e|idx|public.artefact_progress_enrollment_id_updated_at_index",
+        "n|rel|public.artefact_progress_enrollment_id_updated_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.artefact_progress",
+        "n|sch|public",
+        "n|col|public.artefact_progress.enrollment_id",
+        "n|col|public.artefact_progress.updated_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "quiz_attempts",
+        "quiz_attempts_enrollment_id_quiz_id_index"
+      ],
+      "writes": [
+        "s|idx|public.quiz_attempts_enrollment_id_quiz_id_index",
+        "n|idx|public.quiz_attempts_enrollment_id_quiz_id_index",
+        "e|idx|public.quiz_attempts_enrollment_id_quiz_id_index",
+        "n|rel|public.quiz_attempts_enrollment_id_quiz_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.quiz_attempts",
+        "n|sch|public",
+        "n|col|public.quiz_attempts.enrollment_id",
+        "n|col|public.quiz_attempts.quiz_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "media_assets",
+        "media_assets_owner_id_index"
+      ],
+      "writes": [
+        "s|idx|public.media_assets_owner_id_index",
+        "n|idx|public.media_assets_owner_id_index",
+        "e|idx|public.media_assets_owner_id_index",
+        "n|rel|public.media_assets_owner_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.media_assets.owner_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "media_assets",
+        "media_assets_provider_upload_id_index"
+      ],
+      "writes": [
+        "s|idx|public.media_assets_provider_upload_id_index",
+        "n|idx|public.media_assets_provider_upload_id_index",
+        "e|idx|public.media_assets_provider_upload_id_index",
+        "n|rel|public.media_assets_provider_upload_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.media_assets.provider_upload_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "media_assets",
+        "media_assets_provider_asset_id_index"
+      ],
+      "writes": [
+        "s|idx|public.media_assets_provider_asset_id_index",
+        "n|idx|public.media_assets_provider_asset_id_index",
+        "e|idx|public.media_assets_provider_asset_id_index",
+        "n|rel|public.media_assets_provider_asset_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.media_assets.provider_asset_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "analytics_events",
+        "analytics_events_name_created_at_index"
+      ],
+      "writes": [
+        "s|idx|public.analytics_events_name_created_at_index",
+        "n|idx|public.analytics_events_name_created_at_index",
+        "e|idx|public.analytics_events_name_created_at_index",
+        "n|rel|public.analytics_events_name_created_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.analytics_events",
+        "n|sch|public",
+        "n|col|public.analytics_events.name",
+        "n|col|public.analytics_events.created_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "audit_log",
+        "audit_log_entity_type_entity_id_index"
+      ],
+      "writes": [
+        "s|idx|public.audit_log_entity_type_entity_id_index",
+        "n|idx|public.audit_log_entity_type_entity_id_index",
+        "e|idx|public.audit_log_entity_type_entity_id_index",
+        "n|rel|public.audit_log_entity_type_entity_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.audit_log",
+        "n|sch|public",
+        "n|col|public.audit_log.entity_type",
+        "n|col|public.audit_log.entity_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "audit_log",
+        "audit_log_created_at_index"
+      ],
+      "writes": [
+        "s|idx|public.audit_log_created_at_index",
+        "n|idx|public.audit_log_created_at_index",
+        "e|idx|public.audit_log_created_at_index",
+        "n|rel|public.audit_log_created_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.audit_log",
+        "n|sch|public",
+        "n|col|public.audit_log.created_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "identities"
+      ],
+      "writes": [
+        "s|fk|public.identities.identities_user_id_users_id_fk",
+        "n|fk|public.identities.identities_user_id_users_id_fk",
+        "e|fk|public.identities.identities_user_id_users_id_fk",
+        "n|con|public.identities.identities_user_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.identities",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.identities.user_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "sessions"
+      ],
+      "writes": [
+        "s|fk|public.sessions.sessions_user_id_users_id_fk",
+        "n|fk|public.sessions.sessions_user_id_users_id_fk",
+        "e|fk|public.sessions.sessions_user_id_users_id_fk",
+        "n|con|public.sessions.sessions_user_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.sessions",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.sessions.user_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "user_roles"
+      ],
+      "writes": [
+        "s|fk|public.user_roles.user_roles_user_id_users_id_fk",
+        "n|fk|public.user_roles.user_roles_user_id_users_id_fk",
+        "e|fk|public.user_roles.user_roles_user_id_users_id_fk",
+        "n|con|public.user_roles.user_roles_user_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.user_roles",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.user_roles.user_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "user_roles"
+      ],
+      "writes": [
+        "s|fk|public.user_roles.user_roles_granted_by_users_id_fk",
+        "n|fk|public.user_roles.user_roles_granted_by_users_id_fk",
+        "e|fk|public.user_roles.user_roles_granted_by_users_id_fk",
+        "n|con|public.user_roles.user_roles_granted_by_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.user_roles",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.user_roles.granted_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "enrollments"
+      ],
+      "writes": [
+        "s|fk|public.enrollments.enrollments_user_id_users_id_fk",
+        "n|fk|public.enrollments.enrollments_user_id_users_id_fk",
+        "e|fk|public.enrollments.enrollments_user_id_users_id_fk",
+        "n|con|public.enrollments.enrollments_user_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.enrollments",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.enrollments.user_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "enrollments"
+      ],
+      "writes": [
+        "s|fk|public.enrollments.enrollments_course_id_courses_id_fk",
+        "n|fk|public.enrollments.enrollments_course_id_courses_id_fk",
+        "e|fk|public.enrollments.enrollments_course_id_courses_id_fk",
+        "n|con|public.enrollments.enrollments_course_id_courses_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.enrollments",
+        "n|sch|public",
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|col|public.enrollments.course_id",
+        "n|col|public.courses.id",
+        "e|uniqueness|public.courses.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "enrollments"
+      ],
+      "writes": [
+        "s|fk|public.enrollments.enrollments_promo_code_id_promo_codes_id_fk",
+        "n|fk|public.enrollments.enrollments_promo_code_id_promo_codes_id_fk",
+        "e|fk|public.enrollments.enrollments_promo_code_id_promo_codes_id_fk",
+        "n|con|public.enrollments.enrollments_promo_code_id_promo_codes_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.enrollments",
+        "n|sch|public",
+        "n|tbl|public.promo_codes",
+        "n|sch|public",
+        "n|col|public.enrollments.promo_code_id",
+        "n|col|public.promo_codes.id",
+        "e|uniqueness|public.promo_codes.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "payments"
+      ],
+      "writes": [
+        "s|fk|public.payments.payments_enrollment_id_enrollments_id_fk",
+        "n|fk|public.payments.payments_enrollment_id_enrollments_id_fk",
+        "e|fk|public.payments.payments_enrollment_id_enrollments_id_fk",
+        "n|con|public.payments.payments_enrollment_id_enrollments_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|tbl|public.enrollments",
+        "n|sch|public",
+        "n|col|public.payments.enrollment_id",
+        "n|col|public.enrollments.id",
+        "e|uniqueness|public.enrollments.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "payments"
+      ],
+      "writes": [
+        "s|fk|public.payments.payments_user_id_users_id_fk",
+        "n|fk|public.payments.payments_user_id_users_id_fk",
+        "e|fk|public.payments.payments_user_id_users_id_fk",
+        "n|con|public.payments.payments_user_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.payments.user_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "payments"
+      ],
+      "writes": [
+        "s|fk|public.payments.payments_course_id_courses_id_fk",
+        "n|fk|public.payments.payments_course_id_courses_id_fk",
+        "e|fk|public.payments.payments_course_id_courses_id_fk",
+        "n|con|public.payments.payments_course_id_courses_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|col|public.payments.course_id",
+        "n|col|public.courses.id",
+        "e|uniqueness|public.courses.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "payments"
+      ],
+      "writes": [
+        "s|fk|public.payments.payments_teacher_id_users_id_fk",
+        "n|fk|public.payments.payments_teacher_id_users_id_fk",
+        "e|fk|public.payments.payments_teacher_id_users_id_fk",
+        "n|con|public.payments.payments_teacher_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.payments.teacher_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "payments"
+      ],
+      "writes": [
+        "s|fk|public.payments.payments_promo_code_id_promo_codes_id_fk",
+        "n|fk|public.payments.payments_promo_code_id_promo_codes_id_fk",
+        "e|fk|public.payments.payments_promo_code_id_promo_codes_id_fk",
+        "n|con|public.payments.payments_promo_code_id_promo_codes_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|tbl|public.promo_codes",
+        "n|sch|public",
+        "n|col|public.payments.promo_code_id",
+        "n|col|public.promo_codes.id",
+        "e|uniqueness|public.promo_codes.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "promo_codes"
+      ],
+      "writes": [
+        "s|fk|public.promo_codes.promo_codes_course_id_courses_id_fk",
+        "n|fk|public.promo_codes.promo_codes_course_id_courses_id_fk",
+        "e|fk|public.promo_codes.promo_codes_course_id_courses_id_fk",
+        "n|con|public.promo_codes.promo_codes_course_id_courses_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.promo_codes",
+        "n|sch|public",
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|col|public.promo_codes.course_id",
+        "n|col|public.courses.id",
+        "e|uniqueness|public.courses.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "promo_codes"
+      ],
+      "writes": [
+        "s|fk|public.promo_codes.promo_codes_created_by_users_id_fk",
+        "n|fk|public.promo_codes.promo_codes_created_by_users_id_fk",
+        "e|fk|public.promo_codes.promo_codes_created_by_users_id_fk",
+        "n|con|public.promo_codes.promo_codes_created_by_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.promo_codes",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.promo_codes.created_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "refunds"
+      ],
+      "writes": [
+        "s|fk|public.refunds.refunds_payment_id_payments_id_fk",
+        "n|fk|public.refunds.refunds_payment_id_payments_id_fk",
+        "e|fk|public.refunds.refunds_payment_id_payments_id_fk",
+        "n|con|public.refunds.refunds_payment_id_payments_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.refunds",
+        "n|sch|public",
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|col|public.refunds.payment_id",
+        "n|col|public.payments.id",
+        "e|uniqueness|public.payments.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "refunds"
+      ],
+      "writes": [
+        "s|fk|public.refunds.refunds_requested_by_users_id_fk",
+        "n|fk|public.refunds.refunds_requested_by_users_id_fk",
+        "e|fk|public.refunds.refunds_requested_by_users_id_fk",
+        "n|con|public.refunds.refunds_requested_by_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.refunds",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.refunds.requested_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "artefacts"
+      ],
+      "writes": [
+        "s|fk|public.artefacts.artefacts_lesson_id_lessons_id_fk",
+        "n|fk|public.artefacts.artefacts_lesson_id_lessons_id_fk",
+        "e|fk|public.artefacts.artefacts_lesson_id_lessons_id_fk",
+        "n|con|public.artefacts.artefacts_lesson_id_lessons_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.artefacts",
+        "n|sch|public",
+        "n|tbl|public.lessons",
+        "n|sch|public",
+        "n|col|public.artefacts.lesson_id",
+        "n|col|public.lessons.id",
+        "e|uniqueness|public.lessons.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "artefacts"
+      ],
+      "writes": [
+        "s|fk|public.artefacts.artefacts_media_asset_id_media_assets_id_fk",
+        "n|fk|public.artefacts.artefacts_media_asset_id_media_assets_id_fk",
+        "e|fk|public.artefacts.artefacts_media_asset_id_media_assets_id_fk",
+        "n|con|public.artefacts.artefacts_media_asset_id_media_assets_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.artefacts",
+        "n|sch|public",
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.artefacts.media_asset_id",
+        "n|col|public.media_assets.id",
+        "e|uniqueness|public.media_assets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "courses"
+      ],
+      "writes": [
+        "s|fk|public.courses.courses_teacher_id_users_id_fk",
+        "n|fk|public.courses.courses_teacher_id_users_id_fk",
+        "e|fk|public.courses.courses_teacher_id_users_id_fk",
+        "n|con|public.courses.courses_teacher_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.courses.teacher_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "courses"
+      ],
+      "writes": [
+        "s|fk|public.courses.courses_thumbnail_media_id_media_assets_id_fk",
+        "n|fk|public.courses.courses_thumbnail_media_id_media_assets_id_fk",
+        "e|fk|public.courses.courses_thumbnail_media_id_media_assets_id_fk",
+        "n|con|public.courses.courses_thumbnail_media_id_media_assets_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.courses.thumbnail_media_id",
+        "n|col|public.media_assets.id",
+        "e|uniqueness|public.media_assets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "courses"
+      ],
+      "writes": [
+        "s|fk|public.courses.courses_reviewed_by_users_id_fk",
+        "n|fk|public.courses.courses_reviewed_by_users_id_fk",
+        "e|fk|public.courses.courses_reviewed_by_users_id_fk",
+        "n|con|public.courses.courses_reviewed_by_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.courses.reviewed_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "lesson_prerequisites"
+      ],
+      "writes": [
+        "s|fk|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fk",
+        "n|fk|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fk",
+        "e|fk|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fk",
+        "n|con|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.lesson_prerequisites",
+        "n|sch|public",
+        "n|tbl|public.lessons",
+        "n|sch|public",
+        "n|col|public.lesson_prerequisites.lesson_id",
+        "n|col|public.lessons.id",
+        "e|uniqueness|public.lessons.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "lesson_prerequisites"
+      ],
+      "writes": [
+        "s|fk|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fk",
+        "n|fk|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fk",
+        "e|fk|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fk",
+        "n|con|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.lesson_prerequisites",
+        "n|sch|public",
+        "n|tbl|public.lessons",
+        "n|sch|public",
+        "n|col|public.lesson_prerequisites.prerequisite_lesson_id",
+        "n|col|public.lessons.id",
+        "e|uniqueness|public.lessons.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "lessons"
+      ],
+      "writes": [
+        "s|fk|public.lessons.lessons_course_id_courses_id_fk",
+        "n|fk|public.lessons.lessons_course_id_courses_id_fk",
+        "e|fk|public.lessons.lessons_course_id_courses_id_fk",
+        "n|con|public.lessons.lessons_course_id_courses_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.lessons",
+        "n|sch|public",
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|col|public.lessons.course_id",
+        "n|col|public.courses.id",
+        "e|uniqueness|public.courses.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "quizzes"
+      ],
+      "writes": [
+        "s|fk|public.quizzes.quizzes_artefact_id_artefacts_id_fk",
+        "n|fk|public.quizzes.quizzes_artefact_id_artefacts_id_fk",
+        "e|fk|public.quizzes.quizzes_artefact_id_artefacts_id_fk",
+        "n|con|public.quizzes.quizzes_artefact_id_artefacts_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.quizzes",
+        "n|sch|public",
+        "n|tbl|public.artefacts",
+        "n|sch|public",
+        "n|col|public.quizzes.artefact_id",
+        "n|col|public.artefacts.id",
+        "e|uniqueness|public.artefacts.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "artefact_progress"
+      ],
+      "writes": [
+        "s|fk|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fk",
+        "n|fk|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fk",
+        "e|fk|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fk",
+        "n|con|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.artefact_progress",
+        "n|sch|public",
+        "n|tbl|public.enrollments",
+        "n|sch|public",
+        "n|col|public.artefact_progress.enrollment_id",
+        "n|col|public.enrollments.id",
+        "e|uniqueness|public.enrollments.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "artefact_progress"
+      ],
+      "writes": [
+        "s|fk|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fk",
+        "n|fk|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fk",
+        "e|fk|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fk",
+        "n|con|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.artefact_progress",
+        "n|sch|public",
+        "n|tbl|public.artefacts",
+        "n|sch|public",
+        "n|col|public.artefact_progress.artefact_id",
+        "n|col|public.artefacts.id",
+        "e|uniqueness|public.artefacts.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "certificates"
+      ],
+      "writes": [
+        "s|fk|public.certificates.certificates_enrollment_id_enrollments_id_fk",
+        "n|fk|public.certificates.certificates_enrollment_id_enrollments_id_fk",
+        "e|fk|public.certificates.certificates_enrollment_id_enrollments_id_fk",
+        "n|con|public.certificates.certificates_enrollment_id_enrollments_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.certificates",
+        "n|sch|public",
+        "n|tbl|public.enrollments",
+        "n|sch|public",
+        "n|col|public.certificates.enrollment_id",
+        "n|col|public.enrollments.id",
+        "e|uniqueness|public.enrollments.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "quiz_attempts"
+      ],
+      "writes": [
+        "s|fk|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fk",
+        "n|fk|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fk",
+        "e|fk|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fk",
+        "n|con|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.quiz_attempts",
+        "n|sch|public",
+        "n|tbl|public.enrollments",
+        "n|sch|public",
+        "n|col|public.quiz_attempts.enrollment_id",
+        "n|col|public.enrollments.id",
+        "e|uniqueness|public.enrollments.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "quiz_attempts"
+      ],
+      "writes": [
+        "s|fk|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fk",
+        "n|fk|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fk",
+        "e|fk|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fk",
+        "n|con|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.quiz_attempts",
+        "n|sch|public",
+        "n|tbl|public.quizzes",
+        "n|sch|public",
+        "n|col|public.quiz_attempts.quiz_id",
+        "n|col|public.quizzes.id",
+        "e|uniqueness|public.quizzes.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "media_assets"
+      ],
+      "writes": [
+        "s|fk|public.media_assets.media_assets_owner_id_users_id_fk",
+        "n|fk|public.media_assets.media_assets_owner_id_users_id_fk",
+        "e|fk|public.media_assets.media_assets_owner_id_users_id_fk",
+        "n|con|public.media_assets.media_assets_owner_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.media_assets.owner_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "analytics_events"
+      ],
+      "writes": [
+        "s|fk|public.analytics_events.analytics_events_user_id_users_id_fk",
+        "n|fk|public.analytics_events.analytics_events_user_id_users_id_fk",
+        "e|fk|public.analytics_events.analytics_events_user_id_users_id_fk",
+        "n|con|public.analytics_events.analytics_events_user_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.analytics_events",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.analytics_events.user_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "audit_log"
+      ],
+      "writes": [
+        "s|fk|public.audit_log.audit_log_actor_id_users_id_fk",
+        "n|fk|public.audit_log.audit_log_actor_id_users_id_fk",
+        "e|fk|public.audit_log.audit_log_actor_id_users_id_fk",
+        "n|con|public.audit_log.audit_log_actor_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.audit_log",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.audit_log.actor_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "teacher_profiles"
+      ],
+      "writes": [
+        "s|fk|public.teacher_profiles.teacher_profiles_user_id_users_id_fk",
+        "n|fk|public.teacher_profiles.teacher_profiles_user_id_users_id_fk",
+        "e|fk|public.teacher_profiles.teacher_profiles_user_id_users_id_fk",
+        "n|con|public.teacher_profiles.teacher_profiles_user_id_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.teacher_profiles",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.teacher_profiles.user_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "teacher_profiles"
+      ],
+      "writes": [
+        "s|fk|public.teacher_profiles.teacher_profiles_teaching_sample_media_id_media_assets_id_fk",
+        "n|fk|public.teacher_profiles.teacher_profiles_teaching_sample_media_id_media_assets_id_fk",
+        "e|fk|public.teacher_profiles.teacher_profiles_teaching_sample_media_id_media_assets_id_fk",
+        "n|con|public.teacher_profiles.teacher_profiles_teaching_sample_media_id_media_assets_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.teacher_profiles",
+        "n|sch|public",
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.teacher_profiles.teaching_sample_media_id",
+        "n|col|public.media_assets.id",
+        "e|uniqueness|public.media_assets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "teacher_profiles"
+      ],
+      "writes": [
+        "s|fk|public.teacher_profiles.teacher_profiles_reviewed_by_users_id_fk",
+        "n|fk|public.teacher_profiles.teacher_profiles_reviewed_by_users_id_fk",
+        "e|fk|public.teacher_profiles.teacher_profiles_reviewed_by_users_id_fk",
+        "n|con|public.teacher_profiles.teacher_profiles_reviewed_by_users_id_fk"
+      ],
+      "reads": [
+        "n|tbl|public.teacher_profiles",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.teacher_profiles.reviewed_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    }
+  ],
+  "ddl": [
+    {
+      "schema": "public",
+      "name": "identities",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "magic_links",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "sessions",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "user_roles",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "users",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "enrollments",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "payments",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "promo_codes",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "refunds",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "artefacts",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "courses",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "lesson_prerequisites",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "lessons",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "quizzes",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "artefact_progress",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "certificates",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "quiz_attempts",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "media_assets",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "analytics_events",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "audit_log",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "webhook_events",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "teacher_profiles",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "artefact_type",
+      "values": [
+        "video",
+        "audio",
+        "text",
+        "quiz"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "audience",
+      "values": [
+        "learner",
+        "teach",
+        "support"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "course_status",
+      "values": [
+        "draft",
+        "pending_review",
+        "live",
+        "rejected"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "enrollment_mode",
+      "values": [
+        "self_directed",
+        "class_based"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "enrollment_status",
+      "values": [
+        "pending_payment",
+        "active",
+        "refunded",
+        "cancelled"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "identity_provider",
+      "values": [
+        "email",
+        "singpass"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "media_kind",
+      "values": [
+        "video",
+        "audio",
+        "image",
+        "document"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "media_provider",
+      "values": [
+        "local",
+        "mux",
+        "s3"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "media_status",
+      "values": [
+        "pending",
+        "processing",
+        "ready",
+        "errored"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "payment_status",
+      "values": [
+        "succeeded",
+        "refunded",
+        "partially_refunded"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "progress_status",
+      "values": [
+        "not_started",
+        "in_progress",
+        "completed"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "promo_type",
+      "values": [
+        "percent",
+        "fixed"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "teacher_status",
+      "values": [
+        "applied",
+        "approved",
+        "rejected"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "user_role",
+      "values": [
+        "teacher",
+        "support_agent",
+        "super_admin"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "webhook_provider",
+      "values": [
+        "stripe",
+        "mux"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "table": "identities",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "identities",
+      "name": "user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "identities",
+      "name": "provider",
+      "type": "identity_provider",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "identities",
+      "name": "provider_subject",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "identities",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "email",
+      "type": "citext",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "audience",
+      "type": "audience",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "token_hash",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "code_hash",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "redirect_path",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "attempts",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "consumed_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "token_hash",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "audience",
+      "type": "audience",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "user_agent",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "last_seen_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "user_roles",
+      "name": "user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "user_roles",
+      "name": "role",
+      "type": "user_role",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "user_roles",
+      "name": "granted_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "user_roles",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "name": "email",
+      "type": "citext",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "name": "avatar_url",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "course_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "mode",
+      "type": "enrollment_mode",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'self_directed'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "status",
+      "type": "enrollment_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending_payment'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "attendance_records",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "promo_code_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "stripe_checkout_session_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "enrolled_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "completed_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "enrollment_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "course_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "teacher_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "stripe_checkout_session_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "stripe_payment_intent_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "stripe_charge_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "stripe_transfer_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "stripe_application_fee_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "stripe_balance_transaction_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "currency",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'sgd'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "list_price_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "discount_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "amount_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "stripe_fee_estimate_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "stripe_fee_actual_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "commission_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "application_fee_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "teacher_net_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "platform_net_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "promo_code_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "status",
+      "type": "payment_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'succeeded'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "refunded_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "receipt_url",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "paid_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "code",
+      "type": "citext",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "type",
+      "type": "promo_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "value",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "course_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "max_redemptions",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "redeemed_count",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "starts_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "active",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "created_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "payment_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "stripe_refund_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "amount_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "reason",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "requested_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "lesson_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "type",
+      "type": "artefact_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "title",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "position",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "media_asset_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "content_json",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "duration_seconds",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "teacher_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "title",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "slug",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "summary",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "description_json",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "category",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "thumbnail_media_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "price_cents",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "currency",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'sgd'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "status",
+      "type": "course_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'draft'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "rejection_reason",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "scheme_status",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "scheme_type",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "submitted_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "reviewed_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "reviewed_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "published_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "enrol_count",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lesson_prerequisites",
+      "name": "lesson_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lesson_prerequisites",
+      "name": "prerequisite_lesson_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "course_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "title",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "summary",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "position",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "artefact_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "pass_mark_percent",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "70",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "max_attempts",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "time_limit_minutes",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "questions_json",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "enrollment_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "artefact_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "status",
+      "type": "progress_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'not_started'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "position_seconds",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "completed_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "enrollment_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "token",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "pdf_storage_key",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "learner_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "course_title",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "teacher_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "issued_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "revoked_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "enrollment_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "quiz_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "answers_json",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "score_percent",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "passed",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "started_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "submitted_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "owner_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "kind",
+      "type": "media_kind",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "provider",
+      "type": "media_provider",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "status",
+      "type": "media_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "provider_upload_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "provider_asset_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "playback_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "storage_key",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "filename",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "mime_type",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "size_bytes",
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "duration_seconds",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "width",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "height",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "error_message",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "analytics_events",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "analytics_events",
+      "name": "user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "analytics_events",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "analytics_events",
+      "name": "properties",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "analytics_events",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "actor_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "action",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "entity_type",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "entity_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "metadata",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "webhook_events",
+      "name": "provider",
+      "type": "webhook_provider",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "webhook_events",
+      "name": "event_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "webhook_events",
+      "name": "type",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "webhook_events",
+      "name": "payload",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "webhook_events",
+      "name": "received_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "webhook_events",
+      "name": "processed_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "webhook_events",
+      "name": "error",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "display_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "headline",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "bio",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "credentials",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "teaching_sample_url",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "teaching_sample_media_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "status",
+      "type": "teacher_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'applied'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "review_note",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "commission_bps",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1500",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "stripe_account_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "stripe_details_submitted",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "stripe_charges_enabled",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "stripe_payouts_enabled",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "applied_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "reviewed_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "reviewed_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "identities",
+      "name": "identities_user_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "magic_links_email_created_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "email",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "sessions_user_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "sessions_expires_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "expires_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "enrollments_course_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "enrollments_user_id_status_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "status",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_teacher_id_paid_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "teacher_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "paid_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_course_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_user_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "artefacts_lesson_id_position_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "lesson_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "position",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "courses_teacher_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "teacher_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "courses_status_published_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "published_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "courses_status_enrol_count_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "enrol_count",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "lessons_course_id_position_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "position",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "artefact_progress_enrollment_id_updated_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "enrollment_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "updated_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "quiz_attempts_enrollment_id_quiz_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "enrollment_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "quiz_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "media_assets_owner_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "owner_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "media_assets_provider_upload_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "provider_upload_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "media_assets_provider_asset_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "provider_asset_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "analytics_events",
+      "name": "analytics_events_name_created_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "audit_log_entity_type_entity_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "entity_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "entity_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "audit_log_created_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "identities",
+      "name": "identities_user_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "sessions_user_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "user_roles",
+      "name": "user_roles_user_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "user_roles",
+      "name": "user_roles_granted_by_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "granted_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "enrollments_user_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "enrollments_course_id_courses_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "course_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "enrollments_promo_code_id_promo_codes_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "promo_code_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "promo_codes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_enrollment_id_enrollments_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "enrollment_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "enrollments",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_user_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_course_id_courses_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "course_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_teacher_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "teacher_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_promo_code_id_promo_codes_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "promo_code_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "promo_codes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "promo_codes_course_id_courses_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "course_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "promo_codes_created_by_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "created_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "refunds_payment_id_payments_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "payment_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "payments",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "refunds_requested_by_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "requested_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "artefacts_lesson_id_lessons_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "lesson_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lessons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "artefacts_media_asset_id_media_assets_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "media_asset_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "media_assets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "courses_teacher_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "teacher_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "courses_thumbnail_media_id_media_assets_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "thumbnail_media_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "media_assets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "courses_reviewed_by_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "reviewed_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "lesson_prerequisites",
+      "name": "lesson_prerequisites_lesson_id_lessons_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "lesson_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lessons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "lesson_prerequisites",
+      "name": "lesson_prerequisites_prerequisite_lesson_id_lessons_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "prerequisite_lesson_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lessons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "lessons_course_id_courses_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "course_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "quizzes_artefact_id_artefacts_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "artefact_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "artefacts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "artefact_progress_enrollment_id_enrollments_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "enrollment_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "enrollments",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "artefact_progress_artefact_id_artefacts_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "artefact_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "artefacts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "certificates_enrollment_id_enrollments_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "enrollment_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "enrollments",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "quiz_attempts_enrollment_id_enrollments_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "enrollment_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "enrollments",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "quiz_attempts_quiz_id_quizzes_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "quiz_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "quizzes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "media_assets_owner_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "owner_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "analytics_events",
+      "name": "analytics_events_user_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "audit_log_actor_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "actor_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "teacher_profiles_user_id_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "teacher_profiles_teaching_sample_media_id_media_assets_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "teaching_sample_media_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "media_assets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "teacher_profiles_reviewed_by_users_id_fk",
+      "nameExplicit": false,
+      "columns": [
+        "reviewed_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "identities",
+      "name": "identities_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "magic_links_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "sessions_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "user_roles",
+      "name": "user_roles_user_id_role_pk",
+      "columns": [
+        "user_id",
+        "role"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "name": "users_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "enrollments_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "promo_codes_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "refunds_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "artefacts_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "courses_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "lesson_prerequisites",
+      "name": "lesson_prerequisites_lesson_id_prerequisite_lesson_id_pk",
+      "columns": [
+        "lesson_id",
+        "prerequisite_lesson_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "lessons_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "quizzes_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "artefact_progress_enrollment_id_artefact_id_pk",
+      "columns": [
+        "enrollment_id",
+        "artefact_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "certificates_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "quiz_attempts",
+      "name": "quiz_attempts_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "media_assets_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "analytics_events",
+      "name": "analytics_events_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
+      "name": "audit_log_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "webhook_events",
+      "name": "webhook_events_provider_event_id_pk",
+      "columns": [
+        "provider",
+        "event_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "teacher_profiles_pkey",
+      "columns": [
+        "user_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "identities",
+      "name": "identities_provider_providerSubject_unique",
+      "nameExplicit": true,
+      "columns": [
+        "provider",
+        "provider_subject"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "magic_links",
+      "name": "magic_links_tokenHash_unique",
+      "nameExplicit": true,
+      "columns": [
+        "token_hash"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "sessions",
+      "name": "sessions_tokenHash_unique",
+      "nameExplicit": true,
+      "columns": [
+        "token_hash"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "name": "users_email_unique",
+      "nameExplicit": false,
+      "columns": [
+        "email"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "enrollments_stripeCheckoutSessionId_unique",
+      "nameExplicit": true,
+      "columns": [
+        "stripe_checkout_session_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "enrollments",
+      "name": "enrollments_userId_courseId_unique",
+      "nameExplicit": true,
+      "columns": [
+        "user_id",
+        "course_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_stripeCheckoutSessionId_unique",
+      "nameExplicit": true,
+      "columns": [
+        "stripe_checkout_session_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_stripePaymentIntentId_unique",
+      "nameExplicit": true,
+      "columns": [
+        "stripe_payment_intent_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "promo_codes",
+      "name": "promo_codes_code_unique",
+      "nameExplicit": false,
+      "columns": [
+        "code"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "refunds",
+      "name": "refunds_stripeRefundId_unique",
+      "nameExplicit": true,
+      "columns": [
+        "stripe_refund_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "courses_slug_unique",
+      "nameExplicit": false,
+      "columns": [
+        "slug"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "quizzes_artefactId_unique",
+      "nameExplicit": true,
+      "columns": [
+        "artefact_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "certificates_enrollmentId_unique",
+      "nameExplicit": true,
+      "columns": [
+        "enrollment_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "certificates",
+      "name": "certificates_token_unique",
+      "nameExplicit": false,
+      "columns": [
+        "token"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "teacher_profiles_stripeAccountId_unique",
+      "nameExplicit": true,
+      "columns": [
+        "stripe_account_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "courses",
+      "name": "courses_price_cents_non_negative",
+      "value": "\"courses\".\"price_cents\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "public",
+      "table": "lesson_prerequisites",
+      "name": "lesson_prerequisites_not_self",
+      "value": "\"lesson_prerequisites\".\"lesson_id\" <> \"lesson_prerequisites\".\"prerequisite_lesson_id\"",
+      "entityType": "checks"
+    },
+    {
+      "schema": "public",
+      "table": "teacher_profiles",
+      "name": "teacher_profiles_commission_bps_range",
+      "value": "\"teacher_profiles\".\"commission_bps\" between 0 and 10000",
+      "entityType": "checks"
+    }
+  ]
+}

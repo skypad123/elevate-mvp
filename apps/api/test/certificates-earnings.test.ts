@@ -29,7 +29,7 @@ async function buy(token: string, promo?: string) {
   const event = t.payments.completeCheckout(start.body.sessionId)
   expect(await (await stripePost(event)).json()).toMatchObject({ outcome: 'applied' })
   const enrollment = await t.db.query.enrollments.findFirst({
-    where: eq(s.enrollments.stripeCheckoutSessionId, start.body.sessionId),
+    where: { stripeCheckoutSessionId: start.body.sessionId },
   })
   return enrollment?.id as string
 }
@@ -49,7 +49,7 @@ async function completeCourse(token: string, enrollmentId: string) {
         continue
       }
       const start = await t.api('POST', `${base}/quizzes/${a.quizId}/attempts`, { token })
-      const row = await t.db.query.quizzes.findFirst({ where: eq(s.quizzes.id, a.quizId) })
+      const row = await t.db.query.quizzes.findFirst({ where: { id: a.quizId } })
       const answers = Object.fromEntries(
         (row?.questionsJson ?? []).map((q) => [q.id, q.options.find((o) => o.correct)?.id]),
       )
@@ -68,7 +68,7 @@ beforeAll(async () => {
   learner = signed.token as string
   await t.api('PATCH', '/api/me', { token: learner, body: { name: 'Grace Lim' } })
   const course = await t.db.query.courses.findFirst({
-    where: eq(s.courses.slug, 'sourdough-from-scratch'),
+    where: { slug: 'sourdough-from-scratch' },
   })
   courseId = course?.id as string
   teacherId = course?.teacherId as string

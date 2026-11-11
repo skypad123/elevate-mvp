@@ -16,7 +16,7 @@ import {
   stripAnswers,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
 import type { SessionUser } from '../middleware/auth'
@@ -43,18 +43,18 @@ export class LearningService {
   /** Loads an active enrollment with its course graph and the learner's progress rows. */
   private async loadGraph(user: SessionUser, enrollmentId: string) {
     const enrollment = await this.deps.db.query.enrollments.findFirst({
-      where: eq(s.enrollments.id, enrollmentId),
+      where: { id: enrollmentId },
       with: {
         course: {
           with: {
             thumbnail: true,
             teacher: { with: { teacherProfile: true } },
             lessons: {
-              orderBy: [asc(s.lessons.position), asc(s.lessons.createdAt)],
+              orderBy: { position: 'asc', createdAt: 'asc' },
               with: {
                 prerequisites: true,
                 artefacts: {
-                  orderBy: [asc(s.artefacts.position), asc(s.artefacts.createdAt)],
+                  orderBy: { position: 'asc', createdAt: 'asc' },
                   with: { media: true, quiz: true },
                 },
               },

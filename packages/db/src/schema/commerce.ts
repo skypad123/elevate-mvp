@@ -1,12 +1,12 @@
 import { sql } from 'drizzle-orm'
-import { boolean, index, integer, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, jsonb, snakeCase, text, unique, uuid } from 'drizzle-orm/pg-core'
 import { users } from './auth'
 import { citext, createdAt, id, ts, updatedAt } from './columns'
 import { courses } from './courses'
 import { enrollmentModeEnum, enrollmentStatusEnum, paymentStatusEnum, promoTypeEnum } from './enums'
 
 /** Platform-managed promo codes (not Stripe promotion codes) so the application fee stays exact. */
-export const promoCodes = pgTable('promo_codes', {
+export const promoCodes = snakeCase.table('promo_codes', {
   id: id(),
   code: citext().notNull().unique(),
   type: promoTypeEnum().notNull(),
@@ -30,7 +30,7 @@ export type AttendanceRecord = {
   method: 'qr' | 'gps' | 'manual'
 }
 
-export const enrollments = pgTable(
+export const enrollments = snakeCase.table(
   'enrollments',
   {
     id: id(),
@@ -44,20 +44,21 @@ export const enrollments = pgTable(
     status: enrollmentStatusEnum().notNull().default('pending_payment'),
     attendanceRecords: jsonb().$type<AttendanceRecord[]>().notNull().default(sql`'[]'::jsonb`),
     promoCodeId: uuid().references(() => promoCodes.id, { onDelete: 'set null' }),
-    stripeCheckoutSessionId: text().unique(),
+    // Name pinned to the applied migration; see the note in ./index.ts.
+    stripeCheckoutSessionId: text().unique('enrollments_stripeCheckoutSessionId_unique'),
     enrolledAt: ts(),
     completedAt: ts(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
-    unique().on(t.userId, t.courseId),
+    unique('enrollments_userId_courseId_unique').on(t.userId, t.courseId),
     index().on(t.courseId, t.status),
     index().on(t.userId, t.status),
   ],
 )
 
-export const payments = pgTable(
+export const payments = snakeCase.table(
   'payments',
   {
     id: id(),
@@ -73,8 +74,8 @@ export const payments = pgTable(
     teacherId: uuid()
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
-    stripeCheckoutSessionId: text().notNull().unique(),
-    stripePaymentIntentId: text().unique(),
+    stripeCheckoutSessionId: text().notNull().unique('payments_stripeCheckoutSessionId_unique'),
+    stripePaymentIntentId: text().unique('payments_stripePaymentIntentId_unique'),
     stripeChargeId: text(),
     stripeTransferId: text(),
     stripeApplicationFeeId: text(),
@@ -106,12 +107,12 @@ export const payments = pgTable(
   ],
 )
 
-export const refunds = pgTable('refunds', {
+export const refunds = snakeCase.table('refunds', {
   id: id(),
   paymentId: uuid()
     .notNull()
     .references(() => payments.id, { onDelete: 'restrict' }),
-  stripeRefundId: text().notNull().unique(),
+  stripeRefundId: text().notNull().unique('refunds_stripeRefundId_unique'),
   amountCents: integer().notNull(),
   reason: text(),
   requestedBy: uuid().references(() => users.id, { onDelete: 'set null' }),

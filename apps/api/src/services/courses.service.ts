@@ -14,7 +14,7 @@ import {
   withSuffix,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { type and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
 import { hasRole, type SessionUser } from '../middleware/auth'
@@ -36,16 +36,16 @@ export class CoursesService {
   async loadCourseView(courseId: string): Promise<CourseView> {
     const { db } = this.deps
     const course = await db.query.courses.findFirst({
-      where: eq(s.courses.id, courseId),
+      where: { id: courseId },
       with: {
         thumbnail: true,
         teacher: { with: { teacherProfile: true } },
         lessons: {
-          orderBy: [asc(s.lessons.position), asc(s.lessons.createdAt)],
+          orderBy: { position: 'asc', createdAt: 'asc' },
           with: {
             prerequisites: true,
             artefacts: {
-              orderBy: [asc(s.artefacts.position), asc(s.artefacts.createdAt)],
+              orderBy: { position: 'asc', createdAt: 'asc' },
               with: { media: true, quiz: true },
             },
           },
@@ -138,20 +138,24 @@ export class CoursesService {
     }
   }
 
+  /** Lists courses, optionally narrowed to one status and/or one teacher. */
   async listSummaries(
-    where: ReturnType<typeof and> | undefined,
+    filter: { status?: CourseRow['status']; teacherId?: string } = {},
     orderBy: 'updated' | 'submitted' = 'updated',
   ): Promise<CourseSummary[]> {
     const { db } = this.deps
     const rows = await db.query.courses.findMany({
-      where,
+      // Drizzle rejects a filter key whose value is undefined, so absent ones are left out.
+      where: {
+        ...(filter.status ? { status: filter.status } : {}),
+        ...(filter.teacherId ? { teacherId: filter.teacherId } : {}),
+      },
       with: {
         thumbnail: true,
         teacher: { with: { teacherProfile: true } },
         lessons: { with: { artefacts: { columns: { id: true } } }, columns: { id: true } },
       },
-      orderBy:
-        orderBy === 'submitted' ? [asc(s.courses.submittedAt)] : [sql`${s.courses.updatedAt} desc`],
+      orderBy: orderBy === 'submitted' ? { submittedAt: 'asc' } : { updatedAt: 'desc' },
     })
     const out: CourseSummary[] = []
     for (const c of rows) {
@@ -178,7 +182,7 @@ export class CoursesService {
   // ── teacher operations ───────────────────────────────────────────────────
 
   async listForTeacher(user: SessionUser): Promise<CourseSummary[]> {
-    return this.listSummaries(eq(s.courses.teacherId, user.id))
+    return this.listSummaries({ teacherId: user.id })
   }
 
   private async ownedCourse(
@@ -186,7 +190,7 @@ export class CoursesService {
     courseId: string,
     options: { forEdit?: boolean } = {},
   ): Promise<CourseRow> {
-    const course = await this.deps.db.query.courses.findFirst({ where: eq(s.courses.id, courseId) })
+    const course = await this.deps.db.query.courses.findFirst({ where: { id: courseId } })
     if (!course) throw errors.notFound('Course')
     if (course.teacherId !== user.id && !hasRole(user, 'support_agent')) throw errors.forbidden()
     if (options.forEdit && !EDITABLE_STATUSES.has(course.status)) {
@@ -199,7 +203,7 @@ export class CoursesService {
   }
 
   private async ownedLesson(user: SessionUser, lessonId: string) {
-    const lesson = await this.deps.db.query.lessons.findFirst({ where: eq(s.lessons.id, lessonId) })
+    const lesson = await this.deps.db.query.lessons.findFirst({ where: { id: lessonId } })
     if (!lesson) throw errors.notFound('Lesson')
     const course = await this.ownedCourse(user, lesson.courseId, { forEdit: true })
     return { lesson, course }
@@ -207,7 +211,7 @@ export class CoursesService {
 
   private async ownedArtefact(user: SessionUser, artefactId: string) {
     const artefact = await this.deps.db.query.artefacts.findFirst({
-      where: eq(s.artefacts.id, artefactId),
+      where: { id: artefactId },
       with: { lesson: true },
     })
     if (!artefact) throw errors.notFound('Artefact')
@@ -220,7 +224,7 @@ export class CoursesService {
     for (let n = 1; n < 100; n++) {
       const candidate = withSuffix(base, n)
       const taken = await this.deps.db.query.courses.findFirst({
-        where: eq(s.courses.slug, candidate),
+        where: { slug: candidate },
         columns: { id: true },
       })
       if (!taken) return candidate
@@ -343,7 +347,7 @@ export class CoursesService {
   async reorderLessons(user: SessionUser, courseId: string, ids: string[]): Promise<CourseView> {
     await this.ownedCourse(user, courseId, { forEdit: true })
     const existing = await this.deps.db.query.lessons.findMany({
-      where: eq(s.lessons.courseId, courseId),
+      where: { courseId },
       columns: { id: true },
     })
     assertSameSet(
@@ -365,7 +369,7 @@ export class CoursesService {
     const { course } = await this.ownedLesson(user, lessonId)
     const { db } = this.deps
     const courseLessons = await db.query.lessons.findMany({
-      where: eq(s.lessons.courseId, course.id),
+      where: { courseId: course.id },
       with: { prerequisites: true },
     })
     const lessonIds = courseLessons.map((l) => l.id)
@@ -458,7 +462,7 @@ export class CoursesService {
   async reorderArtefacts(user: SessionUser, lessonId: string, ids: string[]): Promise<CourseView> {
     const { course } = await this.ownedLesson(user, lessonId)
     const existing = await this.deps.db.query.artefacts.findMany({
-      where: eq(s.artefacts.lessonId, lessonId),
+      where: { lessonId },
       columns: { id: true },
     })
     assertSameSet(
@@ -525,7 +529,3 @@ function assertSameSet(existing: string[], incoming: string[], what: string): vo
     )
   }
 }
-
-export const courseStatusFilter = (status?: CourseRow['status']) =>
-  status ? eq(s.courses.status, status) : undefined
-export const courseIdsIn = (ids: string[]) => (ids.length ? inArray(s.courses.id, ids) : undefined)

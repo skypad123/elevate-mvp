@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
+    "drizzle-orm": "1.0.0-rc.5",
     "turbo": "2.11.10",
     "typescript": "~6.0.3"
   },
@@ -35,6 +36,7 @@
     "@types/react": "~19.3.0",
     "hono": "4.13.17",
     "zod": "4.6.7",
+    "drizzle-orm": "1.0.0-rc.5",
     "typescript": "~6.0.3",
     "react-native": "0.88.1",
     "react-native-svg": "15.16.0",

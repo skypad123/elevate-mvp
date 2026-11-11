@@ -7,7 +7,7 @@ import {
   type Page,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, asc, desc, eq, exists, ilike, or, type SQL, sql } from 'drizzle-orm'
+import { and, EmptyFilter, eq, exists, ilike, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
 import { MediaService } from './media.service'
@@ -66,27 +66,35 @@ export class CatalogService {
 
   async list(query: CatalogQuery): Promise<Page<CourseCard>> {
     const { db } = this.deps
-    const conditions: SQL[] = [eq(s.courses.status, 'live')]
-    if (query.category) conditions.push(eq(s.courses.category, query.category))
-    if (query.q) {
-      const like = `%${query.q.replace(/[%_]/g, '\\$&')}%`
-      const teacherMatch = exists(
-        db
-          .select({ one: sql`1` })
-          .from(s.teacherProfiles)
-          .where(
-            and(
-              eq(s.teacherProfiles.userId, s.courses.teacherId),
-              ilike(s.teacherProfiles.displayName, like),
-            ),
-          ),
-      )
-      const match = or(ilike(s.courses.title, like), ilike(s.courses.summary, like), teacherMatch)
-      if (match) conditions.push(match)
-    }
+    const like = query.q ? `%${query.q.replace(/[%_]/g, '\\$&')}%` : null
     const offset = decodeOffset(query.cursor)
     const rows = await db.query.courses.findMany({
-      where: and(...conditions),
+      where: {
+        status: 'live',
+        ...(query.category ? { category: query.category } : {}),
+        // Search matches the title, the summary or the teacher's display name. The callback's
+        // `course` is the query's own alias for the table, which the subquery must refer to.
+        ...(like
+          ? {
+              RAW: (course) =>
+                or(
+                  ilike(course.title, like),
+                  ilike(course.summary, like),
+                  exists(
+                    db
+                      .select({ one: sql`1` })
+                      .from(s.teacherProfiles)
+                      .where(
+                        and(
+                          eq(s.teacherProfiles.userId, course.teacherId),
+                          ilike(s.teacherProfiles.displayName, like),
+                        ),
+                      ),
+                  ),
+                ) ?? EmptyFilter,
+            }
+          : {}),
+      },
       with: {
         thumbnail: true,
         teacher: { with: { teacherProfile: true } },
@@ -94,8 +102,8 @@ export class CatalogService {
       },
       orderBy:
         query.sort === 'popular'
-          ? [desc(s.courses.enrolCount), desc(s.courses.publishedAt)]
-          : [desc(s.courses.publishedAt), desc(s.courses.createdAt)],
+          ? { enrolCount: 'desc', publishedAt: 'desc' }
+          : { publishedAt: 'desc', createdAt: 'desc' },
       limit: query.limit + 1,
       offset,
     })
@@ -110,16 +118,16 @@ export class CatalogService {
   async detail(slug: string, viewerId: string | null): Promise<CoursePublicView> {
     const { db } = this.deps
     const course = await db.query.courses.findFirst({
-      where: eq(s.courses.slug, slug),
+      where: { slug },
       with: {
         thumbnail: true,
         teacher: { with: { teacherProfile: true } },
         lessons: {
-          orderBy: [asc(s.lessons.position)],
+          orderBy: { position: 'asc' },
           with: {
             prerequisites: true,
             artefacts: {
-              orderBy: [asc(s.artefacts.position)],
+              orderBy: { position: 'asc' },
               with: { media: { columns: { durationSeconds: true } } },
             },
           },
@@ -129,7 +137,7 @@ export class CatalogService {
     if (!course) throw errors.notFound('Course')
     const viewer = viewerId
       ? await db.query.enrollments.findFirst({
-          where: and(eq(s.enrollments.courseId, course.id), eq(s.enrollments.userId, viewerId)),
+          where: { courseId: course.id, userId: viewerId },
         })
       : null
     // Teachers and staff may preview unpublished courses; everyone else sees live ones only.
@@ -190,9 +198,7 @@ export class CatalogService {
   }
 
   private async isStaff(userId: string): Promise<boolean> {
-    const roles = await this.deps.db.query.userRoles.findMany({
-      where: eq(s.userRoles.userId, userId),
-    })
+    const roles = await this.deps.db.query.userRoles.findMany({ where: { userId } })
     return roles.some((r) => r.role === 'support_agent' || r.role === 'super_admin')
   }
 }

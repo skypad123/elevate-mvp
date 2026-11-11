@@ -1,6 +1,5 @@
 import { schema as s } from '@elevate/db'
 import { createPgliteDb } from '@elevate/db/pglite'
-import { eq } from 'drizzle-orm'
 import { createApp } from '../../src/app'
 import type { Deps } from '../../src/deps'
 import { loadEnv } from '../../src/env'
@@ -80,7 +79,7 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
   }
 
   async function ensureUser(email: string, name?: string) {
-    const existing = await db.query.users.findFirst({ where: eq(s.users.email, email) })
+    const existing = await db.query.users.findFirst({ where: { email } })
     if (existing) return existing
     const [created] = await db
       .insert(s.users)

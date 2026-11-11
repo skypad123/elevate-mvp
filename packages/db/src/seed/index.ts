@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { quizDefinitionSchema } from '@elevate/core'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { AnyDb } from '../index'
 
 import * as s from '../schema'
@@ -97,9 +97,7 @@ async function ensureThumbnail(
     mkdirSync(dirname(file), { recursive: true })
     writeFileSync(file, thumbnailSvg(course))
   }
-  const existing = await db.query.mediaAssets.findFirst({
-    where: eq(s.mediaAssets.storageKey, storageKey),
-  })
+  const existing = await db.query.mediaAssets.findFirst({ where: { storageKey } })
   if (existing) return existing.id
   const [asset] = await db
     .insert(s.mediaAssets)
@@ -125,7 +123,7 @@ async function seedCourse(
   storageDir: string | null,
 ) {
   const thumbnailMediaId = await ensureThumbnail(db, teacherId, course, storageDir)
-  const existing = await db.query.courses.findFirst({ where: eq(s.courses.slug, course.slug) })
+  const existing = await db.query.courses.findFirst({ where: { slug: course.slug } })
   const now = new Date()
   const statusFields =
     course.status === 'live'
@@ -288,7 +286,7 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
   const sourdoughId = courseIds.get('sourdough-from-scratch')
   if (sourdoughId) {
     const existing = await db.query.enrollments.findFirst({
-      where: and(eq(s.enrollments.userId, learner.id), eq(s.enrollments.courseId, sourdoughId)),
+      where: { userId: learner.id, courseId: sourdoughId },
     })
     if (!existing) {
       const [enrollment] = await db
@@ -301,9 +299,9 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
         })
         .returning()
       const firstLesson = await db.query.lessons.findFirst({
-        where: eq(s.lessons.courseId, sourdoughId),
-        orderBy: (l, { asc }) => [asc(l.position)],
-        with: { artefacts: { orderBy: (a, { asc }) => [asc(a.position)] } },
+        where: { courseId: sourdoughId },
+        orderBy: { position: 'asc' },
+        with: { artefacts: { orderBy: { position: 'asc' } } },
       })
       const firstText = firstLesson?.artefacts.find((a) => a.type === 'text')
       if (enrollment && firstText) {

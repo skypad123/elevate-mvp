@@ -20,8 +20,9 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 
 ## Rules
 
-- One copy of `react`, `react-dom`, `react-native`, `react-native-svg`, `react-native-worklets`, `hono`, `zod`:
-  pinned via root `overrides` (React versions follow the Expo SDK); `npm run check:dupes` and `expo-doctor` verify.
+- One copy of `react`, `react-dom`, `react-native`, `react-native-svg`, `react-native-worklets`, `hono`, `zod`,
+  `drizzle-orm`: pinned via root `overrides` (React versions follow the Expo SDK); `npm run check:dupes` and
+  `expo-doctor` verify.
 - `react-router` stays on 7.x (8.x needs a newer React than Expo ships). `typescript` stays `~6.0.3`.
 - Every API handler returns `c.json(body, 200)` with an explicit status so RPC response types narrow.
 - Money is integer cents; the only fee computation lives in `packages/core/src/domain/money.ts`.
@@ -38,3 +39,22 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 - React Native's strict TypeScript API is on: style types are readonly (build styles up with
   `MutableTextStyle` from `src/theme`), refs use instance types such as `TextInputInstance`, and
   `react-native/Libraries/*` deep imports are off-limits.
+
+## Drizzle conventions (packages/db, apps/api)
+
+The repo is on **Drizzle 1.0**: `drizzle-orm` and `drizzle-kit` are pinned to exactly `1.0.0-rc.5`. Code written
+for 0.x does not compile here; see https://orm.drizzle.team/docs/relations-v1-v2 and
+https://orm.drizzle.team/docs/rqb-v2.
+
+- Move the pins only on purpose and together: root `overrides`, root `devDependencies` (the root entry is what
+  keeps `drizzle-orm` to one copy), `packages/db` and `apps/api`.
+- Tables are `snakeCase.table(...)` and views `snakeCase.view(...)` from `drizzle-orm/pg-core`; there is no
+  global `casing` option. All relations live in the one `defineRelations` call in
+  `packages/db/src/schema/relations.ts`.
+- `db.query.*` takes object filters, such as `where: { id }`, `{ consumedAt: { isNull: true } }` and
+  `{ OR: [...] }`, and `orderBy: { createdAt: 'desc' }`. Never pass `undefined` as a filter or a filter value:
+  it compiles and then throws. Leave the key out, or return `EmptyFilter`.
+- SQL expressions inside a filter go in `RAW: (table) => ...` and must use the callback's `table`, not the
+  imported one, because the query aliases its table.
+- Migrations are folders, `packages/db/drizzle/<timestamp>_<name>/` with `migration.sql` and `snapshot.json`,
+  written by `npm run db:generate`. There are no numbered `.sql` files and no `meta/` folder.

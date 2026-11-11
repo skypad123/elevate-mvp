@@ -5,8 +5,8 @@ import {
   index,
   integer,
   jsonb,
-  pgTable,
   primaryKey,
+  snakeCase,
   text,
   uuid,
 } from 'drizzle-orm/pg-core'
@@ -15,7 +15,7 @@ import { enrollments } from './commerce'
 import { artefacts, quizzes } from './courses'
 import { progressStatusEnum } from './enums'
 
-export const artefactProgress = pgTable(
+export const artefactProgress = snakeCase.table(
   'artefact_progress',
   {
     enrollmentId: uuid()
@@ -35,7 +35,7 @@ export const artefactProgress = pgTable(
   ],
 )
 
-export const quizAttempts = pgTable(
+export const quizAttempts = snakeCase.table(
   'quiz_attempts',
   {
     id: id(),
@@ -55,11 +55,11 @@ export const quizAttempts = pgTable(
   (t) => [index().on(t.enrollmentId, t.quizId)],
 )
 
-export const certificates = pgTable('certificates', {
+export const certificates = snakeCase.table('certificates', {
   id: id(),
   enrollmentId: uuid()
     .notNull()
-    .unique()
+    .unique('certificates_enrollmentId_unique')
     .references(() => enrollments.id, { onDelete: 'cascade' }),
   /** Public, unguessable token used in /c/{token}. */
   token: text().notNull().unique(),

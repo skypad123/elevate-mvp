@@ -1,5 +1,3 @@
-import { schema as s } from '@elevate/db'
-import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -76,7 +74,7 @@ describe('teacher onboarding', () => {
     const me = await t.api('GET', '/api/auth/me', { token: applicant })
     expect(me.body.user.roles).toContain('teacher')
     const audit = await t.db.query.auditLog.findMany({
-      where: eq(s.auditLog.entityId, applicantId),
+      where: { entityId: applicantId },
     })
     expect(audit.map((a) => a.action)).toContain('teacher.approve')
     expect(
@@ -94,7 +92,7 @@ describe('teacher onboarding', () => {
     expect(link.status).toBe(200)
     expect(link.body.url).toContain('fake-stripe')
     const profile = await t.db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, applicantId),
+      where: { userId: applicantId },
     })
     expect(profile?.stripeAccountId).toBeTruthy()
 

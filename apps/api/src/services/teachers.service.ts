@@ -47,7 +47,7 @@ export class TeachersService {
 
   async getProfile(userId: string): Promise<TeacherProfileView | null> {
     const profile = await this.deps.db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, userId),
+      where: { userId },
       with: { user: true },
     })
     return profile ? teacherProfileView(profile, profile.user.email) : null
@@ -55,9 +55,7 @@ export class TeachersService {
 
   async apply(user: SessionUser, input: TeacherApplication): Promise<TeacherProfileView> {
     const { db, env, mailer } = this.deps
-    const existing = await db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, user.id),
-    })
+    const existing = await db.query.teacherProfiles.findFirst({ where: { userId: user.id } })
     if (existing?.status === 'approved')
       throw errors.conflict('already_teacher', 'You are already an approved teacher')
     if (input.teachingSampleMediaId) {
@@ -127,7 +125,7 @@ export class TeachersService {
   ): Promise<TeacherProfileView> {
     const { db, env, mailer } = this.deps
     const profile = await db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, teacherUserId),
+      where: { userId: teacherUserId },
       with: { user: true },
     })
     if (!profile) throw errors.notFound('Teacher application')
@@ -177,7 +175,7 @@ export class TeachersService {
   ): Promise<TeacherProfileView> {
     const { db, env, mailer } = this.deps
     const profile = await db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, teacherUserId),
+      where: { userId: teacherUserId },
       with: { user: true },
     })
     if (!profile) throw errors.notFound('Teacher application')
@@ -225,7 +223,7 @@ export class TeachersService {
     commissionBps: number,
   ): Promise<TeacherProfileView> {
     const profile = await this.deps.db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, teacherUserId),
+      where: { userId: teacherUserId },
       with: { user: true },
     })
     if (!profile) throw errors.notFound('Teacher profile')

@@ -1,12 +1,21 @@
 import type { QuizQuestion, RichTextDoc } from '@elevate/core'
 import { sql } from 'drizzle-orm'
-import { check, index, integer, jsonb, pgTable, primaryKey, text, uuid } from 'drizzle-orm/pg-core'
+import {
+  check,
+  index,
+  integer,
+  jsonb,
+  primaryKey,
+  snakeCase,
+  text,
+  uuid,
+} from 'drizzle-orm/pg-core'
 import { users } from './auth'
 import { createdAt, id, ts, updatedAt } from './columns'
 import { artefactTypeEnum, courseStatusEnum } from './enums'
 import { mediaAssets } from './media'
 
-export const courses = pgTable(
+export const courses = snakeCase.table(
   'courses',
   {
     id: id(),
@@ -39,11 +48,12 @@ export const courses = pgTable(
     index().on(t.teacherId),
     index().on(t.status, t.publishedAt),
     index().on(t.status, t.enrolCount),
-    check('courses_price_cents_non_negative', sql`${t.priceCents} >= 0`),
+    // Expression pinned to the applied migration; see the note in ./index.ts.
+    check('courses_price_cents_non_negative', sql.raw('"courses"."price_cents" >= 0')),
   ],
 )
 
-export const lessons = pgTable(
+export const lessons = snakeCase.table(
   'lessons',
   {
     id: id(),
@@ -60,7 +70,7 @@ export const lessons = pgTable(
 )
 
 /** Edge of the course DAG: `lessonId` requires `prerequisiteLessonId` to be completed first. */
-export const lessonPrerequisites = pgTable(
+export const lessonPrerequisites = snakeCase.table(
   'lesson_prerequisites',
   {
     lessonId: uuid()
@@ -72,11 +82,16 @@ export const lessonPrerequisites = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.lessonId, t.prerequisiteLessonId] }),
-    check('lesson_prerequisites_not_self', sql`${t.lessonId} <> ${t.prerequisiteLessonId}`),
+    check(
+      'lesson_prerequisites_not_self',
+      sql.raw(
+        '"lesson_prerequisites"."lesson_id" <> "lesson_prerequisites"."prerequisite_lesson_id"',
+      ),
+    ),
   ],
 )
 
-export const artefacts = pgTable(
+export const artefacts = snakeCase.table(
   'artefacts',
   {
     id: id(),
@@ -97,11 +112,11 @@ export const artefacts = pgTable(
   (t) => [index().on(t.lessonId, t.position)],
 )
 
-export const quizzes = pgTable('quizzes', {
+export const quizzes = snakeCase.table('quizzes', {
   id: id(),
   artefactId: uuid()
     .notNull()
-    .unique()
+    .unique('quizzes_artefactId_unique')
     .references(() => artefacts.id, { onDelete: 'cascade' }),
   passMarkPercent: integer().notNull().default(70),
   maxAttempts: integer().notNull().default(1),

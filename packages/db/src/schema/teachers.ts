@@ -1,11 +1,11 @@
 import { sql } from 'drizzle-orm'
-import { boolean, check, integer, pgTable, text, uuid } from 'drizzle-orm/pg-core'
+import { boolean, check, integer, snakeCase, text, uuid } from 'drizzle-orm/pg-core'
 import { users } from './auth'
 import { createdAt, ts, updatedAt } from './columns'
 import { teacherStatusEnum } from './enums'
 import { mediaAssets } from './media'
 
-export const teacherProfiles = pgTable(
+export const teacherProfiles = snakeCase.table(
   'teacher_profiles',
   {
     userId: uuid()
@@ -21,7 +21,8 @@ export const teacherProfiles = pgTable(
     reviewNote: text(),
     /** Per-teacher platform commission in basis points (1500 = 15%). Not a constant. */
     commissionBps: integer().notNull().default(1500),
-    stripeAccountId: text().unique(),
+    // Name pinned to the applied migration; see the note in ./index.ts.
+    stripeAccountId: text().unique('teacher_profiles_stripeAccountId_unique'),
     stripeDetailsSubmitted: boolean().notNull().default(false),
     stripeChargesEnabled: boolean().notNull().default(false),
     stripePayoutsEnabled: boolean().notNull().default(false),
@@ -30,7 +31,10 @@ export const teacherProfiles = pgTable(
     reviewedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
     updatedAt: updatedAt(),
   },
-  (t) => [
-    check('teacher_profiles_commission_bps_range', sql`${t.commissionBps} between 0 and 10000`),
+  () => [
+    check(
+      'teacher_profiles_commission_bps_range',
+      sql.raw('"teacher_profiles"."commission_bps" between 0 and 10000'),
+    ),
   ],
 )

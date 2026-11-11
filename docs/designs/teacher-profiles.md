@@ -1,7 +1,8 @@
 # Teacher profiles separate from users
 
 -   **Author:** sky
--   **Status:** Proposed
+-   **Status:** In progress. Step 0 (the Drizzle 1.0 upgrade) was implemented on 2026-11-12; steps
+    1 to 3 are not started.
 -   **Date:** 2026-11-11
 -   **Related:** reviews in [reviews/teacher-profiles/](reviews/teacher-profiles/); the brief this design came from, [teacher-profiles-brief.md](teacher-profiles-brief.md).
     Changes [ADR 003](../adr/003-payments-destination-charges.md): the destination charge goes to
@@ -99,7 +100,7 @@ That model breaks in three ways, and a fourth point is the reason to fix it now.
 ### Slice 1: Structure
 
 1.  **Every course and payment belongs to a profile, not a user.** Measured by: a test reads the
-    generated `0000` and finds no foreign key from `courses`, `payments` or
+    generated `init` migration and finds no foreign key from `courses`, `payments` or
     `media_assets.profile_id` to `users`.
 2.  **Every profile has exactly one owner at all times.** Measured by: the database rejects a
     profile row with no owner, and blocks deleting a user who owns a profile.
@@ -121,7 +122,7 @@ That model breaks in three ways, and a fourth point is the reason to fix it now.
     API, Teach, Support and learner test suites pass with changes only to fixtures, route paths and
     renamed fields.
 8.  **Staging and production start from a clean database.** Measured by: both run from a single
-    squashed `0000` migration and a seed run as a one-off task.
+    squashed `init` migration and a seed run as a one-off task.
 
 ### Slice 2: Helpers
 
@@ -183,14 +184,10 @@ That model breaks in three ways, and a fourth point is the reason to fix it now.
 -   **Apple relay addresses**: assumed, not tested, that Apple sign-in can hand Elevate a relay
     address, so an invited email may not match the accepting account. Alternative V relies on
     this; it matters only once the sign-in brief lands.
--   **Drizzle 1.0 status**: the design depends on `drizzle-orm@1.0.0-rc.5`, a release candidate
-    (Technical Plan, section 13). The upgrade is Step 0, before step 1, because the squashed `0000`
-    is generated with the new `drizzle-kit`. Doing it later means generating the squashed migration
-    twice.
--   **`drizzle-kit` RC and views**: not yet tested whether it generates the `CREATE VIEW`
-    statements for `snakeCase.view` definitions. Tested in item 0.10, before step 2 needs the
-    views. Fallback: the views are declared with `.existing()` and the generate wrapper (item 1.8a)
-    adds their SQL to `0000`.
+-   **Drizzle 1.0 final**: since Step 0 the repo runs on `drizzle-orm@1.0.0-rc.5`, a release
+    candidate (Technical Plan, section 13). Not known: when 1.0 final is published, and whether it
+    changes the query syntax, the default constraint names or the migration layout again. The
+    pins move only on purpose, and a move repeats the Step 0 checks (item 0.9).
 
 ## Critical User Journeys (CUJs)
 
@@ -648,18 +645,23 @@ and draft versions, lets them pick one for each conflict, then approve or discar
 - **Not in the change set:** title, summary, description, category and thumbnail. Writers cannot
   change these on a live course; owners and managers can.
 
-**Scratch-project test results.** Tested in a scratch project, not in this repo, on
-`drizzle-orm@1.0.0-rc.5` with PGlite 0.5.16:
+**Scratch test results.** Tested outside the repo on `drizzle-orm@1.0.0-rc.5` and
+`drizzle-kit@1.0.0-rc.5` with PGlite 0.5.16. The second test (item 0.10) used a copy of this repo's
+schema, with `change_set_id` added to the four tables:
 
 - tables and views were declared with `snakeCase.table` and `snakeCase.view`;
-- relations ran over the views with `defineRelations`;
-- a nested query from `courses` through `live_lessons` to `live_artefacts` returned only the live
-  lesson and the live artefact;
+- `drizzle-kit generate` wrote a `CREATE VIEW` statement for each of the four views, including
+  `live_lesson_prerequisites`, and the migration applied;
+- a second client on the same connection was built from a relations set that holds only
+  `courses`, `users` and the four views. Its nested query from `courses` through `liveLessons` to
+  `livePrerequisites`, `liveArtefacts` and `liveQuiz` returned only the live rows;
 - the same query over the raw tables returned the draft rows as well;
-- a query rooted at a view also worked.
+- a query rooted at a view also worked;
+- the second client's `query` object had no `lessons`, `artefacts`, `quizzes` or
+  `lessonPrerequisites` key.
 
-**Not tested:** views over `lesson_prerequisites`, the API's real schema, and migration
-generation (see the `drizzle-kit` item in Open Questions).
+**Not tested:** `source_id` and `removed`, the change-set table, and the real learner services
+reading through the views. Step 2 builds those.
 
 ### 9. Corporate application and checks
 
@@ -707,8 +709,10 @@ Stripe enables charges → Support compares legal names → payout account: acti
 
 ### 12. Reset and seed
 
-- **Migrations:** `packages/db/drizzle/0000_init.sql` and `0001` are replaced by one generated
-  `0000`.
+- **Migrations:** the two migration folders in `packages/db/drizzle/` (`20261108045929_init` and
+  `20261108080136_payment_enrollment_indexes`) are replaced by one generated folder,
+  `<timestamp>_init`, holding `migration.sql` and `snapshot.json`. This document calls it the
+  `init` migration.
 - **A new API image command, `reset-schema`,** drops and recreates the `public` and `drizzle`
   schemas. It refuses to run unless `ALLOW_SCHEMA_RESET=yes` is set for that one task.
 - **A new command, `seed`,** runs the demo seed on staging and the super-admin-only seed on
@@ -716,25 +720,36 @@ Stripe enables charges → Support compares legal names → payout account: acti
 - **Order in each environment.** `reset-schema` exists only in the new image, and the Deploy
   workflow builds that image and then migrates at once. The procedure has four parts, (a) to (d),
   lettered so they are not confused with the plan's steps:
-  a. Push the commit to the environment branch. Deploy builds the image and registers the task
-  definition, then **fails at the migration step, as expected**, because the new `0000` meets
-  the old tables. The workflow leaves the running API on the old version.
-  b. Run `reset-schema` as a one-off task with the task definition that deploy just registered,
-  overriding the command and setting `ALLOW_SCHEMA_RESET=yes` for that task only.
-  c. Re-run Deploy for the branch (`workflow_dispatch`). It reuses the image, applies the new
-  `0000` and rolls the service.
-  d. Run `seed --demo` (staging) or `seed --admin-only` (production) as a one-off task.
+  - **(a)** Push the commit to the environment branch. Deploy builds the image and registers the
+    task definition, then **fails at the migration step, as expected**: the database's migrations
+    table lists the two old migrations, and the image holds only the `init` migration. The
+    workflow leaves the running API on the old version.
+  - **(b)** Run `reset-schema` as a one-off task with the task definition that deploy just
+    registered, overriding the command and setting `ALLOW_SCHEMA_RESET=yes` for that task only.
+  - **(c)** Re-run Deploy for the branch (`workflow_dispatch`). It reuses the image, applies the
+    `init` migration and rolls the service.
+  - **(d)** Run `seed --demo` (staging) or `seed --admin-only` (production) as a one-off task.
 
   The old API serves errors between (b) and (c); this is accepted because there are no users.
-  On production, (a) and (c) wait for approval by the required reviewer of the `production` GitHub Environment, the
-  same approval every production deploy needs today.
+  On production, (a) and (c) wait for approval by the required reviewer of the `production`
+  GitHub Environment, the same approval every production deploy needs today.
+- **The failure in (a) was tested in Step 0** on a throwaway Postgres 17: a database built by
+  the version before Step 0 (Drizzle 0.45.4) met a folder holding one squashed migration. The migration command exits with
+  an error, changes nothing and leaves the data in place. The message depends on the migrations
+  table:
+  - in its old format, as in any environment last migrated before Step 0:
+    `we found 2 migrations (ids: 1, 2) in the database that do not match any local migration`;
+  - already upgraded by a Step 0 build, as on a developer's machine:
+    `type "artefact_type" already exists`.
+
+  A database that was never migrated has nothing to reset: (a) succeeds, and only (d) remains.
 - **Seed images:** the seed writes thumbnails through the storage provider, so S3 is used on
   staging.
 - **The deploy workflow is unchanged.** The procedure uses it as it is, including its expected
   failure in (a). `infra/README.md` documents the procedure, and notes that this change cannot
   be undone with `git revert`.
-- **Extensions:** dropping `public` also drops the `citext` and `pg_trgm` extensions; the new
-  `0000` creates them again (item 1.8a).
+- **Extensions:** dropping `public` also drops the `citext` and `pg_trgm` extensions; the `init`
+  migration creates them again (item 1.8a).
 - **Old Stripe test accounts:** connected accounts created before the reset carry `elevateUserId`
   metadata and have no `payout_accounts` row, so their `account.updated` events store
   `unknown_account` errors. These can be ignored, or the accounts closed in the Stripe test
@@ -742,25 +757,37 @@ Stripe enables charges → Support compares legal names → payout account: acti
 
 ### 13. Drizzle 1.0 upgrade
 
-**Status, checked 2026-11-11:**
+**Status, checked on npm on 2026-11-12:**
 
-- On npm, `drizzle-orm` `latest` is `0.45.4`, published 2026-10-08, which is what the repo uses.
-- The newest 1.0 build is `1.0.0-rc.5`, published 2026-10-21, a release candidate.
-- `drizzle-kit` `latest` is `0.31.11`, with a matching `rc` tag.
+- `drizzle-orm` `latest` is `0.45.4`, published 2026-10-08. 1.0 is not final.
+- The newest 1.0 build of `drizzle-orm` and of `drizzle-kit` is `1.0.0-rc.5`, published
+  2026-10-21, a release candidate. Since Step 0 the repo is pinned to it.
 
-**What the upgrade changes in this repo:**
+**What the upgrade changed in this repo** (Step 0 of the Detailed Implementation Plan):
 
-- **Casing.** Drizzle 1.0 removed the global `casing: 'snake_case'` option, which the repo sets in
-  `packages/db/src/client.ts:14`, `packages/db/src/pglite.ts:18` and `packages/db/drizzle.config.ts:7`.
-  Every table must be declared with `snakeCase.table`, and every view with `snakeCase.view`.
-  Without it, queries use camelCase column names and fail. The scratch test confirmed this.
+- **Casing.** Drizzle 1.0 removed the global `casing: 'snake_case'` option, which the two clients
+  and `drizzle.config.ts` used to set. Every table is declared with `snakeCase.table`, and every
+  view with `snakeCase.view`. Without it, queries use camelCase column names and fail.
 - **Relations.** `packages/db/src/schema/relations.ts` is rewritten with `defineRelations`, because
   the old relational query API is removed.
-- **Queries.** Every `db.query.*` call in the API moves to the new syntax for `where` and `orderBy`.
-  Relation filters no longer accept `undefined`.
-- **Errors.** `DrizzleQueryError` omits query parameters unless `paramsInErrors: true` is set.
-- **Versions.** `drizzle-kit` moves to the matching RC, and the squashed `0000` is generated with
-  it.
+- **Queries.** Every `db.query.*` call uses the new syntax for `where` and `orderBy`. A filter no
+  longer accepts `undefined`. Item 0.8 lists the rules.
+- **Errors.** `DrizzleQueryError` leaves out query values unless `paramsInErrors: true` is set. The
+  clients set it outside production only, so production logs no longer show query values.
+- **Migration layout.** `drizzle-kit` 1.0 keeps each migration in its own folder,
+  `<UTC timestamp>_<name>/`, holding `migration.sql` and `snapshot.json`. There are no numbered
+  files and no `meta/_journal.json`. The migrator refuses the old layout, and `drizzle-kit up`
+  converts it (item 0.9). The migrations table, `drizzle.__drizzle_migrations`, gains `name` and
+  `applied_at` columns; an existing table is upgraded the first time the new migrator runs.
+- **Constraint names.** The RC builds default names from the snake_case column names:
+  `<table>_<column>_key` for a unique column, and `<table>_<columns>_unique` for a unique
+  constraint over several columns. `drizzle-kit` 0.31 built them from the camelCase keys
+  (`sessions_tokenHash_unique`). The RC also prints a check's expression without the table name.
+  Today's names are pinned until the squash (items 0.3 and 1.8).
+- **Config.** `drizzle.config.ts` loses `casing` and `strict`; the RC has neither key.
+- **Install.** The RC has an optional peer dependency that conflicts with a package at the repo
+  root, so npm installed two copies until `drizzle-orm` was also declared in the root
+  `devDependencies` (item 0.1).
 
 **Pinning.** Both packages are pinned to exact RC versions, not the moving `rc` tag, and are moved
 up only on purpose, because a release candidate can still change before 1.0 is final (see Risks &
@@ -768,21 +795,21 @@ Mitigations).
 
 ## Risks & Mitigations
 
-| Risk                                                                              | Impact                                                                   | Mitigation or acceptance                                                                                                                                                         |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Drizzle `1.0.0-rc.5` changes before 1.0 is final                                  | the rewritten query layer may need follow-up changes                     | exact pins; Step 0 lands on its own with every suite passing; the RC is moved only on purpose                                                                                    |
-| `drizzle-kit` RC does not emit views, or changes its migration layout             | the single `0000` cannot be generated as planned                         | tested in item 0.10 before step 2; fallback: the generate wrapper (item 1.8a) adds the view SQL                                                                                  |
-| Stripe company accounts behave differently from the assumptions in Open Questions | step 3 is blocked or changes                                             | tested in Stripe test mode before step 3 starts                                                                                                                                  |
-| The reset cannot be undone                                                        | staging and production data are lost                                     | accepted: no real data exists; production is reset only after staging passes, and its deploys wait for the required reviewer of the `production` GitHub Environment (section 12) |
-| A forged or out-of-date registry document                                         | a company that is not who it claims, or has been struck off, is approved | accepted by the author; remaining safeguards are Stripe's own verification and the legal-name check                                                                              |
-| Anyone holding a company's registry document can apply as that company            | as above                                                                 | accepted; Elevate cannot prove the applicant is connected to the company                                                                                                         |
-| Any Support staff member can approve a company and its payee                      | more people can approve a forged application                             | accepted by the author; each check is audited under the staff member's own user ID                                                                                               |
-| The public name drifts from the verified legal name                               | learners see a different name from the verified one                      | accepted; display-name changes are audited                                                                                                                                       |
-| A forwarded invitation lets someone join as a writer                              | an unwanted writer                                                       | their live edits are held for approval; new courses need Support approval; the inviter is notified and can remove them                                                           |
-| A Support email change is a takeover route                                        | account takeover                                                         | `super_admin` only, audited, both addresses emailed, sessions revoked; accepted because Support cannot reliably verify who is asking                                             |
-| Opening a change set copies the whole course                                      | write cost on a writer's first edit                                      | accepted at pilot size (tens of lessons per course); revisit if a course passes a few hundred artefacts                                                                          |
-| A paid checkout has no payee metadata                                             | the learner paid and has no enrolment                                    | possible only if session creation leaves out the metadata; the error is stored for Support to act on                                                                             |
-| Staff acting in Teach                                                             | staff change a teacher's live content                                    | staff cannot change money, publishing or membership (section 2); every change is audited; Teach shows a banner                                                                   |
+| Risk                                                                              | Impact                                                                                                         | Mitigation or acceptance                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Drizzle 1.0 final differs from `1.0.0-rc.5`                                       | the query syntax, the constraint names or the migration layout may need follow-up changes                      | exact pins; the RC is moved only on purpose, and a move repeats the Step 0 checks (item 0.9)                                                                                                                                   |
+| A relational-query filter is `undefined` at run time                              | the query throws and the request fails, where the old API read it as "no filter"; TypeScript does not catch it | filters leave unset keys out or return `EmptyFilter` (item 0.8, and the rule in `AGENTS.md`); the request comparison in item 0.9 ran the catalogue, people, transactions and review-queue lists with and without their filters |
+| Stripe company accounts behave differently from the assumptions in Open Questions | step 3 is blocked or changes                                                                                   | tested in Stripe test mode before step 3 starts                                                                                                                                                                                |
+| The reset cannot be undone                                                        | staging and production data are lost                                                                           | accepted: no real data exists; production is reset only after staging passes, and its deploys wait for the required reviewer of the `production` GitHub Environment (section 12)                                               |
+| A forged or out-of-date registry document                                         | a company that is not who it claims, or has been struck off, is approved                                       | accepted by the author; remaining safeguards are Stripe's own verification and the legal-name check                                                                                                                            |
+| Anyone holding a company's registry document can apply as that company            | as above                                                                                                       | accepted; Elevate cannot prove the applicant is connected to the company                                                                                                                                                       |
+| Any Support staff member can approve a company and its payee                      | more people can approve a forged application                                                                   | accepted by the author; each check is audited under the staff member's own user ID                                                                                                                                             |
+| The public name drifts from the verified legal name                               | learners see a different name from the verified one                                                            | accepted; display-name changes are audited                                                                                                                                                                                     |
+| A forwarded invitation lets someone join as a writer                              | an unwanted writer                                                                                             | their live edits are held for approval; new courses need Support approval; the inviter is notified and can remove them                                                                                                         |
+| A Support email change is a takeover route                                        | account takeover                                                                                               | `super_admin` only, audited, both addresses emailed, sessions revoked; accepted because Support cannot reliably verify who is asking                                                                                           |
+| Opening a change set copies the whole course                                      | write cost on a writer's first edit                                                                            | accepted at pilot size (tens of lessons per course); revisit if a course passes a few hundred artefacts                                                                                                                        |
+| A paid checkout has no payee metadata                                             | the learner paid and has no enrolment                                                                          | possible only if session creation leaves out the metadata; the error is stored for Support to act on                                                                                                                           |
+| Staff acting in Teach                                                             | staff change a teacher's live content                                                                          | staff cannot change money, publishing or membership (section 2); every change is audited; Teach shows a banner                                                                                                                 |
 
 ## Alternatives Considered
 
@@ -1034,11 +1061,11 @@ Today `super_admin` passes every check, and `support_agent` can edit any course.
 
 ### Reset
 
-#### Alternative Z: A destructive `0002` migration
+#### Alternative Z: A destructive follow-on migration
 
 -   **Pros**: it runs through the normal deploy, with no one-off schema task.
 -   **Cons**: the wipe stays in the migration history for good, and every new database replays it.
--   **Reason for Rejection**: Rejected in favour of squashing into a fresh `0000` and
+-   **Reason for Rejection**: Rejected in favour of squashing into one fresh `init` migration and
     dropping the schema once.
 
 ### Options kept open for the promotion brief
@@ -1073,8 +1100,8 @@ production are then reset with the procedure in section 12.
 
 Steps 1–3 are slices 1–3 of the Overview; this plan calls them steps. Step 0 is separate from step 1
 so that a failure in the upgrade is not mixed up with a failure in the new model. The squashed
-`0000` is first generated at the end of step 1, then regenerated at the end of steps 2 and 3 with
-their tables added. That is allowed because no environment has applied it yet. Once staging is
+`init` migration (section 12) is first generated at the end of step 1, then regenerated at the end
+of steps 2 and 3 with their tables added. That is allowed because no environment has applied it yet. Once staging is
 reset (end of step 3), later changes are normal additive migrations. "Done" for a step means merged
 with its checks passing.
 
@@ -1082,63 +1109,98 @@ with its checks passing.
 
 #### Step 0: Drizzle 1.0 upgrade
 
-##### 0.1 `package.json`, `packages/db/package.json`, `apps/api/package.json` (Modify)
+**Status:** implemented on 2026-11-12. Items 0.1 to 0.10 describe the change as built, and each
+**Result** records what a check found. Three things differ from the plan as first written:
+
+- the RC keeps migrations in a new folder layout, so `packages/db/drizzle/` was converted (0.9);
+- the RC names unique constraints and prints check constraints differently, so today's names are
+  pinned in the schema until the squash in step 1 (0.3);
+- most filters did not need raw SQL: only the catalogue search, the people list and the
+  transactions search use `RAW` (0.8).
+
+##### 0.1 `package.json`, `packages/db/package.json`, `apps/api/package.json`, `package-lock.json` (Modify)
 
 -   **Type / Scope**: dependency manifests.
--   **Proposed Changes**: pin `drizzle-orm` to exactly `1.0.0-rc.5`, and `drizzle-kit` to the exact
-    RC version published with it. Gate at the start of Step 0: look both up on npm (and check
-    whether 1.0 has gone stable) and write them into this item before any other change. Add
-    `drizzle-orm` to the root `overrides`, so one copy is installed. Move `@electric-sql/pglite`
-    from `0.5.15` to `0.5.16`, the version the scratch test used, in both `packages/db` and
-    `apps/api` (dev dependency).
+-   **Proposed Changes**: pin `drizzle-orm` and `drizzle-kit` to exactly `1.0.0-rc.5`. Add
+    `drizzle-orm` to the root `overrides` and to the root `devDependencies`. Move
+    `@electric-sql/pglite` from `0.5.15` to `0.5.16`, the version the scratch test used, in both
+    `packages/db` and `apps/api` (dev dependency).
+-   **Result**:
+    - gate, checked on npm on 2026-11-12: `1.0.0-rc.5` is the newest 1.0 build of both packages,
+      and 1.0 is not final;
+    - the override alone left two copies of `drizzle-orm`, under `apps/api` and `packages/db`. The
+      RC has an optional peer dependency on `@sinclair/typebox` `>=0.34.8`, the repo root holds
+      `0.27.12` for Jest, and npm does not hoist a package next to a peer it conflicts with.
+      Declaring `drizzle-orm` in the root `devDependencies`, as `typescript` already is, puts one
+      copy at the root; `typebox` `0.27.12` moved under `@jest/schemas`;
+    - the API image built from this change holds one copy of `drizzle-orm` and no `drizzle-kit`.
 -   **Why**: Technical Plan, section 13. An exact pin stops an `npm install` picking up a later RC
     with breaking changes.
 
 ##### 0.2 `scripts/check-dupes.mjs` (Modify)
 
 -   **Type / Scope**: repo check script.
--   **Proposed Changes**: add `drizzle-orm` to the packages that must have a single copy.
+-   **Proposed Changes**: add `drizzle-orm` to the packages that must have a single copy. The
+    script also reads `package-lock.json` and fails when one of those packages is installed in
+    more than one folder.
+-   **Result**: the script compared versions only, so it passed while two copies of `1.0.0-rc.5`
+    were installed (0.1). It now lists each folder.
 -   **Why**: two copies of `drizzle-orm` would give two different `SQL` classes, and queries built
     in `packages/db` would fail type checks in `apps/api`.
 
-##### 0.3 `packages/db/src/schema/*.ts` (Modify: `auth.ts`, `teachers.ts`, `courses.ts`, `commerce.ts`, `learning.ts`, `media.ts`, `system.ts`)
+##### 0.3 `packages/db/src/schema/*.ts` (Modify: `auth.ts`, `teachers.ts`, `courses.ts`, `commerce.ts`, `learning.ts`, `media.ts`, `system.ts`, `index.ts`)
 
 -   **Type / Scope**: Drizzle table definitions.
 -   **Proposed Changes**: replace each `pgTable(...)` with `snakeCase.table(...)`. Column names and
-    types do not change.
+    types do not change. Pin the constraint names the database already has: the 11 unique
+    constraints get explicit names (`sessions_tokenHash_unique` and so on), and the 3 check
+    constraints are written with `sql.raw` and the table-qualified text. A comment in `index.ts`
+    explains the pins.
+-   **Result**: without the pins, `drizzle-kit generate` on the unchanged schema asked to rename the
+    11 unique constraints and to re-create the 3 checks (section 13, "Constraint names"). With
+    them it reports no changes (0.9). **Item 1.8 removes the pins**, because the squash lets the
+    new default names apply.
 -   **Why**: Drizzle 1.0 removed the global `casing` option. The scratch test showed that without
-    this, queries use camelCase column names and fail.
+    `snakeCase.table`, queries use camelCase column names and fail. The pins keep Step 0 free of
+    database changes.
 
-##### 0.4 `packages/db/src/schema/columns.ts` (Verify, no change expected)
+##### 0.4 `packages/db/src/schema/columns.ts` (Verified, no change)
 
 -   **Type / Scope**: shared column helpers.
 -   **Proposed Changes**: none. The `id`, `ts`, `createdAt` and `updatedAt` helpers set no column
     names, so `snakeCase.table` names them.
+-   **Result**: no change was needed.
 -   **Why**: these helpers are used by every table.
 
 ##### 0.5 `packages/db/src/schema/relations.ts` (Modify, rewritten)
 
 -   **Type / Scope**: relational query definitions.
--   **Proposed Changes**: replace the `relations(...)` calls with one `defineRelations(schema, (r)
+-   **Proposed Changes**: replace the `relations(...)` calls with one `defineRelations(tables, (r)
     => ({ ... }))` export named `relations`. Each `one` and `many` keeps today's name, so the
-    `with:` keys used in queries stay the same. Each relation that uses `relationName` today
-    becomes an explicit `from`/`to` pair, so two relations between the same tables stay distinct.
+    `with:` keys used in queries stay the same. Every relation has an explicit `from`/`to` pair,
+    so two relations between the same tables stay distinct. A `one` relation over a `NOT NULL`
+    foreign key sets `optional: false`, so its type has no `null`, as before. The tables are
+    listed in the file, not imported from `./index`, which would be a circular import.
 -   **Why**: the old relational API is removed in 1.0.
 
-##### 0.6 `packages/db/src/client.ts`, `packages/db/src/pglite.ts`, `packages/db/src/index.ts` (Modify)
+##### 0.6 `packages/db/src/client.ts`, `packages/db/src/pglite.ts` (Modify)
 
 -   **Type / Scope**: database client factories and their types.
 -   **Proposed Changes**: remove `casing: 'snake_case'`; pass `relations` in place of `schema`. The
-    `Db`, `PgliteDb` and `AnyDb` types take the relations type in place of the schema type. Set
+    `Db` and `PgliteDb` types take the relations type in place of the schema type. Set
     `paramsInErrors: true` only when `NODE_ENV` is not `production`, so query values (which can
-    include emails) stay out of production logs.
+    include emails and token hashes) stay out of production logs. Remove the unused `Schema` type
+    export.
+-   **Result**: `packages/db/src/index.ts` needed no change: `AnyDb` is `Db | PgliteDb` and follows
+    them. A failed query in the production image printed `params: undefined`.
 -   **Why**: section 13.
 
 ##### 0.7 `packages/db/drizzle.config.ts` (Modify)
 
 -   **Type / Scope**: `drizzle-kit` configuration.
--   **Proposed Changes**: remove `casing: 'snake_case'`; keep `schema`, `out` and `dialect`.
--   **Why**: casing now comes from the table definitions.
+-   **Proposed Changes**: remove `casing: 'snake_case'` and `strict: true`; keep `dialect`,
+    `schema`, `out`, `dbCredentials` and `verbose`.
+-   **Why**: casing now comes from the table definitions, and the RC's config has no `strict` key.
 
 ##### 0.8 Every file with `db.query.*` or `tx.query.*` (Modify)
 
@@ -1151,37 +1213,70 @@ with its checks passing.
     `teach-onboarding`, `course-builder`, `media`, `media-video` and `helpers/test-app.ts` in
     `apps/api/test/`.
 -   **Proposed Changes**:
-    - simple equality filters become the object form (`where: { id: x }`);
-    - filters built from SQL expressions today (`eq`, `and(...conditions)`, `exists` and `ilike`
-      subqueries in the catalogue, the tuple cursor in people, the transactions list) move to RQB
-      v2's raw-SQL filter (`where: { RAW: (t) => ... }`), keeping the same expressions;
-    - `CoursesService.listSummaries(where)` takes a `RAW` filter in place of
-      `ReturnType<typeof and>`;
-    - `orderBy` arrays (`[desc(...)]`) become the object or callback form;
-    - where a filter value may be `undefined`, the key is left out of the filter object.
+    - equality and simple comparisons become the object form: `where: { id: x }`,
+      `{ consumedAt: { isNull: true } }`, `{ expiresAt: { gt: now } }`, `{ OR: [...] }`;
+    - three filters keep their SQL expressions through `RAW`: the catalogue search (`ilike`, and
+      an `exists` subquery on the teacher's name), the people list (role and search subqueries and
+      the tuple cursor) and the transactions search. Each is a callback, `RAW: (table) => ...`,
+      and builds its expressions from the callback's `table`;
+    - `CoursesService.listSummaries` takes `{ status?, teacherId? }` in place of
+      `ReturnType<typeof and>`. Its unused helpers `courseStatusFilter` and `courseIdsIn` are
+      removed;
+    - `orderBy` arrays (`[desc(...)]`) become objects, `{ createdAt: 'desc', id: 'desc' }`, where
+      the key order is the sort priority;
+    - where a filter value may be `undefined`, the key is left out of the filter object, and a
+      `RAW` callback with nothing to add returns `EmptyFilter`.
+-   **Result**: two rules were confirmed by test:
+    - a `RAW` expression that names the imported table (`eq(s.users.email, x)`) fails with
+      `invalid reference to FROM-clause entry`, because the query gives its table an alias. The
+      callback's parameter is that alias;
+    - `undefined` as a filter, or as a filter value, throws `Unexpected 'undefined' in filter
+      value`, where the old API read it as "no filter". TypeScript accepts it, so only a test
+      catches it.
+-   **Why**: the RQB v2 syntax. It changes syntax only; 0.9 records how that was checked.
 
-    The exact `RAW` syntax is checked against the Drizzle 1.0 docs at the start of Step 0.
--   **Why**: the RQB v2 syntax. Intended to change syntax only; the existing suites must pass
-    unchanged to confirm this.
+##### 0.9 `packages/db/drizzle/**`, `biome.json` (Modify)
 
-##### 0.9 `packages/db/drizzle/meta/*` (Modify)
-
--   **Type / Scope**: `drizzle-kit` snapshots.
--   **Proposed Changes**: run `drizzle-kit generate` on the unchanged schema and confirm it produces
-    no new migration. If the new kit rewrites the snapshot format, commit the rewritten snapshots.
--   **Why**: shows that casing and relation changes left the database shape the same.
+-   **Type / Scope**: migrations, snapshots, and the checks that end the step.
+-   **Proposed Changes**: convert the migrations folder with `drizzle-kit up`. `0000_init.sql`,
+    `0001_payment_enrollment_indexes.sql` and `meta/` become `20261108045929_init/` and
+    `20261108080136_payment_enrollment_indexes/`, each holding `migration.sql` and
+    `snapshot.json`. The Biome ignore for `drizzle/meta` becomes `drizzle/*/snapshot.json`. Then
+    run `drizzle-kit generate` on the unchanged schema and confirm it produces no new migration.
+-   **Result**:
+    - the RC migrator refuses the old layout: it throws when `meta/_journal.json` exists and asks
+      for `drizzle-kit up`. The converted SQL is byte-identical to the old files;
+    - `drizzle-kit generate` reports "No schema changes", and `drizzle-kit check` passes;
+    - on a throwaway Postgres 17, the API image built from this change migrated a database that
+      the version before it (Drizzle 0.45.4) had built. The migrations table gained `name` and
+      `applied_at`, nothing was applied again and the data stayed. A second run changed nothing.
+      A new database migrated from empty, and the API served the catalogue from it in production
+      mode;
+    - the version before this change still migrates a database after the new migrator has
+      upgraded its migrations table, so both can share one development database until the squash
+      in step 1;
+    - the same 197 API requests were sent to the code before and after the change, on PGlite and
+      on Postgres 17. The responses were identical once generated IDs and timestamps were
+      normalised;
+    - `npm run lint`, `npm run check:dupes` and `npx turbo run typecheck test build` pass.
+-   **Why**: shows that the upgrade left the database shape and the API's responses the same.
 
 ##### 0.10 Scratch check: `drizzle-kit` and views (no repo file)
 
 -   **Type / Scope**: a test in the scratchpad, not the repo.
--   **Proposed Changes**: in the existing scratch project, add a `snakeCase.view` over a table with
-    a composite key like `lesson_prerequisites`, run `drizzle-kit generate`, and read the SQL. Also
-    check that the RC still writes `NNNN_name.sql` files and `meta/_journal.json`; if not,
-    `packages/db/src/migrations-folder.ts`, `apps/api/src/migrate.ts` and the Dockerfile's
-    `COPY packages/db/drizzle` change to match.
--   **Why**: answers the open question on `CREATE VIEW` before step 2 depends on it. If the kit does
-    not emit views, the views are declared in TypeScript with `.existing()` and their SQL is added
-    to `0000` by `packages/db/scripts/generate.ts` (1.8a), so there is still one `0000`.
+-   **Proposed Changes**: on a copy of this repo's schema, add `change_set_id` to the four tables
+    and a `snakeCase.view` over each, including `lesson_prerequisites` with its composite key. Run
+    `drizzle-kit generate`, read the SQL and apply it. Also check whether the RC keeps the
+    migration file layout.
+-   **Result**:
+    - the kit writes a `CREATE VIEW` statement for each view, so step 2 declares the views in the
+      schema and needs no hand-written view SQL;
+    - relational queries through the views work from a second client with its own relations set
+      (section 8 lists what was run);
+    - the layout changed (0.9). `packages/db/src/migrations-folder.ts`, `apps/api/src/migrate.ts`
+      and the Dockerfile's `COPY packages/db/drizzle` needed no change, because each handles the
+      folder as a whole.
+-   **Why**: answered the open question on `CREATE VIEW` before step 2 depends on it.
 
 #### Step 1: Structure
 
@@ -1263,21 +1358,30 @@ with its checks passing.
       where the owner is not needed.
 -   **Why**: the services query through these names.
 
-##### 1.8 `packages/db/drizzle/0000_init.sql`, `0001_payment_enrollment_indexes.sql`, `meta/*` (Delete, then regenerate `0000_init.sql` and `meta/*`)
+##### 1.8 `packages/db/drizzle/**` (Delete both migration folders, then regenerate one), `packages/db/src/schema/*.ts` (Modify)
 
 -   **Type / Scope**: migrations.
--   **Proposed Changes**: delete both migrations and the snapshots, then run `drizzle-kit generate
-    --name init` through the wrapper in 1.8a. Regenerated the same way at the end of steps 2 and 3.
--   **Why**: section 12 (squash).
+-   **Proposed Changes**:
+    - remove the constraint-name pins from item 0.3: the explicit unique names, the `sql.raw`
+      checks and the comment in `schema/index.ts`. The squashed migration then uses the RC's
+      default names. No code reads a constraint name, so nothing else changes;
+    - delete `20261108045929_init/` and `20261108080136_payment_enrollment_indexes/`, then run
+      `drizzle-kit generate --name init` through the wrapper in 1.8a. It writes one folder,
+      `<timestamp>_init/`, holding `migration.sql` and `snapshot.json`;
+    - regenerate the same way at the end of steps 2 and 3, deleting the folder first. The new
+      folder gets a new timestamp, so a local database that applied the earlier one is reset with
+      `npm run db:reset` (Verification Plan).
+-   **Why**: section 12 (squash). The pins existed only to keep Step 0 free of database changes.
 
 ##### 1.8a `packages/db/scripts/generate.ts` (Create), `packages/db/package.json` (Modify), `apps/api/test/migration-guard.test.ts` (Create)
 
 -   **Type / Scope**: migration generation script and test.
 -   **Proposed Changes**: `generate.ts` runs `drizzle-kit generate` and then adds the `citext` and
-    `pg_trgm` `CREATE EXTENSION IF NOT EXISTS` lines to the top of `0000` if they are missing, and,
-    if 0.10 shows the kit does not emit views, appends the four `CREATE VIEW` statements.
-    `packages/db/package.json`'s `generate` script calls it, so regenerating never loses these
-    lines. `migration-guard.test.ts` reads `0000` and fails if the extension lines are missing, or
+    `pg_trgm` `CREATE EXTENSION IF NOT EXISTS` lines to the top of the `init` migration's
+    `migration.sql` if they are missing. It adds no view SQL: item 0.10 showed that the kit writes
+    the `CREATE VIEW` statements itself. `packages/db/package.json`'s `generate` script calls it,
+    so regenerating never loses these lines. `migration-guard.test.ts` reads `migration.sql` from
+    the folder whose name ends in `_init` and fails if the extension lines are missing, or
     if any of `courses.profile_id`, `payments.profile_id`, `payments.payout_account_id` or
     `media_assets.profile_id` references `users`, or if `courses.teacher_id` or
     `payments.teacher_id` still exists (Goal 1). Other foreign keys to `users` are correct and not
@@ -2308,18 +2412,18 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
 -   **Type / Scope**: operations docs.
 -   **Proposed Changes**:
     - the one-time reset procedure from section 12, written out as commands:
-      a. push to the branch, and expect Deploy to fail at "Run database migrations";
-      b. find the task definition it registered
-      (`aws ecs list-task-definitions --family-prefix "$ECS_TASK_FAMILY" --sort DESC
-         --max-items 1`) and run `reset-schema` with the same `aws ecs run-task` flags the
-      workflow's migration step uses (`--cluster "$ECS_CLUSTER"`, `--launch-type FARGATE`,
-      `--network-configuration` with `$ECS_SUBNETS` and `$ECS_SECURITY_GROUP`,
-      `deploy.yml:90–97`; the values come from `terraform output github_environment_variables`),
-      overriding the container command to `["node", "dist/reset-schema.js"]` and adding
-      `ALLOW_SCHEMA_RESET=yes` to its environment;
-      c. re-run Deploy for the branch with `workflow_dispatch`;
-      d. run `seed` the same way as (b), with `["node", "dist/seed.js", "--demo"]` on staging or
-      `"--admin-only"` on production;
+      - **(a)** push to the branch, and expect Deploy to fail at "Run database migrations" with
+        the first message in section 12;
+      - **(b)** find the task definition it registered
+        (`aws ecs list-task-definitions --family-prefix "$ECS_TASK_FAMILY" --sort DESC --max-items 1`)
+        and run `reset-schema` with the same `aws ecs run-task` flags the workflow's migration
+        step uses (`--cluster "$ECS_CLUSTER"`, `--launch-type FARGATE`, `--network-configuration`
+        with `$ECS_SUBNETS` and `$ECS_SECURITY_GROUP`, `deploy.yml:90–97`; the values come from
+        `terraform output github_environment_variables`), overriding the container command to
+        `["node", "dist/reset-schema.js"]` and adding `ALLOW_SCHEMA_RESET=yes` to its environment;
+      - **(c)** re-run Deploy for the branch with `workflow_dispatch`;
+      - **(d)** run `seed` the same way as (b), with `["node", "dist/seed.js", "--demo"]` on
+        staging or `"--admin-only"` on production;
     - that the old API serves errors between (b) and (c), and that on production (a) and (c) wait
       for approval by the required reviewer of the `production` GitHub Environment;
     - the note that `git revert` cannot undo the reset; remove the "Seeding" known gap;
@@ -2332,8 +2436,9 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
 -   **Proposed Changes**: rules: Teach routes live under `/teach/profiles/:profileId` and use
     `requireProfile` with a capability from the 1.15 table; learner-facing services read course
     content only through `learnerDb`, and only `courses.service.ts` and `change-sets.service.ts`
-    touch the raw content tables; `drizzle-orm` is pinned to an exact RC and has one copy;
-    regenerate migrations with `npm run db:generate`, never `drizzle-kit generate` directly.
+    touch the raw content tables; regenerate migrations with `npm run db:generate`, never
+    `drizzle-kit generate` directly. Step 0 already added the Drizzle rules: one copy, the exact
+    RC pin, the query syntax and the migration layout.
 -   **Why**: keeps future changes from bypassing the profile check or showing drafts to learners.
 
 ##### D.6 `.github/workflows/deploy.yml`, `infra/terraform/**` (No change)
@@ -2351,14 +2456,16 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
     2.16, 2.17 and 3.13. Goal-to-test mapping: step 1 goals are listed in the "Why" of 1.36;
     Goal 9 `members.test.ts`; Goal 10 `role-routes.test.ts`; Goal 11 `change-sets.test.ts`; Goal 12
     `profile-media.test.ts`; Goals 13 and 14 `corporate.test.ts`; Goal 15 `staff-acting.test.ts`.
--   **Static Analysis & Linting**: `npm run lint` (Biome); `npm run check:dupes` with `drizzle-orm`
-    added; `npx expo-doctor` in `apps/learner`.
+-   **Static Analysis & Linting**: `npm run lint` (Biome, which also checks Markdown formatting);
+    `npm run check:dupes`; `npx expo-doctor` in `apps/learner`. `expo-doctor` fails one check
+    today, before and after Step 0: 11 Expo packages have newer patch releases. It must show no
+    other failure.
 -   **Test Coverage Requirement**: no numeric target, as the repo has none today. The requirement is
     one test per goal and the role-by-route table in `role-routes.test.ts` covering every Teach
     route.
 -   **Migration check (Goal 8)**: after each step, `npm run db:reset && npm run db:migrate && npm
     run db:seed` against local Postgres from `docker-compose.yml`, then `npm run db:generate`
-    reports no changes, and `drizzle/` holds exactly one migration, `0000`.
+    reports no changes, and `drizzle/` holds exactly one migration folder, `<timestamp>_init`.
 -   **Manual, local**: run CUJs 1–6 in the browser against the local stack with the fake payment
     provider; CUJ 4 again against Stripe test mode with made-up company details.
 -   **Staging**: after step 3, run the reset procedure in D.4, then CUJs 1, 2, 3 and 5 on staging

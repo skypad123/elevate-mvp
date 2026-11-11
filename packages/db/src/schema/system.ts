@@ -1,10 +1,10 @@
-import { index, jsonb, pgTable, primaryKey, text, uuid } from 'drizzle-orm/pg-core'
+import { index, jsonb, primaryKey, snakeCase, text, uuid } from 'drizzle-orm/pg-core'
 import { users } from './auth'
 import { createdAt, id, ts } from './columns'
 import { webhookProviderEnum } from './enums'
 
 /** Idempotency ledger for Stripe and Mux webhooks. */
-export const webhookEvents = pgTable(
+export const webhookEvents = snakeCase.table(
   'webhook_events',
   {
     provider: webhookProviderEnum().notNull(),
@@ -18,7 +18,7 @@ export const webhookEvents = pgTable(
   (t) => [primaryKey({ columns: [t.provider, t.eventId] })],
 )
 
-export const auditLog = pgTable(
+export const auditLog = snakeCase.table(
   'audit_log',
   {
     id: id(),
@@ -32,7 +32,7 @@ export const auditLog = pgTable(
   (t) => [index().on(t.entityType, t.entityId), index().on(t.createdAt)],
 )
 
-export const analyticsEvents = pgTable(
+export const analyticsEvents = snakeCase.table(
   'analytics_events',
   {
     id: id(),

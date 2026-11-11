@@ -7,7 +7,7 @@ import {
   type TransactionSummary,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, desc, eq, exists, ilike, or, type SQL, sql } from 'drizzle-orm'
+import { and, EmptyFilter, eq, exists, ilike, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { simpleEmail } from '../emails/templates'
 import { errors } from '../lib/errors'
@@ -52,32 +52,36 @@ export class TransactionsService {
     limit: number
   }): Promise<Page<TransactionSummary>> {
     const { db } = this.deps
-    const conditions: SQL[] = []
-    if (query.status) conditions.push(eq(s.payments.status, query.status))
-    if (query.q) {
-      const like = `%${query.q.replace(/[%_]/g, '\\$&')}%`
-      // Subqueries, not raw column refs: the relational builder re-aliases bare columns to `payments`.
-      const match = or(
-        exists(
-          db
-            .select({ one: sql`1` })
-            .from(s.users)
-            .where(and(eq(s.users.id, s.payments.userId), ilike(s.users.email, like))),
-        ),
-        exists(
-          db
-            .select({ one: sql`1` })
-            .from(s.courses)
-            .where(and(eq(s.courses.id, s.payments.courseId), ilike(s.courses.title, like))),
-        ),
-        ilike(s.payments.stripePaymentIntentId, like),
-      )
-      if (match) conditions.push(match)
-    }
+    const like = query.q ? `%${query.q.replace(/[%_]/g, '\\$&')}%` : null
     const offset = decodeCursor(query.cursor)
     const rows = await db.query.payments.findMany({
-      where: conditions.length ? and(...conditions) : undefined,
-      orderBy: [desc(s.payments.paidAt)],
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        // Search matches the learner's email, the course title or the Stripe payment intent ID.
+        // The callback's `payment` is the query's own alias for the table, which the subqueries
+        // must refer to.
+        ...(like
+          ? {
+              RAW: (payment) =>
+                or(
+                  exists(
+                    db
+                      .select({ one: sql`1` })
+                      .from(s.users)
+                      .where(and(eq(s.users.id, payment.userId), ilike(s.users.email, like))),
+                  ),
+                  exists(
+                    db
+                      .select({ one: sql`1` })
+                      .from(s.courses)
+                      .where(and(eq(s.courses.id, payment.courseId), ilike(s.courses.title, like))),
+                  ),
+                  ilike(payment.stripePaymentIntentId, like),
+                ) ?? EmptyFilter,
+            }
+          : {}),
+      },
+      orderBy: { paidAt: 'desc' },
       limit: query.limit + 1,
       offset,
       with: {
@@ -97,7 +101,7 @@ export class TransactionsService {
 
   async detail(paymentId: string): Promise<TransactionDetail> {
     const p = await this.deps.db.query.payments.findFirst({
-      where: eq(s.payments.id, paymentId),
+      where: { id: paymentId },
       with: {
         user: { columns: { email: true } },
         course: { columns: { title: true, slug: true } },
@@ -115,7 +119,7 @@ export class TransactionsService {
     for (const r of p.refunds) {
       if (r.requestedBy && !requesters.has(r.requestedBy)) {
         const u = await this.deps.db.query.users.findFirst({
-          where: eq(s.users.id, r.requestedBy),
+          where: { id: r.requestedBy },
           columns: { email: true },
         })
         if (u) requesters.set(r.requestedBy, u.email)
@@ -156,7 +160,7 @@ export class TransactionsService {
   async refund(actor: SessionUser, paymentId: string, reason: string): Promise<TransactionDetail> {
     const { db, payments, mailer } = this.deps
     const p = await db.query.payments.findFirst({
-      where: eq(s.payments.id, paymentId),
+      where: { id: paymentId },
       with: { user: true, course: true },
     })
     if (!p) throw errors.notFound('Payment')
@@ -223,7 +227,7 @@ export class TransactionsService {
       .onConflictDoNothing()
       .returning()
     if (inserted.length === 0) return
-    const p = await db.query.payments.findFirst({ where: eq(s.payments.id, input.paymentId) })
+    const p = await db.query.payments.findFirst({ where: { id: input.paymentId } })
     if (!p) return
     const refundedCents = Math.min(p.amountCents, p.refundedCents + input.amountCents)
     const status = refundedCents >= p.amountCents ? 'refunded' : 'partially_refunded'
@@ -248,10 +252,10 @@ export class TransactionsService {
     const chargeId = typeof charge.id === 'string' ? charge.id : null
     const p = await this.deps.db.query.payments.findFirst({
       where: paymentIntentId
-        ? eq(s.payments.stripePaymentIntentId, paymentIntentId)
+        ? { stripePaymentIntentId: paymentIntentId }
         : chargeId
-          ? eq(s.payments.stripeChargeId, chargeId)
-          : sql`false`,
+          ? { stripeChargeId: chargeId }
+          : { RAW: sql`false` },
     })
     if (!p) return 'unmatched'
     const refundedTotal = typeof charge.amount_refunded === 'number' ? charge.amount_refunded : null
@@ -291,7 +295,7 @@ export class TransactionsService {
     const out: PayoutLedgerRow[] = []
     for (const r of rows) {
       const teacher = await db.query.users.findFirst({
-        where: eq(s.users.id, r.teacherId),
+        where: { id: r.teacherId },
         with: { teacherProfile: true },
       })
       out.push({
@@ -311,7 +315,7 @@ export class TransactionsService {
   async audit(cursor?: string, limit = 50): Promise<Page<AuditEntry>> {
     const offset = decodeCursor(cursor)
     const rows = await this.deps.db.query.auditLog.findMany({
-      orderBy: [desc(s.auditLog.createdAt)],
+      orderBy: { createdAt: 'desc' },
       limit: limit + 1,
       offset,
     })
@@ -319,7 +323,7 @@ export class TransactionsService {
     const actors = new Map<string, string>()
     for (const id of actorIds) {
       const u = await this.deps.db.query.users.findFirst({
-        where: eq(s.users.id, id),
+        where: { id },
         columns: { email: true },
       })
       if (u) actors.set(id, u.email)

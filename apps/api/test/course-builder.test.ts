@@ -201,7 +201,7 @@ describe('course builder', () => {
       body: { kind: 'image', filename: 'cover.png', mimeType: 'image/png', sizeBytes: 10 },
     })
     const row = await t.db.query.mediaAssets.findFirst({
-      where: eq(s.mediaAssets.id, upload.body.asset.id),
+      where: { id: upload.body.asset.id },
     })
     await t.storage.put(row?.storageKey as string, new Uint8Array([1]), 'image/png')
     await t.api('POST', `/api/media/assets/${upload.body.asset.id}/complete`, { token: teacher })
@@ -306,7 +306,7 @@ describe('course builder', () => {
     expect(approved.body.course.status).toBe('live')
     expect(approved.body.course.publishedAt).toBeTruthy()
     expect(t.mailer.last()?.subject).toContain('is live')
-    const audit = await t.db.query.auditLog.findMany({ where: eq(s.auditLog.entityId, courseId) })
+    const audit = await t.db.query.auditLog.findMany({ where: { entityId: courseId } })
     expect(audit.map((a) => a.action)).toEqual(
       expect.arrayContaining(['course.submit', 'course.reject', 'course.approve']),
     )

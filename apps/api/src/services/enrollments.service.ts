@@ -1,6 +1,5 @@
 import type { EnrollmentSummary } from '@elevate/core'
-import { schema as s } from '@elevate/db'
-import { asc, desc, eq, inArray } from 'drizzle-orm'
+import { inArray } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { CatalogService } from './catalog.service'
 
@@ -13,8 +12,8 @@ export class EnrollmentsService {
   async listForUser(userId: string): Promise<EnrollmentSummary[]> {
     const { db } = this.deps
     const rows = await db.query.enrollments.findMany({
-      where: eq(s.enrollments.userId, userId),
-      orderBy: [desc(s.enrollments.updatedAt)],
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
       with: {
         course: {
           with: {
@@ -23,7 +22,7 @@ export class EnrollmentsService {
             lessons: { columns: { id: true }, with: { artefacts: { columns: { id: true } } } },
           },
         },
-        progress: { orderBy: [asc(s.artefactProgress.updatedAt)] },
+        progress: { orderBy: { updatedAt: 'asc' } },
         certificate: true,
       },
     })
@@ -54,7 +53,7 @@ export class EnrollmentsService {
 
   async activeCourseIds(userId: string): Promise<Set<string>> {
     const rows = await this.deps.db.query.enrollments.findMany({
-      where: eq(s.enrollments.userId, userId),
+      where: { userId },
       columns: { courseId: true, status: true },
     })
     return new Set(rows.filter((r) => r.status === 'active').map((r) => r.courseId))
@@ -62,7 +61,7 @@ export class EnrollmentsService {
 
   async ensureActive(userId: string, enrollmentId: string) {
     const enrollment = await this.deps.db.query.enrollments.findFirst({
-      where: eq(s.enrollments.id, enrollmentId),
+      where: { id: enrollmentId },
     })
     if (!enrollment || enrollment.userId !== userId) return null
     if (!inArray) return null

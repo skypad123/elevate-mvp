@@ -16,7 +16,7 @@ export class ConnectService {
 
   private async profileFor(userId: string) {
     const profile = await this.deps.db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, userId),
+      where: { userId },
       with: { user: true },
     })
     if (!profile) throw errors.notFound('Teacher profile')

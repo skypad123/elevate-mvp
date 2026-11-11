@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { CreateUpload, MediaAssetView, PlaybackInfo, UploadInstructions } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { eq, or } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
 import { hasRole, type SessionUser } from '../middleware/auth'
@@ -87,7 +87,7 @@ export class MediaService {
     body: ReadableStream<Uint8Array>,
   ): Promise<MediaAssetView> {
     const { db, storage } = this.deps
-    const asset = await db.query.mediaAssets.findFirst({ where: eq(s.mediaAssets.id, assetId) })
+    const asset = await db.query.mediaAssets.findFirst({ where: { id: assetId } })
     if (!asset?.storageKey) throw errors.notFound('Upload')
     if (asset.status === 'ready')
       throw errors.conflict('already_uploaded', 'This file was already uploaded')
@@ -172,15 +172,14 @@ export class MediaService {
   async applyVideoEvent(event: VideoWebhookEvent): Promise<'applied' | 'ignored' | 'unmatched'> {
     const { db } = this.deps
     const ref = videoEventRef(event)
-    const conditions = []
-    if (ref.passthrough && UUID.test(ref.passthrough))
-      conditions.push(eq(s.mediaAssets.id, ref.passthrough))
-    if (ref.uploadId) conditions.push(eq(s.mediaAssets.providerUploadId, ref.uploadId))
-    if (ref.assetId) conditions.push(eq(s.mediaAssets.providerAssetId, ref.assetId))
+    const conditions: Array<
+      { id: string } | { providerUploadId: string } | { providerAssetId: string }
+    > = []
+    if (ref.passthrough && UUID.test(ref.passthrough)) conditions.push({ id: ref.passthrough })
+    if (ref.uploadId) conditions.push({ providerUploadId: ref.uploadId })
+    if (ref.assetId) conditions.push({ providerAssetId: ref.assetId })
     if (conditions.length === 0) return 'unmatched'
-    const asset = await db.query.mediaAssets.findFirst({
-      where: conditions.length === 1 ? conditions[0] : or(...conditions),
-    })
+    const asset = await db.query.mediaAssets.findFirst({ where: { OR: conditions } })
     if (!asset) return 'unmatched'
     const patch = patchForVideoEvent(event, asset)
     if (!patch) return 'ignored'
@@ -190,9 +189,7 @@ export class MediaService {
 
   /** Owner, or staff (support agents review teaching samples and course media). */
   async getOwnedAsset(user: SessionUser, assetId: string): Promise<MediaAssetRow> {
-    const asset = await this.deps.db.query.mediaAssets.findFirst({
-      where: eq(s.mediaAssets.id, assetId),
-    })
+    const asset = await this.deps.db.query.mediaAssets.findFirst({ where: { id: assetId } })
     if (!asset) throw errors.notFound('Asset')
     if (asset.ownerId !== user.id && !hasRole(user, 'support_agent')) throw errors.forbidden()
     return asset

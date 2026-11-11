@@ -43,12 +43,10 @@ export class CertificatesService {
   /** Issues (once) the certificate for a completed enrollment: PDF to storage, row, email. */
   async issueForEnrollment(enrollmentId: string): Promise<CertificateView> {
     const { db, storage, mailer, env } = this.deps
-    const existing = await db.query.certificates.findFirst({
-      where: eq(s.certificates.enrollmentId, enrollmentId),
-    })
+    const existing = await db.query.certificates.findFirst({ where: { enrollmentId } })
     if (existing) return this.view(existing)
     const enrollment = await db.query.enrollments.findFirst({
-      where: eq(s.enrollments.id, enrollmentId),
+      where: { id: enrollmentId },
       with: { user: true, course: { with: { teacher: { with: { teacherProfile: true } } } } },
     })
     if (!enrollment) throw errors.notFound('Enrollment')
@@ -88,11 +86,7 @@ export class CertificatesService {
       })
       .onConflictDoNothing()
       .returning()
-    const certificate =
-      row ??
-      (await db.query.certificates.findFirst({
-        where: eq(s.certificates.enrollmentId, enrollmentId),
-      }))
+    const certificate = row ?? (await db.query.certificates.findFirst({ where: { enrollmentId } }))
     if (!certificate) throw new Error('failed to issue certificate')
     await trackEvent(this.deps, {
       userId: enrollment.userId,
@@ -125,7 +119,7 @@ export class CertificatesService {
 
   async forEnrollment(user: SessionUser, enrollmentId: string): Promise<CertificateView> {
     const enrollment = await this.deps.db.query.enrollments.findFirst({
-      where: eq(s.enrollments.id, enrollmentId),
+      where: { id: enrollmentId },
       with: { certificate: true, user: { columns: { name: true, email: true } } },
     })
     if (!enrollment || enrollment.userId !== user.id) throw errors.notFound('Enrollment')
@@ -179,7 +173,7 @@ export class CertificatesService {
 
   async verify(token: string): Promise<CertificateVerification> {
     const row = await this.deps.db.query.certificates.findFirst({
-      where: eq(s.certificates.token, token),
+      where: { token },
       with: { enrollment: { with: { course: { columns: { slug: true } } } } },
     })
     if (!row) return { valid: false, reason: 'not_found' }
@@ -191,9 +185,7 @@ export class CertificatesService {
   async pdf(
     token: string,
   ): Promise<{ body: ReadableStream<Uint8Array>; size: number; filename: string }> {
-    const row = await this.deps.db.query.certificates.findFirst({
-      where: eq(s.certificates.token, token),
-    })
+    const row = await this.deps.db.query.certificates.findFirst({ where: { token } })
     if (!row || row.revokedAt || !row.pdfStorageKey) throw errors.notFound('Certificate')
     const object = await this.deps.storage.get(row.pdfStorageKey)
     if (!object) throw errors.notFound('Certificate file')

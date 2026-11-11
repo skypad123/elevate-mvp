@@ -8,7 +8,7 @@ import {
   quote,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, eq, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { simpleEmail } from '../emails/templates'
 import { errors } from '../lib/errors'
@@ -34,7 +34,7 @@ export class PaymentsService {
 
   private async loadCourse(courseId: string) {
     const course = await this.deps.db.query.courses.findFirst({
-      where: eq(s.courses.id, courseId),
+      where: { id: courseId },
       with: {
         thumbnail: true,
         teacher: { with: { teacherProfile: true } },
@@ -48,9 +48,7 @@ export class PaymentsService {
   /** Validates a promo code for a course; returns null when no code was given. */
   async resolvePromo(code: string | undefined, courseId: string): Promise<PromoRow | null> {
     if (!code) return null
-    const promo = await this.deps.db.query.promoCodes.findFirst({
-      where: eq(s.promoCodes.code, code),
-    })
+    const promo = await this.deps.db.query.promoCodes.findFirst({ where: { code } })
     const now = this.deps.now()
     if (!promo?.active) throw errors.badRequest('promo_invalid', 'That promo code is not valid')
     if (promo.courseId && promo.courseId !== courseId)
@@ -101,14 +99,14 @@ export class PaymentsService {
     const course = await this.loadCourse(courseId)
     if (course.status !== 'live') throw errors.notFound('Course')
     const existing = await db.query.enrollments.findFirst({
-      where: and(eq(s.enrollments.userId, user.id), eq(s.enrollments.courseId, courseId)),
+      where: { userId: user.id, courseId },
     })
     if (existing?.status === 'active')
       throw errors.conflict('already_enrolled', 'You are already enrolled in this course')
 
     const { quote: q, promo } = await this.quoteFor(courseId, promoCode)
     const promoRow = promo
-      ? await db.query.promoCodes.findFirst({ where: eq(s.promoCodes.code, promo.code) })
+      ? await db.query.promoCodes.findFirst({ where: { code: promo.code } })
       : null
 
     // Free enrolment: no Stripe involved.
@@ -229,7 +227,7 @@ export class PaymentsService {
   async syncSession(user: SessionUser, sessionId: string): Promise<CheckoutSyncResponse> {
     const { db, payments } = this.deps
     const enrollment = await db.query.enrollments.findFirst({
-      where: eq(s.enrollments.stripeCheckoutSessionId, sessionId),
+      where: { stripeCheckoutSessionId: sessionId },
       with: { course: true },
     })
     if (!enrollment || enrollment.userId !== user.id) throw errors.notFound('Checkout session')
@@ -253,11 +251,11 @@ export class PaymentsService {
   async fulfilCheckout(input: FulfilmentInput): Promise<'applied' | 'ignored' | 'unmatched'> {
     const { db, env, payments, mailer } = this.deps
     const already = await db.query.payments.findFirst({
-      where: eq(s.payments.stripeCheckoutSessionId, input.sessionId),
+      where: { stripeCheckoutSessionId: input.sessionId },
     })
     if (already) return 'ignored'
     const enrollment = await db.query.enrollments.findFirst({
-      where: eq(s.enrollments.stripeCheckoutSessionId, input.sessionId),
+      where: { stripeCheckoutSessionId: input.sessionId },
       with: { course: { with: { teacher: { with: { teacherProfile: true } } } }, user: true },
     })
     if (!enrollment) return 'unmatched'

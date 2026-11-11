@@ -1,5 +1,4 @@
 import { schema as s } from '@elevate/db'
-import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -35,7 +34,7 @@ describe('stripe webhooks', () => {
     expect(first.status).toBe(200)
     expect(await first.json()).toMatchObject({ received: true, outcome: 'applied' })
     const profile = await t.db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, user.id),
+      where: { userId: user.id },
     })
     expect(profile?.stripeChargesEnabled).toBe(true)
     expect(profile?.stripePayoutsEnabled).toBe(true)
@@ -62,7 +61,7 @@ describe('stripe webhooks', () => {
     )
     expect(res.status).toBe(400)
     const ledger = await t.db.query.webhookEvents.findMany({
-      where: eq(s.webhookEvents.eventId, 'evt_bad'),
+      where: { eventId: 'evt_bad' },
     })
     expect(ledger).toHaveLength(0)
   })
