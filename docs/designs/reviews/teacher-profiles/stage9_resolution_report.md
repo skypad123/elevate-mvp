@@ -21,10 +21,10 @@ first, 14 PROPOSE FIX, nits: 13 PROPOSE FIX and 3 DECLINE.
 **Read this first.** IB1 and IB2 each have two ways to fix them, and the choice is architectural,
 so it is the author's. The choice also decides what IM1, IM2, IM4, IM5 and IM11 need:
 
-| If the author picks | Then |
-|---|---|
-| IB1 option B (Alternative N) | IM1 and IM2 are deleted; Step 0 is deleted, so IM4 is deleted and most of IM5 goes |
-| IB2 option B (one reusable account) | the Goal 5 fixture in IM11 goes; IB2's state machine shrinks to three items |
+| If the author picks                 | Then                                                                               |
+| ----------------------------------- | ---------------------------------------------------------------------------------- |
+| IB1 option B (Alternative N)        | IM1 and IM2 are deleted; Step 0 is deleted, so IM4 is deleted and most of IM5 goes |
+| IB2 option B (one reusable account) | the Goal 5 fixture in IM11 goes; IB2's state machine shrinks to three items        |
 
 Fixes for the other findings do not depend on these choices and can be applied either way.
 
@@ -35,13 +35,13 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 1] IB1 [`implementation-readiness`, `codebase-details`] - Severity: Blocker
 
-*   **Affected Scope:** [Lines 1401–1479](docs/designs/teacher-profiles.md#L1401-L1479) (2.2, 2.8, 2.9); Technical Plan section 8.
-*   **Discrepancy Description:** approval never remaps draft IDs to live IDs, so deleting draft
+-   **Affected Scope:** [Lines 1401–1479](docs/designs/teacher-profiles.md#L1401-L1479) (2.2, 2.8, 2.9); Technical Plan section 8.
+-   **Discrepancy Description:** approval never remaps draft IDs to live IDs, so deleting draft
     lessons cascades and deletes new artefacts; prerequisite apply and conflict rules, `source_id`
     delete behaviour and deleted live rows are undefined.
-*   **Rationale:** an implementer would have to design the apply algorithm (Zero-Decision Rule).
-*   ***AI Suggestion:*** PROPOSE FIX, **author decision needed**.
-*   ***Justification:*** the finding is correct (`artefacts.lesson_id` cascades,
+-   **Rationale:** an implementer would have to design the apply algorithm (Zero-Decision Rule).
+-   _**AI Suggestion:**_ PROPOSE FIX, **author decision needed**.
+-   _**Justification:**_ the finding is correct (`artefacts.lesson_id` cascades,
     `packages/db/src/schema/courses.ts:83–85`). Four review stages found this. There are two valid
     fixes:
     - **Option A, keep change sets and specify the apply step.** Writes a merge procedure into 2.8.
@@ -51,8 +51,8 @@ Plan so the two agree, the edit says so.
       2.4–2.6, 2.8, the change-set part of 2.9, 2.10's change-set routes, `change-set-review.tsx`,
       `change-sets.test.ts`, Goal 11, CUJ 3 and Step 0. Held live edits become a later brief, as an
       additive migration.
-*   ***Proposed Edit:***
-    *   **Option A**, location 2.8: replace "approve (applies as in section 8, conflict check
+-   _**Proposed Edit:**_
+    -   **Option A**, location 2.8: replace "approve (applies as in section 8, conflict check
         first)" with an ordered procedure, in one transaction:
         1. lock the change set and its course;
         2. conflict check: a live row is in conflict if its `updated_at` is after
@@ -76,7 +76,7 @@ Plan so the two agree, the edit says so.
         conflicts". Add to `change-sets.test.ts`: a new artefact in an existing lesson survives
         approval; a prerequisite added and one removed both apply; an owner deleting a live lesson
         during the change set is reported as a conflict.
-    *   **Option B**: delete the items listed above; in 2.9 replace the change-set routing with
+    -   **Option B**: delete the items listed above; in 2.9 replace the change-set routing with
         "writers without `course.editLive` get 403 `course_live` on any edit to a course whose
         status is `live` or `pending_review`"; rewrite Goal 11 as "Writers cannot change a live
         course" with a role-route test; move Alternative N's text to the chosen design and record
@@ -84,13 +84,13 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 2] IB2 [`implementation-readiness`, `codebase-details`] - Severity: Blocker
 
-*   **Affected Scope:** [Lines 1159–1201](docs/designs/teacher-profiles.md#L1159-L1201) (1.18, 1.19, 1.21); Technical Plan sections 1, 4, 6.
-*   **Discrepancy Description:** onboarding can create a second account; nothing retires one;
+-   **Affected Scope:** [Lines 1159–1201](docs/designs/teacher-profiles.md#L1159-L1201) (1.18, 1.19, 1.21); Technical Plan sections 1, 4, 6.
+-   **Discrepancy Description:** onboarding can create a second account; nothing retires one;
     `syncStatus` has no activation rule; creation order and `stripe_account_id` nullability are
     undefined; return URLs are not moved; `displayName` is dropped silently.
-*   **Rationale:** the state machine is left to the implementer.
-*   ***AI Suggestion:*** PROPOSE FIX, **author decision needed** on one part.
-*   ***Justification:*** correct (`connect.service.ts:28–51, 64–84`). The `retired` state and
+-   **Rationale:** the state machine is left to the implementer.
+-   _**AI Suggestion:**_ PROPOSE FIX, **author decision needed** on one part.
+-   _**Justification:**_ correct (`connect.service.ts:28–51, 64–84`). The `retired` state and
     movable accounts exist only for promotion, which is a Non-Goal.
     - **Option A, keep `retired` and movable accounts.** Add a Support-only "retire payout
       account" action, a test-only path, or say no flow reaches it and keep the fixture as a direct
@@ -100,7 +100,7 @@ Plan so the two agree, the edit says so.
       as `onboarding` and `active` only. Drop `retired`, `retired_at`, the changeable `profile_id`
       and the "one active" partial index (replaced by a unique `profile_id`). Promotion adds them
       later as additive changes.
-*   ***Proposed Edit:*** whichever option is chosen, add to 1.18:
+-   _**Proposed Edit:**_ whichever option is chosen, add to 1.18:
     - `onboardingLink` reuses the profile's existing non-retired account, whatever its status,
       and reissues the link for it; it creates an account only when none exists;
     - creation order: insert the `payout_accounts` row with `stripe_account_id` null, call Stripe
@@ -120,15 +120,15 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 3] IB3 [`implementation-readiness`] - Severity: Blocker
 
-*   **Affected Scope:** [Lines 1702–1723](docs/designs/teacher-profiles.md#L1702-L1723) (D.4, D.6); Technical Plan section 12.
-*   **Discrepancy Description:** `reset-schema` is only in the new image, and the deploy that
+-   **Affected Scope:** [Lines 1702–1723](docs/designs/teacher-profiles.md#L1702-L1723) (D.4, D.6); Technical Plan section 12.
+-   **Discrepancy Description:** `reset-schema` is only in the new image, and the deploy that
     builds it migrates before any reset is possible.
-*   **Rationale:** the stated order cannot be run.
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Justification:*** correct. `deploy.yml` builds the image, registers the task definition,
+-   **Rationale:** the stated order cannot be run.
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Justification:**_ correct. `deploy.yml` builds the image, registers the task definition,
     then runs `migrate.js` and stops on failure, leaving the running API untouched (lines 84–112). It
     reuses an existing image for the same commit and supports `workflow_dispatch`.
-*   ***Proposed Edit:*** replace section 12's "Order in each environment" and D.4's procedure with:
+-   _**Proposed Edit:**_ replace section 12's "Order in each environment" and D.4's procedure with:
     1. push the commit to the environment branch. The deploy builds the image and registers the
        task definition, then **fails at the migration step, as expected**; the running API is left
        on the old version;
@@ -146,12 +146,12 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 4] IB4 [`codebase-details`, `implementation-readiness`] - Severity: Blocker
 
-*   **Affected Scope:** 1.11–1.16, 1.21, 1.27.
-*   **Discrepancy Description:** several items name the wrong file.
-*   **Rationale:** the file list would send the implementer to the wrong places.
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Justification:*** each was checked against the code.
-*   ***Proposed Edit:***
+-   **Affected Scope:** 1.11–1.16, 1.21, 1.27.
+-   **Discrepancy Description:** several items name the wrong file.
+-   **Rationale:** the file list would send the implementer to the wrong places.
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Justification:**_ each was checked against the code.
+-   _**Proposed Edit:**_
     - 1.14: replace `apps/api/src/lib/request-context.ts` with `apps/api/src/middleware/auth.ts`
       (`AppEnv`, lines 9–14);
     - 1.13: add `apps/api/src/services/auth.service.ts`; `buildAuthUser` (lines 206–230) builds
@@ -171,12 +171,12 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 5] IM1 [`implementation-readiness`, `codebase-details`] - Severity: Major
 
-*   **Affected Scope:** 2.3, 2.4, 1.37, 2.16.
-*   **Discrepancy Description:** the import scan misses `s.lessons`; raw reads still type-check;
+-   **Affected Scope:** 2.3, 2.4, 1.37, 2.16.
+-   **Discrepancy Description:** the import scan misses `s.lessons`; raw reads still type-check;
     learner relations are missing tables; `learnerDb` wiring is undefined.
-*   ***AI Suggestion:*** PROPOSE FIX (only if IB1 option A; deleted under option B).
-*   ***Justification:*** correct; learner services use `schema as s` (`catalog.service.ts:9`).
-*   ***Proposed Edit:*** 2.3: the learner relations include `courses`, the four views, `mediaAssets`,
+-   _**AI Suggestion:**_ PROPOSE FIX (only if IB1 option A; deleted under option B).
+-   _**Justification:**_ correct; learner services use `schema as s` (`catalog.service.ts:9`).
+-   _**Proposed Edit:**_ 2.3: the learner relations include `courses`, the four views, `mediaAssets`,
     `profiles`, `users` (name and avatar only), `userRoles`, enrolments, progress, attempts and
     certificates. `createLearnerDb(client)` takes the same client as `createDb` and `createPgliteDb`
     and returns `LearnerDb`. 2.4: `Deps` gains `learnerDb: LearnerDb`. The guarantee is stated
@@ -187,9 +187,9 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 6] IM2 [`implementation-readiness`] - Severity: Major
 
-*   **Affected Scope:** 2.8–2.10.
-*   ***AI Suggestion:*** PROPOSE FIX (only if IB1 option A).
-*   ***Proposed Edit:*** add to 2.10: `GET courses/:id?draft=1` returns the open change set's tree
+-   **Affected Scope:** 2.8–2.10.
+-   _**AI Suggestion:**_ PROPOSE FIX (only if IB1 option A).
+-   _**Proposed Edit:**_ add to 2.10: `GET courses/:id?draft=1` returns the open change set's tree
     with draft IDs plus `sourceId` on each item; the builder uses draft IDs after the first edit;
     the first edit on a live ID opens the change set and responds with the draft tree so the client
     swaps IDs; `POST courses/:id/change-set/approve` returns `409 { code: 'change_set_conflict',
@@ -198,9 +198,9 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 7] IM3 [`implementation-readiness`] - Severity: Major
 
-*   **Affected Scope:** [Lines 1127–1138](docs/designs/teacher-profiles.md#L1127-L1138) (1.15).
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Proposed Edit:*** add a table to 1.15 with one row per route: method and path, capability,
+-   **Affected Scope:** [Lines 1127–1138](docs/designs/teacher-profiles.md#L1127-L1138) (1.15).
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Proposed Edit:**_ add a table to 1.15 with one row per route: method and path, capability,
     and whether the course status changes it. Examples: `GET courses` → `profile.read`;
     `PATCH courses/:id` → `course.editDraft` when the status is `draft` or `rejected`,
     `course.editLive` when `live`, refused when `pending_review`; `PUT courses/:id/price` →
@@ -210,9 +210,9 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 8] IM4 [`implementation-readiness`, `codebase-details`] - Severity: Major
 
-*   **Affected Scope:** 0.5–0.9, 1.7.
-*   ***AI Suggestion:*** PROPOSE FIX (deleted if IB1 option B removes Step 0).
-*   ***Proposed Edit:*** 0.8: SQL-expression filters (`eq`, `and(...)`, `exists`, `ilike`, the
+-   **Affected Scope:** 0.5–0.9, 1.7.
+-   _**AI Suggestion:**_ PROPOSE FIX (deleted if IB1 option B removes Step 0).
+-   _**Proposed Edit:**_ 0.8: SQL-expression filters (`eq`, `and(...)`, `exists`, `ilike`, the
     people cursor) move to RQB v2's raw-SQL filter (`where: { RAW: (t) => ... }`); `orderBy` arrays
     become the callback form; `listSummaries(where)` takes a `RAW` filter. 0.6: add
     `packages/db/src/index.ts`; `Db`, `PgliteDb` and `AnyDb` take the relations type. 0.5 and 1.7:
@@ -221,13 +221,13 @@ Plan so the two agree, the edit says so.
     replacement `with:` tree (`profile: true`), and map each `relationName` to an explicit
     `from`/`to` pair. 0.10: also check that the RC keeps `NNNN_name.sql` and `meta/_journal.json`;
     if not, `migrations-folder.ts`, `migrate.ts` and the Dockerfile `COPY` change with it.
-    *Note: the exact RQB v2 filter syntax must be checked against the 1.0 docs during Step 0.*
+    _Note: the exact RQB v2 filter syntax must be checked against the 1.0 docs during Step 0._
 
 ### [Issue 9] IM5 [`implementation-readiness`, `style`] - Severity: Major
 
-*   **Affected Scope:** [Lines 886–891](docs/designs/teacher-profiles.md#L886-L891), 0.10, 1.8.
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Proposed Edit:*** new item 1.8a, `packages/db/scripts/generate.ts` (Create): runs
+-   **Affected Scope:** [Lines 886–891](docs/designs/teacher-profiles.md#L886-L891), 0.10, 1.8.
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Proposed Edit:**_ new item 1.8a, `packages/db/scripts/generate.ts` (Create): runs
     `drizzle-kit generate`, then adds the `citext` and `pg_trgm` lines (and, if 0.10 shows the kit
     does not emit views, the view SQL) to the top of the generated `0000`. `npm run db:generate`
     calls it, so regenerating keeps them. A test checks that `0000` starts with the extension lines.
@@ -236,9 +236,9 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 10] IM6 [`implementation-readiness`, `codebase-details`] - Severity: Major
 
-*   **Affected Scope:** 1.11, 1.12, 1.17, 1.32.
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Proposed Edit:*** add to 1.12:
+-   **Affected Scope:** 1.11, 1.12, 1.17, 1.32.
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Proposed Edit:**_ add to 1.12:
     - `TeacherProfileView` becomes `ProfileView`: `id`, `type`, `status`, the application fields,
       `commissionBps`, `payout: { status, chargesEnabled } | null`, `actingAsStaff`;
     - `CourseView.teacher` becomes `CourseView.profile`: `{ id, displayName, ownerEmail, payable }`;
@@ -254,9 +254,9 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 11] IM7 [`implementation-readiness`, `codebase-details`] - Severity: Major
 
-*   **Affected Scope:** [Lines 1217–1225](docs/designs/teacher-profiles.md#L1217-L1225) (1.23).
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Proposed Edit:*** add to 1.23: any member of the course's profile, and staff, can preview an
+-   **Affected Scope:** [Lines 1217–1225](docs/designs/teacher-profiles.md#L1217-L1225) (1.23).
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Proposed Edit:**_ add to 1.23: any member of the course's profile, and staff, can preview an
     unpublished course (`catalog.service.ts:136–139`). Teacher cards use the profile's avatar
     (`avatar_media_id`); a personal profile with no avatar falls back to the owner's
     `users.avatarUrl`, so cards look as they do today (Goal 7); a corporate profile with none shows
@@ -265,23 +265,23 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 12] IM8 [`implementation-readiness`, `codebase-details`] - Severity: Major
 
-*   **Affected Scope:** 1.20, 1.22; Technical Plan section 6.
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Proposed Edit:*** 1.20: `fulfilCheckout` gains the outcome `'unattributed'` when payee
+-   **Affected Scope:** 1.20, 1.22; Technical Plan section 6.
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Proposed Edit:**_ 1.20: `fulfilCheckout` gains the outcome `'unattributed'` when payee
     metadata is missing or names no account. The webhook path throws on it, so it is stored in
     `webhook_events.error`; `syncSession` returns `status: 'pending'` and logs an error. The
     `firstPayout` event (`payments.service.ts:344–359`) is counted per profile: the first payment
     on any of its payout accounts, measured from profile approval; `userId` is the owner's user ID;
     properties are `profileId` and `payoutAccountId`. 1.22 keeps only the median in
     `analytics.service.ts`. Section 6 is changed to say per profile.
-*   **Note:** Stage 5 (B2) proposed recording these payments as unattributed and taking the payee
+-   **Note:** Stage 5 (B2) proposed recording these payments as unattributed and taking the payee
     from the Stripe destination. That is a larger change to section 5 and is not part of this fix.
 
 ### [Issue 13] IM9 [`codebase-details`] - Severity: Major
 
-*   **Affected Scope:** 1.16, 1.30, 1.32.
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Proposed Edit:*** 1.16: `apply` updates the user's personal profile in place when it is
+-   **Affected Scope:** 1.16, 1.30, 1.32.
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Proposed Edit:**_ 1.16: `apply` updates the user's personal profile in place when it is
     `applied` or `rejected`, as today, and refuses with `409 profile_exists` only when it is
     `approved`. 1.30: `/apply` stays outside profiles; any page under `/p/:profileId` shows the
     pending page when that profile is not approved; `/` opens the last-used profile if it is still
@@ -291,9 +291,9 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 14] IM10 [`implementation-readiness`, `codebase-details`] - Severity: Major
 
-*   **Affected Scope:** 1.28, 1.29, 3.12.
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Proposed Edit:*** demo profiles get **no** payout account, so demo courses are unpayable, as
+-   **Affected Scope:** 1.28, 1.29, 3.12.
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Proposed Edit:**_ demo profiles get **no** payout account, so demo courses are unpayable, as
     today. 3.12's corporate demo profile gets none either. `seed --admin-only` and `--demo` both
     fail with a clear error when `SEED_SUPER_ADMIN_EMAIL` is missing; `--admin-only` creates only
     the super admin (no support agent, no learner). The seed's media rows take `provider` from the
@@ -301,9 +301,9 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 15] IM11 [`implementation-readiness`, `style`] - Severity: Major
 
-*   **Affected Scope:** 1.36, Verification Plan.
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Proposed Edit:*** 1.36: `profile-isolation.test.ts` creates the second profile with a direct
+-   **Affected Scope:** 1.36, Verification Plan.
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Proposed Edit:**_ 1.36: `profile-isolation.test.ts` creates the second profile with a direct
     database insert of a `corporate` profile owned by the same user, since step 1 has no other way;
     the Goal 5 fixture (if IB2 option A) is a direct insert too, and says so. Tag every test with
     its goal: `permissions.test.ts` and `role-routes.test.ts` → Goal 3; the fulfilment cases in
@@ -312,9 +312,9 @@ Plan so the two agree, the edit says so.
 
 ### [Issue 16] IM12 [`codebase-details`, `style`, `implementation-readiness`] - Severity: Major
 
-*   **Affected Scope:** 1.5, 1.24, 1.26, 1.38, 2.11, 3.2.
-*   ***AI Suggestion:*** PROPOSE FIX.
-*   ***Proposed Edit:***
+-   **Affected Scope:** 1.5, 1.24, 1.26, 1.38, 2.11, 3.2.
+-   _**AI Suggestion:**_ PROPOSE FIX.
+-   _**Proposed Edit:**_
     - 1.26: add `packages/core/src/contracts/media.ts` (`createUploadSchema` gains `profileId`) and
       `packages/web-ui/src/components/MediaUploader.tsx` (passes it); the rule goes into
       `getOwnedAsset` (`media.service.ts:197`); 1.5 drops "step 2 makes access checks use it";
@@ -332,22 +332,22 @@ Plan so the two agree, the edit says so.
 
 ### Nits
 
-| Id | AI Suggestion | Proposed Edit or reason |
-|---|---|---|
-| ir-N2 | PROPOSE FIX | Keep `check-dupes.mjs` in 0.2 only; name the exact `drizzle-kit` RC version found in Step 0; drop "no `^` or `~`". |
-| ir-N3, cd-N1 | PROPOSE FIX | 0.4 becomes "Verify, no change expected: the helpers set no column names." |
-| ir-N5 | PROPOSE FIX | 1.25: staff entries use `action: 'staff.<route>'`, `entityType: 'profile'`, `metadata: { method, path }`. |
-| ir-N6, st-n7 | PROPOSE FIX | Link `concepts_brief.md` where "the brief" is cited (a Stage 7 fix covers the FeatureRange). Goal 7 wording: "test changes are limited to fixtures, route paths and the renamed fields". |
-| cd-N2 | PROPOSE FIX | 1.4: the `(teacher_id, paid_at)` index becomes `(profile_id, paid_at)`, plus `(payout_account_id, paid_at)`. |
-| cd-N3 | PROPOSE FIX | 1.25: `recordAudit(deps, {...})` gains `profileId`. |
-| cd-N4 | PROPOSE FIX | 1.37: the guard reads the generated `0000` and fails on any foreign key from `courses`, `payments` or `media_assets.profile_id` to `users` (also answers Stage 5 C3). |
-| cd-N5 | PROPOSE FIX | 1.20: refunds made in the Stripe dashboard (`applyChargeRefunded`, `transactions.service.ts:244–278`) send the same owner emails. |
-| cd-N6 | PROPOSE FIX | 0.1: bump `@electric-sql/pglite` in both `packages/db` and `apps/api`. |
-| st-n1 | PROPOSE FIX | Use "step" in the Implementation Plan and add one line: "steps 1–3 are slices 1–3". |
-| st-n2 | DECLINE | "Author" is the document's standard field name; the header names sky. |
-| st-n3 | PROPOSE FIX | Drop the parenthesis. |
-| st-n4 | PROPOSE FIX | "Intended to change syntax only; the existing suites confirm results are unchanged." |
-| st-n5 | PROPOSE FIX | "otherwise cannot get back an owner who can sign in." |
-| st-n6 | DECLINE | Line numbers are quoted with function names in most items, and step 0 does not move them much. |
-| st-n7 | PROPOSE FIX | 1.33 becomes "No code change expected: the type change flows through"; move the refund change under 1.22's file list; D.5 names the boundaries (profile-scoped routes, `requireProfile`, learner reads only through views). Cross-references use "section N". |
-| cd-N7 | DECLINE | Covered by Issue 8. |
+| Id           | AI Suggestion | Proposed Edit or reason                                                                                                                                                                                                                                       |
+| ------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ir-N2        | PROPOSE FIX   | Keep `check-dupes.mjs` in 0.2 only; name the exact `drizzle-kit` RC version found in Step 0; drop "no `^` or `~`".                                                                                                                                            |
+| ir-N3, cd-N1 | PROPOSE FIX   | 0.4 becomes "Verify, no change expected: the helpers set no column names."                                                                                                                                                                                    |
+| ir-N5        | PROPOSE FIX   | 1.25: staff entries use `action: 'staff.<route>'`, `entityType: 'profile'`, `metadata: { method, path }`.                                                                                                                                                     |
+| ir-N6, st-n7 | PROPOSE FIX   | Link `concepts_brief.md` where "the brief" is cited (a Stage 7 fix covers the FeatureRange). Goal 7 wording: "test changes are limited to fixtures, route paths and the renamed fields".                                                                      |
+| cd-N2        | PROPOSE FIX   | 1.4: the `(teacher_id, paid_at)` index becomes `(profile_id, paid_at)`, plus `(payout_account_id, paid_at)`.                                                                                                                                                  |
+| cd-N3        | PROPOSE FIX   | 1.25: `recordAudit(deps, {...})` gains `profileId`.                                                                                                                                                                                                           |
+| cd-N4        | PROPOSE FIX   | 1.37: the guard reads the generated `0000` and fails on any foreign key from `courses`, `payments` or `media_assets.profile_id` to `users` (also answers Stage 5 C3).                                                                                         |
+| cd-N5        | PROPOSE FIX   | 1.20: refunds made in the Stripe dashboard (`applyChargeRefunded`, `transactions.service.ts:244–278`) send the same owner emails.                                                                                                                             |
+| cd-N6        | PROPOSE FIX   | 0.1: bump `@electric-sql/pglite` in both `packages/db` and `apps/api`.                                                                                                                                                                                        |
+| st-n1        | PROPOSE FIX   | Use "step" in the Implementation Plan and add one line: "steps 1–3 are slices 1–3".                                                                                                                                                                           |
+| st-n2        | DECLINE       | "Author" is the document's standard field name; the header names sky.                                                                                                                                                                                         |
+| st-n3        | PROPOSE FIX   | Drop the parenthesis.                                                                                                                                                                                                                                         |
+| st-n4        | PROPOSE FIX   | "Intended to change syntax only; the existing suites confirm results are unchanged."                                                                                                                                                                          |
+| st-n5        | PROPOSE FIX   | "otherwise cannot get back an owner who can sign in."                                                                                                                                                                                                         |
+| st-n6        | DECLINE       | Line numbers are quoted with function names in most items, and step 0 does not move them much.                                                                                                                                                                |
+| st-n7        | PROPOSE FIX   | 1.33 becomes "No code change expected: the type change flows through"; move the refund change under 1.22's file list; D.5 names the boundaries (profile-scoped routes, `requireProfile`, learner reads only through views). Cross-references use "section N". |
+| cd-N7        | DECLINE       | Covered by Issue 8.                                                                                                                                                                                                                                           |

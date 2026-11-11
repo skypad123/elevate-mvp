@@ -1,8 +1,8 @@
 # Teacher profiles separate from users
 
-* **Author:** sky
-* **Date:** 2026-11-11
-* **Status:** two Goldfish review rounds done. The nine blocking decisions from the second round
+- **Author:** sky
+- **Date:** 2026-11-11
+- **Status:** two Goldfish review rounds done. The nine blocking decisions from the second round
   are decided by the author. The author confirmed production holds no real data. The design is
   [teacher-profiles.md](teacher-profiles.md); decisions changed during
   drafting and review are listed at the end of this brief.
@@ -17,9 +17,9 @@ The first build gives the teacher profile its own ID. Users join a profile throu
 a fixed role. It adds:
 
 - **Two profile types:**
-  - *Personal:* paid through an individual or sole-proprietor Stripe account. It cannot be handed
+  - _Personal:_ paid through an individual or sole-proprietor Stripe account. It cannot be handed
     to another person.
-  - *Corporate:* for a separate legal entity registered with ACRA (a private limited company or an
+  - _Corporate:_ for a separate legal entity registered with ACRA (a private limited company or an
     LLP, even with one director), paid through a company Stripe account.
 - **A payout account record,** separate from the profile, stored on every payment.
 - **Invitations,** so an owner can add helpers.
@@ -151,40 +151,40 @@ become a switch of the active account that no learner can observe.
 
 ## Goals vs. Non-Goals
 
-* **In-Scope Goals (first build), in three slices that each leave a working system:**
+- **In-Scope Goals (first build), in three slices that each leave a working system:**
   1. **Structure.** The product behaves as today after this slice.
-     * Profile with its own ID; courses and payments point at it.
-     * Owner column on the profile.
-     * One permission function and capability table in `packages/core`, used by every Teach route.
-     * The global `teacher` platform role removed.
-     * Payout account record, stored on every payment and every checkout.
-     * Money queries grouped by payout account.
-     * Profile ID in the Teach URL.
-     * Support pages keyed to the profile.
-     * Migrations squashed into a fresh `0000`; staging and production schemas dropped and
+     - Profile with its own ID; courses and payments point at it.
+     - Owner column on the profile.
+     - One permission function and capability table in `packages/core`, used by every Teach route.
+     - The global `teacher` platform role removed.
+     - Payout account record, stored on every payment and every checkout.
+     - Money queries grouped by payout account.
+     - Profile ID in the Teach URL.
+     - Support pages keyed to the profile.
+     - Migrations squashed into a fresh `0000`; staging and production schemas dropped and
        reseeded.
   2. **Helpers.**
-     * Writer role and invitations.
-     * Member management screens.
-     * Media owned by the profile.
-     * Price and submit separated from content editing.
-     * Writer edits to live courses held as a change set until an owner or manager approves.
+     - Writer role and invitations.
+     - Member management screens.
+     - Media owned by the profile.
+     - Price and submit separated from content editing.
+     - Writer edits to live courses held as a change set until an owner or manager approves.
   3. **Corporate.**
-     * Corporate type and legal-entity record.
-     * Self-serve corporate application and its Support review queue.
-     * Company Stripe account creation.
-     * The Support entity check and the Stripe legal-name comparison.
-     * The manager role.
-  * **Across slices:** owner recovery by `super_admin`; `super_admin` acting inside Teach as a
+     - Corporate type and legal-entity record.
+     - Self-serve corporate application and its Support review queue.
+     - Company Stripe account creation.
+     - The Support entity check and the Stripe legal-name comparison.
+     - The manager role.
+  - **Across slices:** owner recovery by `super_admin`; `super_admin` acting inside Teach as a
     profile, audited; staff barred from Stripe links.
-* **Out-of-Scope Non-Goals:**
-  * Promotion from personal to corporate (later brief).
-  * Ownership transfer, beyond a Support recovery action (later brief).
-  * Custom roles (later brief).
-  * Google and Apple sign-in (later brief). Company single sign-on into Teach.
-  * Automated ACRA or Singpass lookup.
-  * Several profiles per legal entity; per-course writer permissions; per-course instructor credit.
-  * Dispute handling, GST and invoicing.
+- **Out-of-Scope Non-Goals:**
+  - Promotion from personal to corporate (later brief).
+  - Ownership transfer, beyond a Support recovery action (later brief).
+  - Custom roles (later brief).
+  - Google and Apple sign-in (later brief). Company single sign-on into Teach.
+  - Automated ACRA or Singpass lookup.
+  - Several profiles per legal entity; per-course writer permissions; per-course instructor credit.
+  - Dispute handling, GST and invoicing.
 
 ## Alternatives Weighed
 
@@ -240,6 +240,7 @@ Revised during design review (2026-11-11, author's choice). The first build keep
 costly to add after launch and leaves additive changes to the promotion brief.
 
 **Built now:**
+
 - A payout account is its own record, one per profile in this build.
 - A payment stores its payout account permanently, plus the profile at the time of sale for audit.
 - Earnings, reconciliation and the Support ledger select payments by payout account.
@@ -252,6 +253,7 @@ costly to add after launch and leaves additive changes to the promotion brief.
   viewer owns. Each payout account records when it became active.
 
 **Left to the promotion brief, each an additive change:**
+
 - a `retired` state, with retired accounts still receiving webhooks;
 - a payout account's link to its profile becoming changeable;
 - more than one account per profile, with at most one active;
