@@ -1,0 +1,22 @@
+# Keep the build context to source + manifests; everything else is rebuilt inside the image.
+.git
+.github
+.claude
+.turbo
+**/.turbo
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.data
+.env
+.env.*
+!.env.example
+.expo
+**/.expo
+apps/learner/ios
+apps/learner/android
+docs
+infra
+*.md
+!apps/api/assets/fonts/fallback/README.md

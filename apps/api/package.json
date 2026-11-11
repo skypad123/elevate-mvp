@@ -12,7 +12,9 @@
   "scripts": {
     "dev": "node --env-file=../../.env --import tsx --watch src/server.ts",
     "start": "node --env-file=../../.env dist/server.js",
-    "build": "tsup src/server.ts --format esm --target node22 --out-dir dist --clean",
+    "start:prod": "node dist/server.js",
+    "migrate:prod": "node dist/migrate.js",
+    "build": "tsup",
     "build:types": "tsc -p tsconfig.types.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests"

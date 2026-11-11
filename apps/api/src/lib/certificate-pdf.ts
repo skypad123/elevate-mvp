@@ -1,10 +1,11 @@
 // @pdf-lib/fontkit's bundle expects the Babel regenerator global when subsetting large fonts.
-import 'regenerator-runtime/runtime'
+import 'regenerator-runtime/runtime.js'
 import { readdir, readFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 import fontkit from '@pdf-lib/fontkit'
 import { PDFDocument, type PDFFont, rgb, StandardFonts } from 'pdf-lib'
 import QRCode from 'qrcode'
+import { apiRoot } from '../env'
 
 export type CertificateInput = {
   learnerName: string
@@ -23,7 +24,7 @@ export type CertificateRenderOptions = {
   fallbackFonts?: string[]
 }
 
-const fallbackDir = resolve(import.meta.dirname, '../../assets/fonts/fallback')
+const fallbackDir = resolve(apiRoot, 'assets/fonts/fallback')
 
 /** Fallback fonts: `CERTIFICATE_FALLBACK_FONTS` (comma-separated paths) plus assets/fonts/fallback/. */
 export async function listFallbackFonts(fromEnv: string | undefined): Promise<string[]> {
@@ -51,7 +52,7 @@ const COLORS = {
   border: rgb(0.898, 0.871, 0.824),
 }
 
-const fontsDir = resolve(import.meta.dirname, '../../assets/fonts')
+const fontsDir = resolve(apiRoot, 'assets/fonts')
 
 async function embed(doc: PDFDocument, file: string, fallback: StandardFonts): Promise<PDFFont> {
   try {
