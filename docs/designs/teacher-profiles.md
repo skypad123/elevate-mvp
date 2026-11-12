@@ -3,7 +3,9 @@
 -   **Author:** sky
 -   **Status:** Implemented. Step 0 (the Drizzle 1.0 upgrade), step 1 (Structure), step 2
     (Helpers) and step 3 (Corporate) were implemented on 2026-11-12. The Stripe company-account
-    test in Open Questions has not been run, and Goal 8 has not been run on staging.
+    test in Open Questions was run afterwards, on 2026-11-12, in a Stripe sandbox: three of its
+    four points hold, and a company account could not finish onboarding in test mode (see Open
+    Questions). Goal 8 has not been run on staging.
 -   **Date:** 2026-11-11
 -   **Related:** reviews in [reviews/teacher-profiles/](reviews/teacher-profiles/); the brief this design came from, [teacher-profiles-brief.md](teacher-profiles-brief.md).
     Changes [ADR 003](../adr/003-payments-destination-charges.md): the destination charge goes to
@@ -170,18 +172,59 @@ That model breaks in three ways, and a fourth point is the reason to fix it now.
 
 ## Open Questions
 
--   **Stripe behaviour for company accounts**: Deferred by the author until slices 1 and 2 are done;
-    no company Stripe account exists yet. Slice 3 cannot start until this is tested. Assumption:
-    Stripe test mode accepts made-up company details, so a real company is not needed for the test.
-    Each point is an assumption until tested:
-    - a Singapore company account can be created with the settings used for individual accounts;
-    - one person can hold two connected accounts;
-    - the dashboard login link works for company accounts, and which person it signs in: the
-      representative Stripe holds for the company, or whoever controls the owner's email;
-    - the company's legal name can be read from the account.
+-   **Stripe behaviour for company accounts**: tested on 2026-11-12, after step 3 was built, in a
+    Stripe sandbox with Connect enabled, through Teach and Support against the real Stripe API.
+    The assumption that Stripe test mode accepts made-up company details holds only in part: it
+    takes them, but it cannot verify who may act for a made-up company, so a company account
+    cannot finish onboarding in test mode. The four points:
+    - **A Singapore company account can be created with the settings used for individual
+      accounts: yes.** Stripe created a `business_type: company` account with the same
+      `controller` settings. Its onboarding asks for the UEN, the legal name ("must exactly
+      match the name associated with your UEN"), the incorporation date, the directors and the
+      owners. **Finishing it: not in test mode.** Stripe checks the account representative
+      against ACRA: the representative must be listed as a Director or CEO, or else the company
+      names an authoriser who is, and uploads a letter of authorisation signed by them. Stripe's
+      test registry lists no director for a made-up company, so the check failed
+      (`verification_failed_representative_authority`, then
+      `verification_failed_authorizer_authority`) with every test value tried: the company-name
+      token `match_name_relationships` (which did make Stripe verify the company itself), the
+      immediate-match UEN `222222222`, Stripe's test document image for the ownership document
+      and the letter, an added director as authoriser, and the representative verified through
+      Singpass Myinfo with a staging test persona. Stripe does not let the platform attach
+      documents to these accounts (`oauth_not_supported`), so only the person in Stripe's form
+      can. A full company run needs a real company, in live mode.
+    - **One person can hold two connected accounts: yes.** The same Elevate user, with the same
+      email, holds a company account and an individual account. Stripe did not ask to sign in to
+      an existing account or merge them, and the individual account finished onboarding with the
+      same Myinfo persona and became `active` in Elevate.
+    - **The dashboard login link: works for the individual account; not reached for the company
+      account**, because Elevate refuses the link until onboarding is submitted
+      (`409 stripe_not_onboarded`). The link opens the Express dashboard for that one account
+      with no Stripe sign-in and no account switcher, so it admits whoever Elevate hands it to:
+      the owner, through `stripe.links`. Without a link, Express signs in by the account's email
+      address and an SMS code, which reaches whoever controls that email and phone. Express also
+      has a "Team members" setting for adding people to the account.
+    - **The company's legal name can be read from the account: yes.** `company.name` is returned
+      as soon as the representative types it, before onboarding is submitted, and Support's name
+      check showed it. When the name was changed in Stripe, the next read showed the new name,
+      and recording a mismatch emailed the owner. Stripe also collects the UEN, but the API
+      reports only `company.tax_id_provided`, not the number.
+
+    Found along the way:
+    - **Stripe runs its own registry check of the company** (legal name against UEN), so
+      Elevate's name check is a second check, comparing the name Stripe holds with the company
+      Elevate approved.
+    - **A company's Stripe representative is expected to be a director or CEO.** An Elevate owner
+      who is neither needs a director's signed authorisation in Stripe. An owner recovery changes
+      the Elevate owner only; Stripe's representative stays as it was.
+    - **The Support "Open in Stripe" URL was not checked**: it needs the platform's own dashboard
+      sign-in. In a Stripe sandbox, Stripe's own dashboard links include the platform account
+      (`dashboard.stripe.com/acct_<platform>/test/...`), so the built URL may not open the right
+      account there.
 -   **Stripe sorts accounts by legal form**: assumed, not tested, that Stripe classes a connected
     account as individual or company by legal form, not by how many people run it. Alternative F
-    relies on this.
+    relies on this. The company-account test showed only that Stripe keeps the business type the
+    platform sets when it creates the account.
 -   **Apple relay addresses**: assumed, not tested, that Apple sign-in can hand Elevate a relay
     address, so an invited email may not match the accepting account. Alternative V relies on
     this; it matters only once the sign-in brief lands.
@@ -2421,10 +2464,10 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
 
 **Status:** implemented on 2026-11-12, **without that test**. The author asked for step 3 to
 start before it, and the test needs Stripe test keys, which the development environment does not
-have. Step 3 was built and checked against the fake payments provider, so the four Stripe
-assumptions in Open Questions are still untested (see "Not checked" below). The items below
-describe the change as planned; this block records what was built differently and how it was
-checked.
+have. Step 3 was built and checked against the fake payments provider. The test was run
+afterwards, the same day, once test keys were added; its results are in Open Questions and under
+"Checked against Stripe" below. The items below describe the change as planned; this block
+records what was built differently and how it was checked.
 
 **Built differently from the items below**
 
@@ -2467,8 +2510,8 @@ Payout accounts and the name check:
   audit log, which is the only place a mismatch and its note are kept, so the next person to open
   the check sees what was decided, by whom, and what the owner was told.
 - **The dashboard URL is built, not fetched (3.6).** `accountDashboardUrl` returns
-  `https://dashboard.stripe.com/[test/]connect/accounts/<id>`. The format is an assumption, to be
-  confirmed in the Stripe test.
+  `https://dashboard.stripe.com/[test/]connect/accounts/<id>`. The format is an assumption; the
+  Stripe test could not confirm it (Open Questions).
 
 Owner recovery:
 
@@ -2525,12 +2568,29 @@ Seed:
     are there. On a personal profile, an address already in use is refused, then the owner's
     address is changed; the new address signs in as the owner, and the old one reaches no profile.
 
+**Checked against Stripe** (2026-11-12, a Stripe sandbox, the API with real test keys against a
+throwaway database, Teach and Support in a browser):
+
+- The demo company's owner started onboarding from Teach: Stripe created the company account,
+  and Support's name check showed the legal name Stripe held while onboarding was unfinished.
+  After the name was changed in Stripe, Support recorded a mismatch from the API name and the
+  owner was emailed. Teach refused the dashboard link for the unfinished account.
+- The same owner applied for a personal profile, Support approved it, and its individual account
+  finished onboarding: on return, Teach read the account from Stripe and showed payments enabled
+  without a webhook, the payout account became `active`, and the dashboard link opened the
+  account's Express dashboard.
+- The company account could not finish onboarding in test mode, so a company account becoming
+  `active` after a match was not seen against Stripe; `corporate.test.ts` covers it with the fake.
+- Webhooks: with `stripe listen` forwarding both scopes, a Connect `account.updated` for a company
+  account (sent by changing its metadata) reached the API, passed the signature check with the
+  CLI's secret, was answered 200 and stored as processed.
+
 **Not checked:**
 
-- **The Stripe company-account test in Open Questions**, so all four of its assumptions: creating
-  a company account with these settings, one person holding two connected accounts, the dashboard
-  login link for a company account and whom it signs in, and reading the legal name from the API.
-  The dashboard URL format and what Stripe's login shows after an owner recovery are untested too.
+- A company account finishing onboarding, the dashboard login link for a company account, the
+  Support "Open in Stripe" URL, and what Stripe shows after an owner recovery (Open Questions).
+- The onboarding results above came from the return page's read of the account, not from
+  webhooks, which were checked separately afterwards.
 - Email delivery (the console mail driver was used), the Docker image (the built commands ran from
   `dist`), and staging (Goal 8 there).
 
@@ -2785,7 +2845,9 @@ list, since the review queue lists courses.
     run db:seed` against local Postgres from `docker-compose.yml`, then `npm run db:generate`
     reports no changes, and `drizzle/` holds exactly one migration folder, `<timestamp>_init`.
 -   **Manual, local**: run CUJs 1–6 in the browser against the local stack with the fake payment
-    provider; CUJ 4 again against Stripe test mode with made-up company details.
+    provider; CUJ 4 again against Stripe test mode with made-up company details. Done on
+    2026-11-12 as far as test mode allows: a made-up company cannot finish Stripe onboarding
+    there (Open Questions), so the end of CUJ 4 waits for a real company.
 -   **Staging**: after step 3, run the reset procedure in D.4, then CUJs 1, 2, 3 and 5 on staging
     with Stripe test mode. Production is reset with `seed --admin-only` only after staging passes,
     and its deploys wait for the required reviewer of the `production` GitHub Environment.

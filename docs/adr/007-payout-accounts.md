@@ -41,8 +41,12 @@ Builds on [ADR 003](003-payments-destination-charges.md) (destination charges) a
 
 ## Consequences
 
-- The legal-name check rests on assumptions about Stripe company accounts that have not been
-  tested (the design's Open Questions); `docs/runbooks/stripe.md` lists what to try.
+- Tested in a Stripe sandbox on 2026-11-12 (the design's Open Questions): Stripe returns a
+  company's legal name before onboarding is finished, and one person can hold an individual and
+  a company account. A company account cannot finish onboarding in test mode, because Stripe
+  checks the representative against ACRA's directors, so a company becoming `active` has been
+  seen only with the fake provider. Stripe also checks the legal name against the UEN itself;
+  Support's check compares the name Stripe holds with the company Elevate approved.
 
 - An `account.updated` event for an account with no row is stored as a webhook error instead of
   being ignored.

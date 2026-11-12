@@ -10,10 +10,12 @@ commission (see `docs/adr/003-payments-destination-charges.md` and
 
 1. Create a Stripe account (or a sandbox in an existing one) and switch to **Test mode**.
 2. Dashboard → Developers → API keys → copy the **Secret key** (`sk_test_…`) into `.env` as
-   `STRIPE_SECRET_KEY`.
-3. Dashboard → Connect → **Get started** and complete the platform profile. Because teachers'
-   accounts are created with `controller.losses.payments = application`, Stripe asks you once to
-   acknowledge that the platform is responsible for negative balances.
+   `STRIPE_SECRET_KEY`. The publishable key (`pk_test_…`) does not work: Stripe refuses server
+   calls made with it (`more_permissions_required`).
+3. Dashboard → Connect → **Get started** and complete the platform profile. Until then, opening
+   onboarding fails with "You can only create new accounts if you've signed up for Connect".
+   Because teachers' accounts are created with `controller.losses.payments = application`, Stripe
+   asks you once to acknowledge that the platform is responsible for negative balances.
 4. Connect → Settings → Branding: set the Elevate name, icon and colours used on the hosted
    onboarding and Checkout pages.
 
@@ -24,11 +26,12 @@ Install the CLI and forward both the account scope and the Connect scope to the 
 ```bash
 brew install stripe/stripe-cli/stripe
 stripe login
-stripe listen --forward-to localhost:4400/api/webhooks/stripe --forward-connect-to localhost:4400/api/webhooks/stripe
+stripe listen --events account.updated,charge.refunded,checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed --forward-to localhost:4400/api/webhooks/stripe --forward-connect-to localhost:4400/api/webhooks/stripe
 ```
 
-Paste the `whsec_…` the CLI prints into `.env` as `STRIPE_WEBHOOK_SECRET` (the CLI uses one secret
-for both scopes). Restart the API.
+Recent versions of the CLI refuse to start without `--events`. Paste the `whsec_…` the CLI prints
+on its "Ready!" line into `.env` as `STRIPE_WEBHOOK_SECRET` (the CLI uses one secret for both
+scopes). Restart the API.
 
 Without the CLI the app still works: the checkout success page calls
 `GET /api/checkout/sessions/:id/sync`, which re-reads the session from Stripe and runs the same
@@ -46,8 +49,15 @@ Create two endpoints in Dashboard → Developers → Webhooks, both pointing at
 ## 4. Test data
 
 - Card that succeeds: `4242 4242 4242 4242`, any future expiry, any CVC.
-- Onboarding a test connected account: use the "Use test data" shortcuts Stripe offers in the
-  hosted flow; `000 000 000` style test identifiers are accepted.
+- Onboarding a test connected account: the hosted flow offers "Use test phone number", "Use test
+  code", "Simulate" on the identity check, and "Use test account" for the bank. `000000000` works
+  as an ID or business number, `01/01/1901` as a date of birth, and `address_full_match` as an
+  address line (with a real postal code). Stripe's test document image is
+  `https://d37ugbyn3rpeym.cloudfront.net/docs/identity/success.png`.
+- "Retrieve Myinfo with Singpass" goes to Singpass's staging sign-in in test mode. Sign in as a
+  Myinfo test persona (a UIN/FIN from the Myinfo test profile catalogue, with the staging password
+  from the Singpass developer portal) and Stripe fills the person's name, date of birth, address
+  and NRIC.
 - Fees: Singapore domestic cards are 3.4% + S$0.50 (`STRIPE_FEE_BPS=340`,
   `STRIPE_FEE_FIXED_CENTS=50`). The earnings view shows the estimate and the actual fee from the
   balance transaction side by side.
@@ -108,15 +118,24 @@ Create two endpoints in Dashboard → Developers → Webhooks, both pointing at
   `{ match, source: 'api' | 'dashboard', stripeLegalName?, note? }`. Each decision is audited as
   `payout_account.name_check`.
 
-**Not yet tested against Stripe.** The company flow was built and checked with the fake payments
-provider only. Before relying on it, in test mode:
+**What Stripe does with a company** (tested in a sandbox on 2026-11-12; details in the
+design's Open Questions):
 
-1. Create a corporate profile, open Stripe onboarding from Teach, and complete it as a Singapore
-   company with test data. Confirm Stripe accepts the account settings used for individuals.
-2. With the same Elevate user, onboard a second profile (personal and corporate): confirm one
-   person can hold two connected accounts.
-3. Open the Stripe dashboard link from Teach for the company account: confirm it works, and note
-   whom it signs in (the company's representative, or whoever controls the owner's email).
-4. In Support, open the name check: confirm Stripe's API returns the company's legal name, and
-   that "Open in Stripe" opens the right account (the URL is built as
-   `https://dashboard.stripe.com/test/connect/accounts/<id>`).
+- Stripe creates the account with the settings used for individuals, and its onboarding asks for
+  the UEN and the legal name, which "must exactly match the name associated with your UEN".
+  Stripe checks them against the registry itself.
+- The legal name is readable from the API (`company.name`) as soon as it is typed, before
+  onboarding is submitted, so the name check can be done early. The UEN is not returned.
+- **The account representative must be a Director or CEO on ACRA.** Otherwise the company names
+  an authoriser who is one, and uploads a letter of authorisation they signed (Stripe's template
+  is offered in the form). Only the person in Stripe's form can upload these: the platform cannot
+  attach documents to the account. Tell a company owner who is not a director to have one ready.
+- One person can hold an individual and a company account under the same email.
+- The dashboard link opens the Express dashboard for that one account without a Stripe sign-in.
+
+**Not testable in test mode:** a company account finishing onboarding. Stripe's test registry
+lists no director for a made-up company, so the authority check fails with every test value
+(`match_name_relationships` as the legal name does make Stripe verify the company itself). Check
+the first real company's onboarding, its dashboard link and Support's "Open in Stripe" link (built
+as `https://dashboard.stripe.com/[test/]connect/accounts/<id>`; in a Stripe sandbox, Stripe's own
+links also carry the platform account) by hand.
