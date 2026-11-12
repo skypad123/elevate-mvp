@@ -19,9 +19,9 @@ import {
 
 import { type MessageKey, useErrorMessage, useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { GraduationCap } from 'lucide-react'
-import { useDeferredValue, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import { type ProfilesFilter, useProfiles } from '../lib/queries'
+import { useUrlSearch } from '../lib/search'
 
 const TABS: Array<{ value: string; labelKey: MessageKey; filter: ProfilesFilter }> = [
   { value: 'applications', labelKey: 'profiles.tab.applications', filter: { status: 'applied' } },
@@ -37,14 +37,10 @@ export function Profiles() {
   const formatDate = useFormatDate()
   const [params, setParams] = useSearchParams()
   const tab = params.get('tab') ?? 'applications'
-  const [q, setQ] = useState(params.get('q') ?? '')
-  const deferredQ = useDeferredValue(q)
-  const navigate = useNavigate()
+  const { q, setQ, search } = useUrlSearch()
+  const location = useLocation()
   const active = TABS.find((item) => item.value === tab) ?? TABS[0]!
-  const query = useProfiles({
-    ...active.filter,
-    ...(deferredQ.trim() ? { q: deferredQ.trim() } : {}),
-  })
+  const query = useProfiles({ ...active.filter, ...(search ? { q: search } : {}) })
 
   return (
     <>
@@ -64,10 +60,12 @@ export function Profiles() {
           </TabsList>
         </Tabs>
         <Input
+          type="search"
+          aria-label={t('profiles.search.label')}
           placeholder={t('profiles.search.placeholder')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          wrapperClassName="w-72"
+          wrapperClassName="w-full sm:w-80"
         />
       </div>
       {query.isPending ? (
@@ -86,7 +84,7 @@ export function Profiles() {
         <EmptyState
           icon={GraduationCap}
           title={t('profiles.empty.title')}
-          body={deferredQ ? t('profiles.empty.search') : t('profiles.empty.list')}
+          body={search ? t('profiles.empty.search') : t('profiles.empty.list')}
         />
       ) : (
         <Table>
@@ -103,13 +101,16 @@ export function Profiles() {
           </THead>
           <TBody>
             {query.data.items.map((p) => (
-              <TR
-                key={p.id}
-                className="cursor-pointer"
-                onClick={() => navigate(`/profiles/${p.id}`)}
-              >
+              <TR key={p.id} className="relative">
                 <TD>
-                  <p className="font-semibold text-ink">{p.displayName}</p>
+                  {/* A real link, stretched over the row: keyboard, screen readers and new tabs work. */}
+                  <Link
+                    to={`/profiles/${p.id}`}
+                    state={{ from: `${location.pathname}${location.search}` }}
+                    className="font-semibold text-ink after:absolute after:inset-0 hover:text-brand-fg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-focus"
+                  >
+                    {p.displayName}
+                  </Link>
                   {p.legalName ? (
                     <p className="text-caption text-ink-tertiary">
                       {p.legalName} · {t('company.uenValue', { uen: p.uen ?? '' })}
@@ -118,8 +119,10 @@ export function Profiles() {
                 </TD>
                 <TD className="text-ink-secondary">{t(`profileType.${p.type}`)}</TD>
                 <TD>
-                  <p className="text-ink">{p.ownerName ?? '—'}</p>
-                  <p className="text-caption text-ink-tertiary">{p.ownerEmail}</p>
+                  {p.ownerName ? <p className="text-ink">{p.ownerName}</p> : null}
+                  <p className={p.ownerName ? 'text-caption text-ink-tertiary' : 'text-ink'}>
+                    {p.ownerEmail}
+                  </p>
                 </TD>
                 <TD>
                   <Badge tone={statusTone[p.status]}>{t(`status.profile.${p.status}`)}</Badge>

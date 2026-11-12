@@ -5,6 +5,7 @@ import {
   Card,
   CardHeader,
   DescriptionList,
+  Dialog,
   EmptyState,
   formatDate,
   PageHeader,
@@ -47,12 +48,14 @@ function PersonView({ person }: { person: PersonDetail }) {
   const { hasRole, user: me } = usePortalAuth()
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const [busy, setBusy] = useState(false)
+  // Each row waits on its own; a change of staff access is confirmed first.
+  const [busy, setBusy] = useState<StaffRole | null>(null)
+  const [confirming, setConfirming] = useState<{ role: StaffRole; grant: boolean } | null>(null)
   const isSuperAdmin = hasRole('super_admin')
 
-  async function toggleRole(role: 'support_agent' | 'super_admin', grant: boolean) {
+  async function toggleRole(role: StaffRole, grant: boolean) {
     const label = grant ? 'Role granted' : 'Role revoked'
-    setBusy(true)
+    setBusy(role)
     try {
       await unwrap(
         await api.support.people[':id'].roles.$post({
@@ -63,10 +66,11 @@ function PersonView({ person }: { person: PersonDetail }) {
       await queryClient.invalidateQueries({ queryKey: supportKeys.person(person.id) })
       await queryClient.invalidateQueries({ queryKey: ['support', 'people'] })
       toast({ tone: 'success', title: label })
+      setConfirming(null)
     } catch (error) {
       toast({ tone: 'danger', title: `${label} failed`, description: errorMessage(error) })
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
@@ -159,12 +163,19 @@ function PersonView({ person }: { person: PersonDetail }) {
                       key={role}
                       className="flex items-center justify-between rounded-control border border-border px-3 py-2"
                     >
-                      <span className="text-small font-semibold text-ink">{statusLabel(role)}</span>
+                      <span>
+                        <span className="block text-small font-semibold text-ink">
+                          {statusLabel(role)}
+                        </span>
+                        <span className="block text-caption text-ink-tertiary">
+                          {has ? 'Has this role' : 'Does not have this role'}
+                        </span>
+                      </span>
                       <Button
-                        variant={has ? 'ghost' : 'secondary'}
+                        variant={has ? 'danger' : 'secondary'}
                         size="sm"
-                        loading={busy}
-                        onClick={() => toggleRole(role, !has)}
+                        loading={busy === role}
+                        onClick={() => setConfirming({ role, grant: !has })}
                       >
                         {has ? 'Revoke' : 'Grant'}
                       </Button>
@@ -176,6 +187,49 @@ function PersonView({ person }: { person: PersonDetail }) {
           ) : null}
         </div>
       </div>
+      <Dialog
+        open={!!confirming}
+        onOpenChange={(open) => !open && setConfirming(null)}
+        title={
+          confirming
+            ? `${confirming.grant ? 'Grant' : 'Revoke'} ${statusLabel(confirming.role).toLowerCase()} for ${person.name ?? person.email}?`
+            : ''
+        }
+        description={
+          confirming ? ROLE_EFFECT[confirming.role][confirming.grant ? 'grant' : 'revoke'] : ''
+        }
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirming(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant={confirming?.grant ? 'primary' : 'danger'}
+              loading={!!confirming && busy === confirming.role}
+              onClick={() => confirming && void toggleRole(confirming.role, confirming.grant)}
+            >
+              {confirming?.grant ? 'Grant' : 'Revoke'}
+            </Button>
+          </>
+        }
+      />
     </>
   )
+}
+
+type StaffRole = 'support_agent' | 'super_admin'
+
+/** What each staff role gives, said before it is granted or taken away. The change is audited. */
+const ROLE_EFFECT: Record<StaffRole, { grant: string; revoke: string }> = {
+  support_agent: {
+    grant:
+      'They can sign in to Support: review courses and profile applications, look up people and transactions, and record legal-name checks. The change is recorded in the audit log.',
+    revoke: 'They lose access to Support at once. The change is recorded in the audit log.',
+  },
+  super_admin: {
+    grant:
+      'On top of Support access, they can change commission, issue refunds, grant and revoke staff roles, recover profile owners and act inside any teaching profile. The change is recorded in the audit log.',
+    revoke:
+      'They keep any Support access they have, but lose the super-admin powers. The change is recorded in the audit log.',
+  },
 }

@@ -57,7 +57,7 @@ export const supportProfileZh = {
   'profileDetail.payout.enabled': '已启用',
   'profileDetail.payout.notEnabled': '未启用',
   'profileDetail.payout.legalName.matched': '已于 {date}核对一致',
-  'profileDetail.payout.legalName.notChecked': '尚未核对',
+  'profileDetail.payout.legalName.notChecked': '尚未核对一致，见法定名称核对',
   'profileDetail.payout.activeSince': '启用日期',
   'profileDetail.payout.firstActive': '首次启用日期',
 
@@ -80,4 +80,18 @@ export const supportProfileZh = {
   'profileDetail.reject.description': '原因会通过邮件发送给所有者。对方可以修改申请后重新提交。',
   'profileDetail.reject.reason': '原因（将发送给所有者）',
   'profileDetail.reject.done': '申请已拒绝',
+
+  'profileDetail.next.applied': '下一步：审核申请，然后批准或拒绝。',
+  'profileDetail.next.rejected': '已拒绝。所有者可以修改申请后重新提交。',
+  'profileDetail.next.noStripe': '下一步：所有者连接 Stripe。在此之前，课程无法购买。',
+  'profileDetail.next.chargesOff': '正在等待 Stripe 为该账户启用收款功能。',
+  'profileDetail.next.nameCheck': '下一步：完成下方的法定名称核对。',
+  'profileDetail.approveAnyway': '仍然批准',
+  'profileDetail.reject.reason.hint':
+    '至少 10 个字符（已输入 {count} 个）。所有者会通过邮件收到此内容。',
+  'profileDetail.commission.invalid': '请输入 0 到 50% 之间的比例。',
+  'profileDetail.commission.confirm.title': '要将佣金改为 {rate} 吗？',
+  'profileDetail.commission.confirm.description':
+    '当前为 {current}。此后的销售按新比例计算，之前的销售保持原比例。',
+  'profileDetail.commission.confirm': '修改佣金',
 } satisfies Record<keyof typeof supportProfileEn, string>

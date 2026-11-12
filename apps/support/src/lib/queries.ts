@@ -12,7 +12,7 @@ import type {
   TransactionSummary,
 } from '@elevate/core'
 import { unwrap } from '@elevate/web-ui/portal'
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { api } from './api'
 
 export type PeopleFilter = {
@@ -64,6 +64,8 @@ export const profileKeys = {
 export function useProfiles(filter: ProfilesFilter) {
   return useQuery({
     queryKey: profileKeys.list(filter),
+    // Keep the rows on screen while the next search loads, instead of flashing a skeleton.
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const query: Record<string, string> = { limit: '50' }
       if (filter.q) query.q = filter.q

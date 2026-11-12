@@ -2,7 +2,7 @@
 export const supportCompanyEn = {
   // The Company card on a corporate profile: the company's details and Support's check of them.
   // Its Legal name, UEN and Legal form rows use the shared `company.*` and `entityType.*` keys.
-  'companyCard.title': 'Company',
+  'companyCard.title': 'Company documents',
   // Where Support's check of the company stands, by check status: `.label` is the badge beside
   // the title, `.description` the line under the title
   'companyCard.check.pending.label': 'Not checked yet',
@@ -118,4 +118,14 @@ export const supportCompanyEn = {
   'nameCheck.toast.mismatch.emailed': 'The owner has been emailed your note.',
   // Title of the toast when the decision could not be recorded; the description is the error itself
   'nameCheck.toast.failed': 'Could not record the check',
+
+  // Under the mismatch note. {count} is the number of characters typed so far.
+  'nameCheck.mismatchDialog.note.hint':
+    'At least 10 characters ({count} so far). It is emailed to the owner, so say what to change in Stripe.',
+  // Beside the disabled buttons while the Stripe name has not been typed in
+  'nameCheck.needName': 'Enter the name shown in Stripe first.',
+  // The dialog for taking back a recorded match
+  'nameCheck.noLongerDialog.title': 'Record that the names no longer match?',
+  'nameCheck.noLongerDialog.description':
+    'The company stops taking payments until a new match is recorded. Your note is emailed to the owner, so say what to change in Stripe.',
 } as const

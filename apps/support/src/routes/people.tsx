@@ -17,10 +17,11 @@ import {
   THead,
   TR,
 } from '@elevate/web-ui'
+import { errorMessage } from '@elevate/web-ui/portal'
 import { Users } from 'lucide-react'
-import { useDeferredValue, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { type PeopleFilter, usePeople } from '../lib/queries'
+import { useUrlSearch } from '../lib/search'
 
 // Teachers are found through the Profiles page: teaching belongs to a profile, not to a person.
 const TABS: Array<{ value: string; label: string; filter: PeopleFilter }> = [
@@ -32,14 +33,9 @@ const TABS: Array<{ value: string; label: string; filter: PeopleFilter }> = [
 export function People() {
   const [params, setParams] = useSearchParams()
   const tab = params.get('tab') ?? 'all'
-  const [q, setQ] = useState(params.get('q') ?? '')
-  const deferredQ = useDeferredValue(q)
-  const navigate = useNavigate()
+  const { q, setQ, search } = useUrlSearch()
   const active = TABS.find((t) => t.value === tab) ?? TABS[0]!
-  const query = usePeople({
-    ...active.filter,
-    ...(deferredQ.trim() ? { q: deferredQ.trim() } : {}),
-  })
+  const query = usePeople({ ...active.filter, ...(search ? { q: search } : {}) })
 
   return (
     <>
@@ -59,10 +55,12 @@ export function People() {
           </TabsList>
         </Tabs>
         <Input
+          type="search"
+          aria-label="Search people"
           placeholder="Search name or email"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          wrapperClassName="w-72"
+          wrapperClassName="w-full sm:w-80"
         />
       </div>
       {query.isPending ? (
@@ -72,12 +70,12 @@ export function People() {
           ))}
         </div>
       ) : query.isError ? (
-        <EmptyState tone="danger" title="Could not load people" body={String(query.error)} />
+        <EmptyState tone="danger" title="Could not load people" body={errorMessage(query.error)} />
       ) : query.data.items.length === 0 ? (
         <EmptyState
           icon={Users}
           title="Nobody here"
-          body={deferredQ ? 'No one matches that search.' : 'This list is empty for now.'}
+          body={search ? 'No one matches that search.' : 'This list is empty for now.'}
         />
       ) : (
         <Table>
@@ -91,13 +89,19 @@ export function People() {
           </THead>
           <TBody>
             {query.data.items.map((p) => (
-              <TR key={p.id} className="cursor-pointer" onClick={() => navigate(`/people/${p.id}`)}>
+              <TR key={p.id} className="relative">
                 <TD>
                   <div className="flex items-center gap-3">
                     <Avatar name={p.name ?? p.email} url={p.avatarUrl} size="sm" />
                     <div>
-                      <p className="font-semibold text-ink">{p.name ?? '—'}</p>
-                      <p className="text-caption text-ink-tertiary">{p.email}</p>
+                      {/* A real link, stretched over the row. */}
+                      <Link
+                        to={`/people/${p.id}`}
+                        className="block font-semibold text-ink after:absolute after:inset-0 hover:text-brand-fg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-focus"
+                      >
+                        {p.name ?? p.email}
+                      </Link>
+                      {p.name ? <p className="text-caption text-ink-tertiary">{p.email}</p> : null}
                     </div>
                   </div>
                 </TD>
@@ -118,8 +122,17 @@ export function People() {
                   {p.profiles.length === 0 ? (
                     <span className="text-ink-tertiary">—</span>
                   ) : (
-                    <span className="text-ink-secondary">
-                      {p.profiles.map((profile) => profile.displayName).join(', ')}
+                    // Above the row's link, so each profile opens its own page.
+                    <span className="relative z-10 flex flex-wrap gap-x-2 gap-y-1">
+                      {p.profiles.map((profile) => (
+                        <Link
+                          key={profile.id}
+                          to={`/profiles/${profile.id}`}
+                          className="text-brand-fg hover:underline"
+                        >
+                          {profile.displayName}
+                        </Link>
+                      ))}
                     </span>
                   )}
                 </TD>

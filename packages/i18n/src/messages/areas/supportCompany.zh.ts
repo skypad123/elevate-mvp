@@ -4,7 +4,7 @@ import type { supportCompanyEn } from './supportCompany.en'
 // 收款功能, the 收款 row of the payout account on the same page; a company "being paid" is 收款.
 // A {date} reads like 2026年11月12日: a space before it after a Chinese character, none after it.
 export const supportCompanyZh = {
-  'companyCard.title': '公司',
+  'companyCard.title': '公司文件',
   'companyCard.check.pending.label': '尚未核对',
   'companyCard.check.pending.description':
     '批准前，请对照商业档案核对这些信息。一经批准，该公司即记录为已核实。',
@@ -74,4 +74,11 @@ export const supportCompanyZh = {
   'nameCheck.toast.mismatch': '已记录名称不一致',
   'nameCheck.toast.mismatch.emailed': '已将您的说明通过邮件发送给所有者。',
   'nameCheck.toast.failed': '无法记录核对结果',
+
+  'nameCheck.mismatchDialog.note.hint':
+    '至少 10 个字符（已输入 {count} 个）。说明会通过邮件发送给所有者，请写明需要在 Stripe 中修改的内容。',
+  'nameCheck.needName': '请先输入 Stripe 中显示的名称。',
+  'nameCheck.noLongerDialog.title': '要记录名称已不再一致吗？',
+  'nameCheck.noLongerDialog.description':
+    '在重新记录名称一致之前，该公司将无法收款。您的说明会通过邮件发送给所有者，请写明需要在 Stripe 中修改的内容。',
 } satisfies Record<keyof typeof supportCompanyEn, string>

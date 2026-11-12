@@ -36,4 +36,7 @@ export const supportProfilesEn = {
   // Badges in the Payments column: the profile can take payments, or cannot yet
   'profiles.payable.yes': 'Can be paid',
   'profiles.payable.no': 'Not yet',
+
+  // What a screen reader calls the search box
+  'profiles.search.label': 'Search profiles',
 } as const

@@ -89,7 +89,7 @@ export const supportProfileEn = {
   // The value of Legal name, on a company's account: Support recorded on {date} that the legal
   // name Stripe holds is the company's, or has not checked it yet
   'profileDetail.payout.legalName.matched': 'Matched {date}',
-  'profileDetail.payout.legalName.notChecked': 'Not checked yet',
+  'profileDetail.payout.legalName.notChecked': 'Not matched yet: see the legal-name check',
   // Label of the date the account became active: while it is active, and while it is not
   'profileDetail.payout.activeSince': 'Active since',
   'profileDetail.payout.firstActive': 'First active',
@@ -127,4 +127,24 @@ export const supportProfileEn = {
   'profileDetail.reject.reason': 'Reason (sent to the owner)',
   // Toast once the application is rejected
   'profileDetail.reject.done': 'Application rejected',
+
+  // One line under the title: what has to happen next for this profile
+  'profileDetail.next.applied': 'Next step: review the application, then approve or reject it.',
+  'profileDetail.next.rejected':
+    'Rejected. The owner can correct the application and send it again.',
+  'profileDetail.next.noStripe':
+    'Next step: the owner connects Stripe. Courses cannot be bought until then.',
+  'profileDetail.next.chargesOff': 'Waiting for Stripe to enable charges on the account.',
+  'profileDetail.next.nameCheck': 'Next step: the legal-name check below.',
+  // The approve button on a profile that was rejected earlier
+  'profileDetail.approveAnyway': 'Approve anyway',
+  // Under the rejection reason. {count} is the number of characters typed so far.
+  'profileDetail.reject.reason.hint':
+    'At least 10 characters ({count} so far). The owner receives this by email.',
+  'profileDetail.commission.invalid': 'Enter a rate from 0 to 50%.',
+  // {rate} and {current} are percentages such as 15%
+  'profileDetail.commission.confirm.title': 'Change the commission to {rate}?',
+  'profileDetail.commission.confirm.description':
+    'It is {current} now. Sales from now on use the new rate; earlier sales keep theirs.',
+  'profileDetail.commission.confirm': 'Change commission',
 } as const

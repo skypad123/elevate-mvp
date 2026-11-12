@@ -24,4 +24,6 @@ export const supportProfilesZh = {
 
   'profiles.payable.yes': '可收款',
   'profiles.payable.no': '暂不可收款',
+
+  'profiles.search.label': '搜索档案',
 } satisfies Record<keyof typeof supportProfilesEn, string>

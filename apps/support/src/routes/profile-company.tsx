@@ -11,6 +11,7 @@ import {
   CardHeader,
   DescriptionList,
   Dialog,
+  focusPageHeading,
   Input,
   MediaPreview,
   Skeleton,
@@ -109,7 +110,7 @@ export function NameCheckCard({
         : { label: t('nameCheck.state.notStarted'), tone: 'neutral' }
 
   return (
-    <Card as="section">
+    <Card as="section" id="name-check" className="scroll-mt-6">
       <CardHeader
         title={t('nameCheck.title')}
         description={t('nameCheck.description')}
@@ -141,7 +142,12 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
   const t = useT()
   const errorMessage = useErrorMessage()
   const formatDate = useFormatDate()
-  const [dialog, setDialog] = useState<'match' | 'mismatch' | null>(null)
+  const [dialog, setDialogState] = useState<'match' | 'mismatch' | null>(null)
+  // A note typed for one dialog never travels with another decision.
+  const setDialog = (next: 'match' | 'mismatch' | null) => {
+    setNote('')
+    setDialogState(next)
+  }
   const [dashboardName, setDashboardName] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -180,7 +186,7 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
             match,
             source,
             ...(source === 'dashboard' ? { stripeLegalName: dashboardName.trim() } : {}),
-            ...(note.trim() ? { note: note.trim() } : {}),
+            ...(!match && note.trim() ? { note: note.trim() } : {}),
           },
         }),
       )
@@ -197,7 +203,7 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
           : t('nameCheck.toast.mismatch.emailed'),
       })
       setDialog(null)
-      setNote('')
+      focusPageHeading()
     } catch (error) {
       toast({
         tone: 'danger',
@@ -275,7 +281,7 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
         {t('nameCheck.sentences', { first: recorded, second: effect })}
       </p>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {verified ? null : (
           <Button icon={Check} disabled={!stripeName} onClick={() => setDialog('match')}>
             {t('nameCheck.action.match')}
@@ -289,6 +295,9 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
         >
           {verified ? t('nameCheck.action.noLongerMatch') : t('nameCheck.action.mismatch')}
         </Button>
+        {stripeName ? null : (
+          <span className="text-small text-ink-tertiary">{t('nameCheck.needName')}</span>
+        )}
       </div>
 
       <Dialog
@@ -317,8 +326,12 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
       <Dialog
         open={dialog === 'mismatch'}
         onOpenChange={(open) => !open && setDialog(null)}
-        title={t('nameCheck.mismatchDialog.title')}
-        description={t('nameCheck.mismatchDialog.description')}
+        title={verified ? t('nameCheck.noLongerDialog.title') : t('nameCheck.mismatchDialog.title')}
+        description={
+          verified
+            ? t('nameCheck.noLongerDialog.description')
+            : t('nameCheck.mismatchDialog.description')
+        }
         footer={
           <>
             <Button variant="ghost" onClick={() => setDialog(null)}>
@@ -337,6 +350,7 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
       >
         <Textarea
           label={t('nameCheck.mismatchDialog.note')}
+          hint={t('nameCheck.mismatchDialog.note.hint', { count: note.trim().length })}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={4}

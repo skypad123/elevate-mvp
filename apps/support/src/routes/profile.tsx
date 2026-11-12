@@ -4,9 +4,11 @@ import {
   Button,
   Card,
   CardHeader,
+  cn,
   DescriptionList,
   Dialog,
   EmptyState,
+  focusPageHeading,
   formatBps,
   Input,
   MediaPreview,
@@ -28,7 +30,7 @@ import { useErrorMessage, useFormatDate, useT } from '@elevate/web-ui/preference
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, ExternalLink, X } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import { api } from '../lib/api'
 import { profileKeys, useProfile } from '../lib/queries'
 import { teachUrl } from '../lib/urls'
@@ -63,18 +65,34 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
   const formatDate = useFormatDate()
   const { hasRole } = usePortalAuth()
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
   const { toast } = useToast()
-  const [dialog, setDialog] = useState<'approve' | 'reject' | null>(null)
-  const [note, setNote] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [dialog, setDialog] = useState<'approve' | 'reject' | 'commission' | null>(null)
+  // Separate fields: an internal approval note must never end up in a reason emailed to the owner.
+  const [approveNote, setApproveNote] = useState('')
+  const [rejectReason, setRejectReason] = useState('')
+  const [busy, setBusy] = useState<'approve' | 'reject' | 'commission' | null>(null)
   const [commission, setCommission] = useState((profile.commissionBps / 100).toString())
+  const location = useLocation()
+  const backTo = (location.state as { from?: string } | null)?.from ?? '/profiles'
+  /** Opens a dialog, or closes them all; either way nothing typed for another one carries over. */
+  const openDialog = (next: typeof dialog) => {
+    setApproveNote('')
+    setRejectReason('')
+    setDialog(next)
+  }
+  const newBps = Math.round(Number.parseFloat(commission) * 100)
+  const commissionValid = Number.isFinite(newBps) && newBps >= 0 && newBps <= 5000
+  const commissionChanged = commissionValid && newBps !== profile.commissionBps
   const isSuperAdmin = hasRole('super_admin')
   const liveCourses = courses.filter((c) => c.status === 'live').length
 
   /** Runs one action on the profile; `done` is the title of the toast when it succeeds. */
-  async function act(done: string, fn: () => Promise<unknown>) {
-    setBusy(true)
+  async function act(
+    kind: 'approve' | 'reject' | 'commission',
+    done: string,
+    fn: () => Promise<unknown>,
+  ) {
+    setBusy(kind)
     try {
       await fn()
       // The lists show status and commission too, and a person lists their profiles' status.
@@ -82,46 +100,64 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
       await queryClient.invalidateQueries({ queryKey: ['support', 'people'] })
       await queryClient.invalidateQueries({ queryKey: ['support', 'person'] })
       toast({ tone: 'success', title: done })
-      setDialog(null)
-      setNote('')
+      openDialog(null)
+      // The buttons that opened the dialog may be gone now; keep the keyboard on the page.
+      focusPageHeading()
     } catch (error) {
       toast({ tone: 'danger', title: t('common.actionFailed'), description: errorMessage(error) })
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
   const param = { id: profile.id }
   const approve = () =>
-    act(t('profileDetail.approve.done'), async () =>
+    act('approve', t('profileDetail.approve.done'), async () =>
       unwrap(
         await api.support.profiles[':id'].approve.$post({
           param,
-          json: note.trim() ? { note: note.trim() } : {},
+          json: approveNote.trim() ? { note: approveNote.trim() } : {},
         }),
       ),
     )
   const reject = () =>
-    act(t('profileDetail.reject.done'), async () =>
+    act('reject', t('profileDetail.reject.done'), async () =>
       unwrap(
-        await api.support.profiles[':id'].reject.$post({ param, json: { reason: note.trim() } }),
+        await api.support.profiles[':id'].reject.$post({
+          param,
+          json: { reason: rejectReason.trim() },
+        }),
       ),
     )
   const saveCommission = () =>
-    act(t('profileDetail.commission.updated'), async () => {
-      const bps = Math.round(Number.parseFloat(commission) * 100)
-      return unwrap(
+    act('commission', t('profileDetail.commission.updated'), async () =>
+      unwrap(
         await api.support.profiles[':id'].commission.$patch({
           param,
-          json: { commissionBps: bps },
+          json: { commissionBps: newBps },
         }),
-      )
-    })
+      ),
+    )
+
+  // What has to happen next, in one line under the title.
+  const account = payoutAccounts[0]
+  const next =
+    profile.status === 'applied'
+      ? t('profileDetail.next.applied')
+      : profile.status === 'rejected'
+        ? t('profileDetail.next.rejected')
+        : !account
+          ? t('profileDetail.next.noStripe')
+          : legalEntity && !account.nameVerifiedAt && account.chargesEnabled
+            ? t('profileDetail.next.nameCheck')
+            : !account.chargesEnabled
+              ? t('profileDetail.next.chargesOff')
+              : null
 
   return (
     <>
       <Link
-        to="/profiles"
+        to={backTo}
         className="mb-4 inline-flex items-center gap-1 text-small text-ink-secondary hover:text-ink"
       >
         <ArrowLeft className="size-4" /> {t('profileDetail.back')}
@@ -140,42 +176,63 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
             {isSuperAdmin ? (
               // A super admin opening the profile in Teach acts as staff there: Teach says so in
               // a banner, and every change is recorded under their own name.
-              <a href={teachUrl(`/p/${profile.id}`)} target="_blank" rel="noreferrer">
-                <Button variant="secondary" icon={ExternalLink}>
+              <Button asChild variant="secondary" icon={ExternalLink}>
+                <a href={teachUrl(`/p/${profile.id}`)} target="_blank" rel="noreferrer">
                   {t('profileDetail.openInTeach')}
-                </Button>
-              </a>
+                </a>
+              </Button>
+            ) : null}
+            {/* A rejected profile can still be approved, but not rejected a second time. */}
+            {profile.status === 'applied' ? (
+              <Button variant="secondary" icon={X} onClick={() => openDialog('reject')}>
+                {t('profileDetail.reject')}
+              </Button>
             ) : null}
             {profile.status !== 'approved' ? (
-              <>
-                <Button variant="secondary" icon={X} onClick={() => setDialog('reject')}>
-                  {t('profileDetail.reject')}
-                </Button>
-                <Button icon={Check} onClick={() => setDialog('approve')}>
-                  {t('profileDetail.approve')}
-                </Button>
-              </>
+              <Button icon={Check} onClick={() => openDialog('approve')}>
+                {profile.status === 'rejected'
+                  ? t('profileDetail.approveAnyway')
+                  : t('profileDetail.approve')}
+              </Button>
             ) : null}
           </>
         }
       />
 
-      <div className="grid gap-6 md:grid-cols-4">
+      {next ? (
+        <p
+          role="status"
+          className="mb-6 rounded-card border border-warning bg-warning-tint px-4 py-3 text-small text-ink"
+        >
+          {next}
+        </p>
+      ) : null}
+      {/* Sales and earnings are zero until a profile is approved, so an application shows less. */}
+      <div
+        className={cn(
+          'grid gap-6',
+          profile.status === 'approved' ? 'md:grid-cols-4' : 'md:grid-cols-2',
+        )}
+      >
         <StatCard
           label={t('profileDetail.stat.courses')}
           value={courses.length}
           hint={t('profileDetail.stat.courses.live', { count: liveCourses })}
         />
-        <StatCard
-          label={t('profileDetail.stat.sales')}
-          value={earnings.paymentCount}
-          hint={t('profileDetail.stat.sales.hint')}
-        />
-        <StatCard
-          label={t('profileDetail.stat.netEarnings')}
-          value={formatSgd(earnings.netCents)}
-          hint={t('profileDetail.stat.netEarnings.hint')}
-        />
+        {profile.status === 'approved' ? (
+          <>
+            <StatCard
+              label={t('profileDetail.stat.sales')}
+              value={earnings.paymentCount}
+              hint={t('profileDetail.stat.sales.hint')}
+            />
+            <StatCard
+              label={t('profileDetail.stat.netEarnings')}
+              value={formatSgd(earnings.netCents)}
+              hint={t('profileDetail.stat.netEarnings.hint')}
+            />
+          </>
+        ) : null}
         <StatCard label={t('profileDetail.stat.applied')} value={formatDate(profile.appliedAt)} />
       </div>
 
@@ -263,12 +320,15 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
                 </THead>
                 <TBody>
                   {courses.map((c) => (
-                    <TR
-                      key={c.id}
-                      className="cursor-pointer"
-                      onClick={() => navigate(`/review/${c.id}`)}
-                    >
-                      <TD className="font-semibold text-ink">{c.title}</TD>
+                    <TR key={c.id} className="relative">
+                      <TD className="font-semibold text-ink">
+                        <Link
+                          to={`/review/${c.id}`}
+                          className="after:absolute after:inset-0 hover:text-brand-fg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-focus"
+                        >
+                          {c.title}
+                        </Link>
+                      </TD>
                       <TD>
                         <Badge tone={statusTone[c.status]}>{t(`status.course.${c.status}`)}</Badge>
                       </TD>
@@ -364,11 +424,15 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
                       ? [
                           {
                             label: t('company.legalName'),
-                            value: account.nameVerifiedAt
-                              ? t('profileDetail.payout.legalName.matched', {
-                                  date: formatDate(account.nameVerifiedAt),
-                                })
-                              : t('profileDetail.payout.legalName.notChecked'),
+                            value: account.nameVerifiedAt ? (
+                              t('profileDetail.payout.legalName.matched', {
+                                date: formatDate(account.nameVerifiedAt),
+                              })
+                            ) : (
+                              <a href="#name-check" className="text-brand-fg hover:underline">
+                                {t('profileDetail.payout.legalName.notChecked')}
+                              </a>
+                            ),
                           },
                         ]
                       : []),
@@ -407,9 +471,14 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
                   step={0.5}
                   value={commission}
                   onChange={(e) => setCommission(e.target.value)}
-                  wrapperClassName="w-32"
+                  error={commissionValid ? undefined : t('profileDetail.commission.invalid')}
+                  wrapperClassName="w-40"
                 />
-                <Button variant="secondary" loading={busy} onClick={saveCommission}>
+                <Button
+                  variant="secondary"
+                  disabled={!commissionChanged}
+                  onClick={() => setDialog('commission')}
+                >
                   {t('common.save')}
                 </Button>
               </div>
@@ -423,8 +492,26 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
       </div>
 
       <Dialog
-        open={dialog === 'approve'}
+        open={dialog === 'commission'}
         onOpenChange={(o) => !o && setDialog(null)}
+        title={t('profileDetail.commission.confirm.title', { rate: formatBps(newBps) })}
+        description={t('profileDetail.commission.confirm.description', {
+          current: formatBps(profile.commissionBps),
+        })}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDialog(null)}>
+              {t('common.cancel')}
+            </Button>
+            <Button loading={busy === 'commission'} onClick={saveCommission}>
+              {t('profileDetail.commission.confirm')}
+            </Button>
+          </>
+        }
+      />
+      <Dialog
+        open={dialog === 'approve'}
+        onOpenChange={(o) => !o && openDialog(null)}
         title={t('profileDetail.approve.title')}
         description={
           legalEntity
@@ -436,10 +523,10 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
         }
         footer={
           <>
-            <Button variant="ghost" onClick={() => setDialog(null)}>
+            <Button variant="ghost" onClick={() => openDialog(null)}>
               {t('common.cancel')}
             </Button>
-            <Button loading={busy} onClick={approve}>
+            <Button loading={busy === 'approve'} onClick={approve}>
               {t('profileDetail.approve')}
             </Button>
           </>
@@ -447,25 +534,25 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
       >
         <Textarea
           label={t('profileDetail.approve.note')}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
+          value={approveNote}
+          onChange={(e) => setApproveNote(e.target.value)}
           rows={3}
         />
       </Dialog>
       <Dialog
         open={dialog === 'reject'}
-        onOpenChange={(o) => !o && setDialog(null)}
+        onOpenChange={(o) => !o && openDialog(null)}
         title={t('profileDetail.reject.title')}
         description={t('profileDetail.reject.description')}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setDialog(null)}>
+            <Button variant="ghost" onClick={() => openDialog(null)}>
               {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
-              loading={busy}
-              disabled={note.trim().length < 10}
+              loading={busy === 'reject'}
+              disabled={rejectReason.trim().length < 10}
               onClick={reject}
             >
               {t('profileDetail.reject')}
@@ -475,8 +562,9 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
       >
         <Textarea
           label={t('profileDetail.reject.reason')}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
+          hint={t('profileDetail.reject.reason.hint', { count: rejectReason.trim().length })}
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
           rows={4}
           required
         />
