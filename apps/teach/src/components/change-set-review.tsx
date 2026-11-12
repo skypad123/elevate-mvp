@@ -19,8 +19,8 @@ import {
   type StatusTone,
   useToast,
 } from '@elevate/web-ui'
-import { ApiError, errorMessage } from '@elevate/web-ui/portal'
-import { useFormatDate, useFormatList, useT } from '@elevate/web-ui/preferences'
+import { ApiError } from '@elevate/web-ui/portal'
+import { useErrorMessage, useFormatDate, useFormatList, useT } from '@elevate/web-ui/preferences'
 import { Check, CheckCircle2, Trash2 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { useChangeSetActions } from '../lib/change-sets'
@@ -68,6 +68,7 @@ export function ChangeSetReview({
   const actions = useChangeSetActions(courseId)
   const { toast } = useToast()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const formatDate = useFormatDate()
   const [busy, setBusy] = useState<'approve' | 'discard' | string | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
@@ -287,7 +288,8 @@ function ItemDetail({ item, before, after }: { item: ChangeSetItem; before: Inde
       return (
         <p className="text-small text-ink-secondary">
           {now?.summary
-            ? t('changes.lesson.added.withSummary', { summary: now.summary })
+            ? // The message ends the summary's sentence itself, so drop a full stop that is already there.
+              t('changes.lesson.added.withSummary', { summary: now.summary.replace(/[.。]+$/, '') })
             : t('changes.lesson.added')}
         </p>
       )

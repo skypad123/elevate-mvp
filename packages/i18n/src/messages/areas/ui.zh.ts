@@ -1,6 +1,9 @@
 import type { uiEn } from './ui.en'
 
 export const uiZh = {
+  'ui.error.generic': '出了点问题，请重试。',
+  'ui.error.unreachable': '无法连接 Elevate API。它是否正在运行？',
+
   'ui.close': '关闭',
   'ui.dismiss': '关闭通知',
 

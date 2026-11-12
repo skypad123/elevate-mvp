@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '../lib/cn'
-import { errorMessage, type PortalApi, unwrap } from '../portal/api'
+import { type PortalApi, unwrap } from '../portal/api'
+import { useErrorMessage } from '../preferences/errors'
 import { useT } from '../preferences/PreferencesProvider'
 import { Badge, statusTone } from './Badge'
 import { Button } from './Button'
@@ -82,6 +83,7 @@ export function MediaUploader({
   className,
 }: MediaUploaderProps) {
   const t = useT()
+  const errorMessage = useErrorMessage()
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const inputRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<number | null>(null)
@@ -122,7 +124,7 @@ export function MediaUploader({
       void tick()
       pollRef.current = window.setInterval(tick, 3000)
     },
-    [api, onChange, stopPolling, t],
+    [api, onChange, stopPolling, t, errorMessage],
   )
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {

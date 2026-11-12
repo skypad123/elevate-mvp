@@ -1,5 +1,9 @@
 /** Text inside shared web-ui components (uploader, media preview, dialog, toast). */
 export const uiEn = {
+  // What a failed request says when the server sent no message of its own
+  'ui.error.generic': 'Something went wrong. Try again.',
+  'ui.error.unreachable': 'Cannot reach the Elevate API. Is it running?',
+
   // Icon buttons: the close button of a dialog, the dismiss button of a toast
   'ui.close': 'Close',
   'ui.dismiss': 'Dismiss',

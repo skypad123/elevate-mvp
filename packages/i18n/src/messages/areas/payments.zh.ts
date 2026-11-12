@@ -2,7 +2,7 @@ import type { paymentsEn } from './payments.en'
 
 export const paymentsZh = {
   'payments.title': '收款',
-  'payments.description.enabled': '学员可以向您付款。收款会按 Stripe 的结算周期转入您的银行账户。',
+  'payments.description.enabled': '学员可以向您付款。款项会按 Stripe 的结算周期转入您的银行账户。',
   'payments.description.nameCheck':
     'Stripe 账户已连接。Elevate 核对该账户的法定名称与公司一致后，学员即可购买课程。',
   'payments.description.connect': '连接 Stripe 账户后，学员即可向您付款。大约需要五分钟。',

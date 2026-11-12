@@ -23,8 +23,8 @@ import {
   TR,
   useToast,
 } from '@elevate/web-ui'
-import { errorMessage, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
-import { useFormatDate, useT } from '@elevate/web-ui/preferences'
+import { unwrap, usePortalAuth } from '@elevate/web-ui/portal'
+import { useErrorMessage, useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, ExternalLink, X } from 'lucide-react'
 import { useState } from 'react'
@@ -37,6 +37,7 @@ import { OwnerRecovery } from './profile-recovery'
 
 export function Profile() {
   const t = useT()
+  const errorMessage = useErrorMessage()
   const { id = '' } = useParams()
   const query = useProfile(id)
   if (query.isPending) return <Skeleton className="h-64 w-full" />
@@ -58,6 +59,7 @@ export function Profile() {
 function ProfileView({ detail }: { detail: SupportProfileDetail }) {
   const { profile, courses, payoutAccounts, legalEntity, earnings } = detail
   const t = useT()
+  const errorMessage = useErrorMessage()
   const formatDate = useFormatDate()
   const { hasRole } = usePortalAuth()
   const queryClient = useQueryClient()

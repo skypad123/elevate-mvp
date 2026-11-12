@@ -18,8 +18,8 @@ import {
   TR,
   useToast,
 } from '@elevate/web-ui'
-import { errorMessage, fieldErrors } from '@elevate/web-ui/portal'
-import { fillSlots, useFormatDate, useT } from '@elevate/web-ui/preferences'
+import { fieldErrors } from '@elevate/web-ui/portal'
+import { fillSlots, useErrorMessage, useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { MailPlus, Users } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { useMemberActions, useMembers } from '../lib/members'
@@ -37,6 +37,7 @@ export function MembersPage() {
   const actions = useMemberActions()
   const { toast } = useToast()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const formatDate = useFormatDate()
   const [removing, setRemoving] = useState<MemberView | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -388,6 +389,7 @@ function InviteCard({
 }) {
   const { toast } = useToast()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<MembershipRole>('writer')
   const [errors, setErrors] = useState<Record<string, string>>({})

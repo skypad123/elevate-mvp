@@ -16,14 +16,14 @@ export const teachSettingsZh = {
   'settings.teach.picture.saveFailed': '头像保存失败',
 
   'membership.yourRole': '您的角色：{role}',
-  'membership.leave': '退出此教学档案',
-  'membership.leave.title': '要退出 {name} 吗？',
+  'membership.leave': '离开此教学档案',
+  'membership.leave.title': '要离开 {name} 吗？',
   'membership.leave.description':
     '您将立即失去对此教学档案及其课程的访问权限。您撰写的内容会保留在档案中。如需重新加入，需要获得新的邀请。',
   'membership.leave.stay': '留下',
-  'membership.leave.confirm': '退出',
-  'membership.leave.done': '您已退出 {name}',
-  'membership.leave.failed': '退出失败',
+  'membership.leave.confirm': '离开',
+  'membership.leave.done': '您已离开 {name}',
+  'membership.leave.failed': '离开失败',
 
   'account.signedInAs': '登录账户',
   'account.owner': '所有者',

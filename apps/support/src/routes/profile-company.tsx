@@ -18,8 +18,8 @@ import {
   Textarea,
   useToast,
 } from '@elevate/web-ui'
-import { errorMessage, unwrap } from '@elevate/web-ui/portal'
-import { useFormatDate, useT } from '@elevate/web-ui/preferences'
+import { unwrap } from '@elevate/web-ui/portal'
+import { useErrorMessage, useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, ExternalLink, X } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
@@ -95,6 +95,7 @@ export function NameCheckCard({
   account: SupportPayoutAccount | undefined
 }) {
   const t = useT()
+  const errorMessage = useErrorMessage()
   const started = !!account?.stripeAccountId
   const query = useNameCheck(profileId, started)
   const verified = !!account?.nameVerifiedAt
@@ -138,6 +139,7 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const formatDate = useFormatDate()
   const [dialog, setDialog] = useState<'match' | 'mismatch' | null>(null)
   const [dashboardName, setDashboardName] = useState('')

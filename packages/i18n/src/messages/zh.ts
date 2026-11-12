@@ -12,6 +12,10 @@
  * - live 已上线 · draft 草稿 · changes 更改 · clash 冲突 · approve 批准 · reject 拒绝 · discard 放弃
  * - application 申请 · review 审核 · payout account 收款账户 · earnings 收入 · commission 佣金
  * - legal name 法定名称 · legal-name check 法定名称核对 · sign in 登录 · sign out 退出登录
+ * - business profile (the ACRA document a company uploads) 商业档案 · Stripe onboarding 开通
+ * - on a Stripe account: charges 收款 · payouts 提现. Elsewhere "payouts" is the teacher's
+ *   money matters as a whole, 收款; money on its way to the bank is 款项.
+ * - leave a profile 离开 (never 退出, which is half of "sign out")
  * - Elevate, Teach, Support, Stripe and UEN stay as they are.
  *
  * Style: address the reader as 您; a half-width space between Chinese and Latin letters or

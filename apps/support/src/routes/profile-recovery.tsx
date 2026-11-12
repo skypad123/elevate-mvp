@@ -5,8 +5,8 @@ import type {
   SupportProfileDetail,
 } from '@elevate/core'
 import { Badge, Button, Dialog, Input, MediaUploader, useToast } from '@elevate/web-ui'
-import { errorMessage, unwrap } from '@elevate/web-ui/portal'
-import { fillSlots, useT } from '@elevate/web-ui/preferences'
+import { unwrap } from '@elevate/web-ui/portal'
+import { fillSlots, useErrorMessage, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { KeyRound } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
@@ -50,6 +50,7 @@ function useRecover(profileId: string, onDone: () => void) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const [busy, setBusy] = useState(false)
 
   /** `done` is the title of the toast shown when the recovery has gone through. */
@@ -144,6 +145,7 @@ function CompanyRecovery({
   onClose: () => void
 }) {
   const t = useT()
+  const errorMessage = useErrorMessage()
   const { profile, legalEntity } = detail
   const previous = profile.owner
   const [q, setQ] = useState('')

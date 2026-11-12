@@ -13,8 +13,8 @@ import {
   Textarea,
   useToast,
 } from '@elevate/web-ui'
-import { errorMessage, fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
-import { PreferencesCard, useFormatDate, useT } from '@elevate/web-ui/preferences'
+import { fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
+import { PreferencesCard, useErrorMessage, useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -32,6 +32,7 @@ function MembershipCard() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   if (role !== 'manager' && role !== 'writer') return null
@@ -89,6 +90,7 @@ export function SettingsPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const formatDate = useFormatDate()
   const [form, setForm] = useState({ displayName: '', headline: '', bio: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})

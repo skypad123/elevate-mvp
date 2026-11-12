@@ -1,6 +1,6 @@
 import { useToast } from '@elevate/web-ui'
-import { errorMessage, FullPageSpinner, unwrap } from '@elevate/web-ui/portal'
-import { useT } from '@elevate/web-ui/preferences'
+import { FullPageSpinner, unwrap } from '@elevate/web-ui/portal'
+import { useErrorMessage, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
@@ -16,6 +16,7 @@ export function StripeReturn() {
   const { profileId, path } = useCurrentProfile()
   const { toast } = useToast()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const ran = useRef(false)
   useEffect(() => {
     if (ran.current) return
@@ -57,7 +58,7 @@ export function StripeReturn() {
         navigate(path(), { replace: true })
       }
     })()
-  }, [navigate, queryClient, profileId, path, toast, t])
+  }, [navigate, queryClient, profileId, path, toast, t, errorMessage])
   return <FullPageSpinner label={t('payments.return.checking')} />
 }
 

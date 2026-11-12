@@ -1,7 +1,13 @@
 import type { InvitationAccepted } from '@elevate/core'
 import { Badge, Button, Card, EmptyState, Logo, Skeleton } from '@elevate/web-ui'
-import { errorMessage, usePortalAuth } from '@elevate/web-ui/portal'
-import { fillSlots, PreferencesButton, useFormatDate, useT } from '@elevate/web-ui/preferences'
+import { usePortalAuth } from '@elevate/web-ui/portal'
+import {
+  fillSlots,
+  PreferencesButton,
+  useErrorMessage,
+  useFormatDate,
+  useT,
+} from '@elevate/web-ui/preferences'
 import { MailCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -19,6 +25,7 @@ export function InvitationPage() {
   const { status: session, user, refreshUser, signOut } = usePortalAuth()
   const navigate = useNavigate()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const formatDate = useFormatDate()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)

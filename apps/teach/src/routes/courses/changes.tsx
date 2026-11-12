@@ -1,6 +1,6 @@
 import { Button, EmptyState, PageHeader, Skeleton } from '@elevate/web-ui'
-import { errorMessage } from '@elevate/web-ui/portal'
-import { useT } from '@elevate/web-ui/preferences'
+
+import { useErrorMessage, useT } from '@elevate/web-ui/preferences'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ChangeSetReview } from '../../components/change-set-review'
@@ -18,6 +18,7 @@ export function CourseChangesPage() {
   const { path } = useCurrentProfile()
   const navigate = useNavigate()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const builder = path(`/courses/${id}`)
   const changeSet = useChangeSet(id)
   const live = useCourseTree(id, 'live')

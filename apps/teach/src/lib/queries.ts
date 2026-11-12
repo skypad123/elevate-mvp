@@ -5,8 +5,8 @@ import type {
   StripeStatusView,
 } from '@elevate/core'
 import { useToast } from '@elevate/web-ui'
-import { ApiError, errorMessage, unwrap } from '@elevate/web-ui/portal'
-import { useT } from '@elevate/web-ui/preferences'
+import { ApiError, unwrap } from '@elevate/web-ui/portal'
+import { useErrorMessage, useT } from '@elevate/web-ui/preferences'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -74,6 +74,7 @@ export function useStripeLinks() {
   const location = useLocation()
   const { toast } = useToast()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const [busy, setBusy] = useState(false)
 
   /** `reauth`: the user is on their way to sign in again and will come back to this page. */
@@ -100,7 +101,7 @@ export function useStripeLinks() {
         setBusy(false)
       }
     },
-    [navigate, location.pathname, location.search, toast, t],
+    [navigate, location.pathname, location.search, toast, t, errorMessage],
   )
 
   const connect = useCallback(

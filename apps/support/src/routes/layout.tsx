@@ -25,8 +25,10 @@ export function SupportLayout() {
           <EmptyState
             icon={ShieldAlert}
             tone="danger"
-            title="Staff only"
-            body={`${user?.email ?? 'This account'} does not have Support access.`}
+            title={t('staffOnly.title')}
+            body={
+              user?.email ? t('staffOnly.body', { email: user.email }) : t('staffOnly.body.noEmail')
+            }
             action={
               <Button variant="secondary" onClick={signOut}>
                 {t('nav.signOut')}

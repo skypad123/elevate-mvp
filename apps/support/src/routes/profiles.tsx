@@ -16,8 +16,8 @@ import {
   THead,
   TR,
 } from '@elevate/web-ui'
-import { errorMessage } from '@elevate/web-ui/portal'
-import { type MessageKey, useFormatDate, useT } from '@elevate/web-ui/preferences'
+
+import { type MessageKey, useErrorMessage, useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { GraduationCap } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
@@ -33,6 +33,7 @@ const TABS: Array<{ value: string; labelKey: MessageKey; filter: ProfilesFilter 
 /** Teaching profiles: applications waiting for review, and the profiles that teach. */
 export function Profiles() {
   const t = useT()
+  const errorMessage = useErrorMessage()
   const formatDate = useFormatDate()
   const [params, setParams] = useSearchParams()
   const tab = params.get('tab') ?? 'applications'

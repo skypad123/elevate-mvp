@@ -3,7 +3,8 @@ import MuxPlayer from '@mux/mux-player-react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, FileText } from 'lucide-react'
 import { cn } from '../lib/cn'
-import { errorMessage, type PortalApi, unwrap } from '../portal/api'
+import { type PortalApi, unwrap } from '../portal/api'
+import { useErrorMessage } from '../preferences/errors'
 import { useT } from '../preferences/PreferencesProvider'
 import { Skeleton } from './Skeleton'
 
@@ -18,6 +19,7 @@ export function MediaPreview({
   className?: string
 }) {
   const t = useT()
+  const errorMessage = useErrorMessage()
   const query = useQuery({
     queryKey: ['media', 'playback', assetId],
     queryFn: async () =>

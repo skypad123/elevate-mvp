@@ -20,8 +20,8 @@ import {
   Textarea,
   useToast,
 } from '@elevate/web-ui'
-import { errorMessage, fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
-import { fillSlots, useT } from '@elevate/web-ui/preferences'
+import { fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
+import { fillSlots, useErrorMessage, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
@@ -78,6 +78,7 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const t = useT()
+  const errorMessage = useErrorMessage()
   const entity = existing?.legalEntity ?? null
   const [form, setForm] = useState<Fields>({
     uen: entity?.uen ?? '',
@@ -324,6 +325,7 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
             loading={busy}
             disabled={uenLooksWrong}
             iconRight={ArrowRight}
+            className="shrink-0"
           >
             {t(isResubmission ? 'companyApply.submit.reapply' : 'companyApply.submit.apply')}
           </Button>
