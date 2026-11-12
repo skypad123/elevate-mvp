@@ -194,7 +194,14 @@ describe('course builder', () => {
     // fix: summary, description, price, thumbnail, content for lesson B, stripe enabled
     const upload = await t.api('POST', '/api/media/uploads', {
       token: teacher,
-      body: { kind: 'image', filename: 'cover.png', mimeType: 'image/png', sizeBytes: 10 },
+      // course media is uploaded to the profile, as the builder does
+      body: {
+        kind: 'image',
+        filename: 'cover.png',
+        mimeType: 'image/png',
+        sizeBytes: 10,
+        profileId,
+      },
     })
     const row = await t.db.query.mediaAssets.findFirst({
       where: { id: upload.body.asset.id },

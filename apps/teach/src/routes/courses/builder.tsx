@@ -1,6 +1,7 @@
 import { COURSE_CATEGORIES } from '@elevate/core'
 import {
   Badge,
+  Button,
   EmptyState,
   formatDate,
   PageHeader,
@@ -13,7 +14,7 @@ import {
   TabsTrigger,
 } from '@elevate/web-ui'
 import { errorMessage } from '@elevate/web-ui/portal'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, GitPullRequestArrow } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { CurriculumEditor } from '../../components/curriculum-editor'
 import { DetailsForm } from '../../components/details-form'
@@ -28,7 +29,7 @@ const TABS: Tab[] = ['curriculum', 'map', 'details', 'review']
 
 export function CourseBuilder() {
   const { id = '' } = useParams()
-  const { path } = useCurrentProfile()
+  const { path, can } = useCurrentProfile()
   const course = useCourse(id)
   const [params, setParams] = useSearchParams()
   const tab = (TABS.find((t) => t === params.get('tab')) ?? 'curriculum') as Tab
@@ -41,6 +42,12 @@ export function CourseBuilder() {
     )
   const c = course.data
   const locked = c.status === 'pending_review'
+  const live = c.status === 'live'
+  // On a live course, content edits by someone who cannot edit it directly wait in a change set,
+  // and the course's own details are not theirs to change at all.
+  const editsLive = can('course.editLive')
+  const proposes = live && !editsLive && can('course.proposeLiveEdit')
+  const changesPath = path(`/courses/${c.id}/changes`)
 
   return (
     <SaveTrackerProvider>
@@ -74,10 +81,58 @@ export function CourseBuilder() {
           <strong className="font-semibold">Changes requested:</strong> {c.rejectionReason}
         </div>
       ) : null}
-      {c.status === 'live' ? (
+      {live && editsLive ? (
         <div className="mb-6 rounded-card border border-success bg-success-tint px-4 py-3 text-small text-ink">
           <strong className="font-semibold">Live.</strong> Edits publish immediately to enrolled
           learners.
+        </div>
+      ) : null}
+      {proposes ? (
+        <div
+          role="status"
+          className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-card border border-warning bg-warning-tint px-4 py-3 text-small text-ink"
+        >
+          {c.viewing === 'draft' ? (
+            <span>
+              <strong className="font-semibold">Changes waiting for approval.</strong> You are
+              editing a copy of this live course. Learners see the course as it was until the owner
+              or a manager approves your changes.
+            </span>
+          ) : (
+            <span>
+              <strong className="font-semibold">This course is live.</strong> Your edits to lessons
+              and content are saved as changes for the owner or a manager to approve. Learners do
+              not see them until then.
+            </span>
+          )}
+          {c.viewing === 'draft' ? (
+            <Link to={changesPath}>
+              <Button variant="secondary" size="sm" icon={GitPullRequestArrow}>
+                See what is waiting
+              </Button>
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+      {live && editsLive && c.changeSet ? (
+        <div
+          role="status"
+          className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-card border border-warning bg-warning-tint px-4 py-3 text-small text-ink"
+        >
+          <span>
+            <strong className="font-semibold">
+              {c.changeSet.openedBy ?? 'A writer'} has changes waiting for approval.
+            </strong>{' '}
+            Learners do not see them yet. What you edit here changes the live course, and can clash
+            with those changes.
+          </span>
+          {can('changeSet.review') ? (
+            <Link to={changesPath}>
+              <Button variant="secondary" size="sm" icon={GitPullRequestArrow}>
+                Review changes
+              </Button>
+            </Link>
+          ) : null}
         </div>
       ) : null}
       <Tabs value={tab} onValueChange={setTab}>
@@ -103,7 +158,13 @@ export function CourseBuilder() {
           <PrerequisitesEditor course={c} locked={locked} />
         </TabsContent>
         <TabsContent value="details">
-          <DetailsForm key={c.updatedAt} course={c} locked={locked} />
+          {proposes ? (
+            <p className="mb-4 text-small text-ink-secondary">
+              The title, description, cover image and price of a live course are for the owner or a
+              manager to change.
+            </p>
+          ) : null}
+          <DetailsForm key={c.updatedAt} course={c} locked={locked || proposes} />
         </TabsContent>
         <TabsContent value="review">
           <ReviewPanel course={c} onGoTo={setTab} />

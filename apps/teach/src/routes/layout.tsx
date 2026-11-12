@@ -1,6 +1,6 @@
 import { Avatar, Button, NativeSelect, PortalShell } from '@elevate/web-ui'
 import { usePortalAuth } from '@elevate/web-ui/portal'
-import { BookOpen, LayoutDashboard, LogOut, Settings, Wallet } from 'lucide-react'
+import { BookOpen, LayoutDashboard, LogOut, Settings, Users, Wallet } from 'lucide-react'
 import { Outlet, useNavigate } from 'react-router'
 import { useCurrentProfile } from '../lib/profile'
 import { profilePath } from '../lib/urls'
@@ -35,7 +35,7 @@ function ProfileSwitcher() {
 
 export function TeachLayout() {
   const { user, signOut } = usePortalAuth()
-  const { path, displayName, actingAsStaff, profile } = useCurrentProfile()
+  const { path, displayName, actingAsStaff, profile, can } = useCurrentProfile()
   return (
     <PortalShell
       portal="Teach"
@@ -43,7 +43,11 @@ export function TeachLayout() {
       items={[
         { to: path(), label: 'Dashboard', icon: LayoutDashboard, end: true },
         { to: path('/courses'), label: 'Courses', icon: BookOpen },
-        { to: path('/earnings'), label: 'Earnings', icon: Wallet },
+        // A writer has no earnings or members page: the API would refuse both.
+        ...(can('earnings.read')
+          ? [{ to: path('/earnings'), label: 'Earnings', icon: Wallet }]
+          : []),
+        ...(can('members.read') ? [{ to: path('/members'), label: 'Members', icon: Users }] : []),
         { to: path('/settings'), label: 'Settings', icon: Settings },
       ]}
       footer={

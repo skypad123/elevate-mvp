@@ -18,7 +18,7 @@ import { profileAvatarUrl } from './profiles.service'
 type CourseWithCard = typeof s.courses.$inferSelect & {
   thumbnail: typeof s.mediaAssets.$inferSelect | null
   profile: Pick<typeof s.profiles.$inferSelect, 'displayName'>
-  lessons: Array<{ id: string }>
+  liveLessons: Array<{ id: string }>
 }
 
 /** Who is looking: only used to show unpublished courses to the people who may preview them. */
@@ -31,6 +31,10 @@ const decodeOffset = (cursor?: string) => {
   return Number.isInteger(n) && n >= 0 ? n : 0
 }
 
+/**
+ * The public catalogue. Course content is read through `learnerDb`, which sees only live rows:
+ * a writer's pending edits to a live course are not part of what a learner is shown or sold.
+ */
 export class CatalogService {
   private readonly media: MediaService
   constructor(private readonly deps: Deps) {
@@ -48,7 +52,7 @@ export class CatalogService {
       thumbnailUrl: await this.media.publicUrl(course.thumbnail),
       teacherName: course.profile.displayName,
       enrolCount: course.enrolCount,
-      lessonCount: course.lessons.length,
+      lessonCount: course.liveLessons.length,
       publishedAt: course.publishedAt?.toISOString() ?? null,
     }
   }
@@ -68,7 +72,7 @@ export class CatalogService {
   }
 
   async list(query: CatalogQuery): Promise<Page<CourseCard>> {
-    const { db } = this.deps
+    const { learnerDb: db } = this.deps
     const like = query.q ? `%${query.q.replace(/[%_]/g, '\\$&')}%` : null
     const offset = decodeOffset(query.cursor)
     const rows = await db.query.courses.findMany({
@@ -101,7 +105,7 @@ export class CatalogService {
       with: {
         thumbnail: true,
         profile: true,
-        lessons: { columns: { id: true } },
+        liveLessons: { columns: { id: true } },
       },
       orderBy:
         query.sort === 'popular'
@@ -119,17 +123,17 @@ export class CatalogService {
   }
 
   async detail(slug: string, viewer: Viewer | null): Promise<CoursePublicView> {
-    const { db } = this.deps
-    const course = await db.query.courses.findFirst({
+    const { db, learnerDb } = this.deps
+    const course = await learnerDb.query.courses.findFirst({
       where: { slug },
       with: {
         thumbnail: true,
         profile: { with: { owner: true, avatar: true } },
-        lessons: {
+        liveLessons: {
           orderBy: { position: 'asc' },
           with: {
-            prerequisites: true,
-            artefacts: {
+            livePrerequisites: true,
+            liveArtefacts: {
               orderBy: { position: 'asc' },
               with: { media: { columns: { durationSeconds: true } } },
             },
@@ -152,13 +156,13 @@ export class CatalogService {
           (await loadActor(this.deps, viewer, course.profileId)) !== null)
       if (!allowed) throw errors.notFound('Course')
     }
-    const lessons = course.lessons.map((l) => ({
+    const lessons = course.liveLessons.map((l) => ({
       id: l.id,
       title: l.title,
       summary: l.summary,
       position: l.position,
-      prerequisiteIds: l.prerequisites.map((p) => p.prerequisiteLessonId),
-      artefacts: l.artefacts.map((a) => ({
+      prerequisiteIds: l.livePrerequisites.map((p) => p.prerequisiteLessonId),
+      artefacts: l.liveArtefacts.map((a) => ({
         id: a.id,
         type: a.type,
         title: a.title,

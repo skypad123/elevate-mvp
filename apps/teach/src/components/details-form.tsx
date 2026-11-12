@@ -156,7 +156,7 @@ export function DetailsForm({ course, locked }: { course: CourseView; locked: bo
             inputMode="decimal"
             value={price}
             disabled={locked || !canSetPrice}
-            hint={canSetPrice ? undefined : 'Only the profile’s owner can change the price.'}
+            hint={canSetPrice ? undefined : 'Only the owner or a manager can change the price.'}
             error={priceCents === null ? 'Enter a valid amount' : undefined}
             onChange={(e) => {
               setPrice(e.target.value)

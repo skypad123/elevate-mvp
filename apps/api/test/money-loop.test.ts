@@ -163,7 +163,14 @@ describe('money loop', () => {
 
     const upload = await t.api('POST', '/api/media/uploads', {
       token: teacher,
-      body: { kind: 'image', filename: 'cover.png', mimeType: 'image/png', sizeBytes: 10 },
+      // course media is uploaded to the profile, as the builder does
+      body: {
+        kind: 'image',
+        filename: 'cover.png',
+        mimeType: 'image/png',
+        sizeBytes: 10,
+        profileId,
+      },
     })
     const asset = await t.db.query.mediaAssets.findFirst({
       where: { id: upload.body.asset.id },

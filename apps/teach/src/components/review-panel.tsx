@@ -167,7 +167,7 @@ export function ReviewPanel({
             </Button>
           ) : (
             <p className="text-small text-ink-secondary">
-              Submitting a course for review is for the profile’s owner.
+              Submitting a course for review is for the owner or a manager.
             </p>
           )}
         </Card>

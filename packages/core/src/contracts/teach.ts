@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { courseCategorySchema } from '../domain/categories'
 import { quizDefinitionSchema } from '../domain/quiz'
 import { richTextDocSchema } from '../domain/richtext'
-import { uuidSchema } from './common'
+import { emailSchema, uuidSchema } from './common'
 
 /** The application for a personal profile: one person teaching under their own name. */
 export const personalApplicationSchema = z
@@ -34,6 +34,9 @@ export const updateCourseSchema = z.object({
   thumbnailMediaId: uuidSchema.nullable().optional(),
 })
 export type UpdateCourse = z.infer<typeof updateCourseSchema>
+
+/** `GET courses/:id`: `draft=1` asks for the rows of the course's open change set. */
+export const courseViewQuerySchema = z.object({ draft: z.literal('1').optional() })
 
 /** Price has its own route, so a role can edit a course's details without being able to price it. */
 export const setPriceSchema = z.object({ priceCents: z.number().int().min(0).max(1_000_000) })
@@ -72,6 +75,69 @@ export const updateProfileSchema = z.object({
   avatarMediaId: uuidSchema.nullable().optional(),
 })
 export type UpdateProfile = z.infer<typeof updateProfileSchema>
+
+// ── Members and invitations ──────────────────────────────────────────────────
+
+/** The roles a member can hold. The owner is not a member and has no row here. */
+export const membershipRoleSchema = z.enum(['manager', 'writer'])
+export type MembershipRole = z.infer<typeof membershipRoleSchema>
+
+export const inviteSchema = z.object({ email: emailSchema, role: membershipRoleSchema })
+export type Invite = z.infer<typeof inviteSchema>
+
+export const changeRoleSchema = z.object({ role: membershipRoleSchema })
+
+export type MemberView = {
+  userId: string
+  name: string | null
+  email: string
+  role: MembershipRole
+  addedAt: string
+  /** The name or email of whoever added them; null when that account no longer exists. */
+  addedBy: string | null
+}
+
+export type InvitationStatus =
+  | 'pending'
+  | 'awaiting_confirmation'
+  | 'accepted'
+  | 'revoked'
+  | 'expired'
+
+export type InvitationView = {
+  id: string
+  email: string
+  role: MembershipRole
+  status: InvitationStatus
+  /** The name or email of whoever sent it. */
+  invitedBy: string | null
+  /** Set once the link was used: the address that used it, which can differ from `email`. */
+  acceptedByEmail: string | null
+  expiresAt: string
+  createdAt: string
+}
+
+/** `GET members`: managers and writers, and the invitations still waiting on someone. */
+export type MembersView = { members: MemberView[]; invitations: InvitationView[] }
+
+/** What the invitation page shows before the invitee signs in. */
+export type InvitationPreview = {
+  profileName: string
+  profileType: ProfileType
+  role: MembershipRole
+  invitedByName: string | null
+  expiresAt: string
+  status: InvitationStatus
+}
+
+/** The result of using an invitation link. */
+export type InvitationAccepted = {
+  profileId: string
+  profileName: string
+  role: MembershipRole
+  /** `awaiting_confirmation`: a manager invitation used from another address waits for the owner. */
+  status: 'accepted' | 'awaiting_confirmation'
+}
 
 export type PayoutAccountStatus = 'onboarding' | 'active'
 
@@ -127,6 +193,8 @@ export type ArtefactType = 'video' | 'audio' | 'text' | 'quiz'
 
 export type ArtefactView = {
   id: string
+  /** In a draft tree: the live artefact this one was copied from; null for a new one. */
+  sourceId: string | null
   lessonId: string
   type: ArtefactType
   title: string
@@ -139,6 +207,8 @@ export type ArtefactView = {
 
 export type LessonView = {
   id: string
+  /** In a draft tree: the live lesson this one was copied from; null for a new one. */
+  sourceId: string | null
   courseId: string
   title: string
   summary: string | null
@@ -161,6 +231,13 @@ export type CourseView = {
   thumbnail: MediaAssetView | null
   /** `payable`: the profile has an active payout account that can take charges. */
   profile: { id: string; displayName: string; ownerEmail: string; payable: boolean }
+  /**
+   * Which tree `lessons` is: the live rows, or the rows of the open change set (asked for with
+   * `?draft=1`). A draft tree has its own IDs; each item's `sourceId` is its live counterpart.
+   */
+  viewing: 'live' | 'draft'
+  /** The course's open change set, if a writer has edits waiting for approval. */
+  changeSet: { id: string; openedBy: string | null; openedAt: string } | null
   lessons: LessonView[]
   checklist: SubmissionCheck
   enrolCount: number
@@ -185,9 +262,88 @@ export type CourseSummary = {
   profileId: string
   profileName: string
   ownerEmail: string
+  /** A writer's edits to this live course are waiting for approval. */
+  pendingChanges: boolean
   submittedAt: string | null
   updatedAt: string
 }
+
+// ── Change sets: a writer's edits to a live course ───────────────────────────
+
+/** A prerequisite link between two lessons, as stored when a change set is opened. */
+export type PrerequisiteLink = { lessonId: string; prerequisiteId: string }
+
+export type ChangeSetStatus = 'open' | 'approved' | 'discarded'
+
+/**
+ * One thing the change set would change. The IDs are those of the lesson or artefact in the live
+ * tree and in the draft tree, so a screen can show the two versions:
+ * - `prerequisites` is a lesson whose prerequisite list changed; its IDs are the lesson's;
+ * - `quiz` is an artefact whose quiz changed; its IDs are the artefact's.
+ */
+export type ChangeSetItem = {
+  kind: 'lesson' | 'artefact' | 'quiz' | 'prerequisites'
+  liveId: string | null
+  draftId: string | null
+  change: 'added' | 'edited' | 'removed'
+  title: string
+}
+
+export const changeSetConflictKindSchema = z.enum(['edited', 'deleted', 'prerequisites'])
+export type ChangeSetConflictKind = z.infer<typeof changeSetConflictKindSchema>
+
+/**
+ * A live row that changed after the change set was opened, so the two versions cannot both apply.
+ *
+ * - `edited`: the live row was edited. `id` is the draft's ID.
+ * - `deleted`: the live row was deleted. `id` is the draft's ID; `droppedChildren` is how many new
+ *   items under it are lost if the deletion stands.
+ * - `prerequisites`: the live lesson's prerequisite list changed. `id` is the live lesson's ID and
+ *   `item` is null.
+ *
+ * `id` is what a choice refers to. `liveId` and `draftId` are for showing the two versions: the
+ * lesson's or artefact's ID in each tree (for a quiz, its artefact's).
+ *
+ * `seen` identifies the live state this conflict describes. A choice carries it back, so a choice
+ * made against an older state is not applied to a newer one.
+ */
+export type ChangeSetConflict = {
+  kind: ChangeSetConflictKind
+  item: 'lesson' | 'artefact' | 'quiz' | null
+  id: string
+  liveId: string | null
+  draftId: string | null
+  droppedChildren: number
+  title: string
+  seen: string
+  /** The approver's stored choice for this state of the conflict, if they have made one. */
+  resolution: 'live' | 'draft' | null
+}
+
+export type ChangeSetView = {
+  id: string
+  status: ChangeSetStatus
+  openedBy: { id: string; name: string | null; email: string } | null
+  openedAt: string
+  items: ChangeSetItem[]
+  conflicts: ChangeSetConflict[]
+}
+
+export const changeSetChoiceSchema = z.object({
+  kind: changeSetConflictKindSchema,
+  id: uuidSchema,
+  keep: z.enum(['live', 'draft']),
+  seen: z.string().min(1).max(4000),
+})
+export type ChangeSetChoice = z.infer<typeof changeSetChoiceSchema>
+
+export const resolveChangeSetSchema = z.object({
+  choices: z.array(changeSetChoiceSchema).min(1).max(500),
+})
+export type ResolveChangeSet = z.infer<typeof resolveChangeSetSchema>
+
+/** The body of `409 change_set_conflict`, under `error.details`. */
+export type ChangeSetConflictDetails = { conflicts: ChangeSetConflict[] }
 
 // ── Earnings ───────────────────────────────────────────────────────────────
 export type MoneyBreakdown = {

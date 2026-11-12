@@ -2,7 +2,7 @@
   "type": "base",
   "version": "9",
   "dialect": "postgres",
-  "id": "7cb43129-d0ed-447f-ae95-b444cd559d88",
+  "id": "43ed5669-a999-485b-b224-c2853d1d214a",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -36,6 +36,23 @@
         "n|enum|public.audience",
         "e|enum|public.audience",
         "n|type|public.audience"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "change_set_status"
+      ],
+      "writes": [
+        "s|enum|public.change_set_status",
+        "n|enum|public.change_set_status",
+        "e|enum|public.change_set_status",
+        "n|type|public.change_set_status"
       ],
       "reads": [
         "n|sch|public"
@@ -114,6 +131,23 @@
       "statementTarget": [
         "enum",
         "public",
+        "invitation_status"
+      ],
+      "writes": [
+        "s|enum|public.invitation_status",
+        "n|enum|public.invitation_status",
+        "e|enum|public.invitation_status",
+        "n|type|public.invitation_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
         "media_kind"
       ],
       "writes": [
@@ -155,6 +189,23 @@
         "n|enum|public.media_status",
         "e|enum|public.media_status",
         "n|type|public.media_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "membership_role"
+      ],
+      "writes": [
+        "s|enum|public.membership_role",
+        "n|enum|public.membership_role",
+        "e|enum|public.membership_role",
+        "n|type|public.membership_role"
       ],
       "reads": [
         "n|sch|public"
@@ -527,6 +578,26 @@
       "statementTarget": [
         "table",
         "public",
+        "course_change_sets"
+      ],
+      "writes": [
+        "s|tbl|public.course_change_sets",
+        "n|tbl|public.course_change_sets",
+        "e|tbl|public.course_change_sets",
+        "n|rel|public.course_change_sets",
+        "n|type|public.course_change_sets",
+        "n|rel|public.course_change_sets_pkey"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.change_set_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
         "courses"
       ],
       "writes": [
@@ -704,6 +775,48 @@
         "n|sch|public",
         "n|enum|public.stripe_business_type",
         "n|enum|public.payout_account_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "profile_invitations"
+      ],
+      "writes": [
+        "s|tbl|public.profile_invitations",
+        "n|tbl|public.profile_invitations",
+        "e|tbl|public.profile_invitations",
+        "n|rel|public.profile_invitations",
+        "n|type|public.profile_invitations",
+        "n|rel|public.profile_invitations_pkey",
+        "n|rel|public.profile_invitations_token_hash_key"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.membership_role",
+        "n|enum|public.invitation_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "profile_memberships"
+      ],
+      "writes": [
+        "s|tbl|public.profile_memberships",
+        "n|tbl|public.profile_memberships",
+        "e|tbl|public.profile_memberships",
+        "n|rel|public.profile_memberships",
+        "n|type|public.profile_memberships",
+        "n|rel|public.profile_memberships_pkey"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.membership_role"
       ]
     },
     {
@@ -1058,6 +1171,86 @@
       "statementTarget": [
         "index",
         "public",
+        "artefacts",
+        "artefacts_change_set_id_index"
+      ],
+      "writes": [
+        "s|idx|public.artefacts_change_set_id_index",
+        "n|idx|public.artefacts_change_set_id_index",
+        "e|idx|public.artefacts_change_set_id_index",
+        "n|rel|public.artefacts_change_set_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.artefacts",
+        "n|sch|public",
+        "n|col|public.artefacts.change_set_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "artefacts",
+        "artefacts_source_id_index"
+      ],
+      "writes": [
+        "s|idx|public.artefacts_source_id_index",
+        "n|idx|public.artefacts_source_id_index",
+        "e|idx|public.artefacts_source_id_index",
+        "n|rel|public.artefacts_source_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.artefacts",
+        "n|sch|public",
+        "n|col|public.artefacts.source_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "course_change_sets",
+        "course_change_sets_one_open_per_course"
+      ],
+      "writes": [
+        "s|idx|public.course_change_sets_one_open_per_course",
+        "n|idx|public.course_change_sets_one_open_per_course",
+        "e|idx|public.course_change_sets_one_open_per_course",
+        "n|rel|public.course_change_sets_one_open_per_course"
+      ],
+      "reads": [
+        "n|tbl|public.course_change_sets",
+        "n|sch|public",
+        "n|col|public.course_change_sets.course_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "course_change_sets",
+        "course_change_sets_course_id_index"
+      ],
+      "writes": [
+        "s|idx|public.course_change_sets_course_id_index",
+        "n|idx|public.course_change_sets_course_id_index",
+        "e|idx|public.course_change_sets_course_id_index",
+        "n|rel|public.course_change_sets_course_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.course_change_sets",
+        "n|sch|public",
+        "n|col|public.course_change_sets.course_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
         "courses",
         "courses_profile_id_index"
       ],
@@ -1120,6 +1313,26 @@
       "statementTarget": [
         "index",
         "public",
+        "lesson_prerequisites",
+        "lesson_prerequisites_change_set_id_index"
+      ],
+      "writes": [
+        "s|idx|public.lesson_prerequisites_change_set_id_index",
+        "n|idx|public.lesson_prerequisites_change_set_id_index",
+        "e|idx|public.lesson_prerequisites_change_set_id_index",
+        "n|rel|public.lesson_prerequisites_change_set_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.lesson_prerequisites",
+        "n|sch|public",
+        "n|col|public.lesson_prerequisites.change_set_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
         "lessons",
         "lessons_course_id_position_index"
       ],
@@ -1134,6 +1347,86 @@
         "n|sch|public",
         "n|col|public.lessons.course_id",
         "n|col|public.lessons.position"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "lessons",
+        "lessons_change_set_id_index"
+      ],
+      "writes": [
+        "s|idx|public.lessons_change_set_id_index",
+        "n|idx|public.lessons_change_set_id_index",
+        "e|idx|public.lessons_change_set_id_index",
+        "n|rel|public.lessons_change_set_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.lessons",
+        "n|sch|public",
+        "n|col|public.lessons.change_set_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "lessons",
+        "lessons_source_id_index"
+      ],
+      "writes": [
+        "s|idx|public.lessons_source_id_index",
+        "n|idx|public.lessons_source_id_index",
+        "e|idx|public.lessons_source_id_index",
+        "n|rel|public.lessons_source_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.lessons",
+        "n|sch|public",
+        "n|col|public.lessons.source_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "quizzes",
+        "quizzes_change_set_id_index"
+      ],
+      "writes": [
+        "s|idx|public.quizzes_change_set_id_index",
+        "n|idx|public.quizzes_change_set_id_index",
+        "e|idx|public.quizzes_change_set_id_index",
+        "n|rel|public.quizzes_change_set_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.quizzes",
+        "n|sch|public",
+        "n|col|public.quizzes.change_set_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "quizzes",
+        "quizzes_source_id_index"
+      ],
+      "writes": [
+        "s|idx|public.quizzes_source_id_index",
+        "n|idx|public.quizzes_source_id_index",
+        "e|idx|public.quizzes_source_id_index",
+        "n|rel|public.quizzes_source_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.quizzes",
+        "n|sch|public",
+        "n|col|public.quizzes.source_id"
       ]
     },
     {
@@ -1256,6 +1549,68 @@
         "n|tbl|public.media_assets",
         "n|sch|public",
         "n|col|public.media_assets.provider_asset_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "profile_invitations",
+        "profile_invitations_one_pending_per_email"
+      ],
+      "writes": [
+        "s|idx|public.profile_invitations_one_pending_per_email",
+        "n|idx|public.profile_invitations_one_pending_per_email",
+        "e|idx|public.profile_invitations_one_pending_per_email",
+        "n|rel|public.profile_invitations_one_pending_per_email"
+      ],
+      "reads": [
+        "n|tbl|public.profile_invitations",
+        "n|sch|public",
+        "n|col|public.profile_invitations.profile_id",
+        "n|col|public.profile_invitations.email"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "profile_invitations",
+        "profile_invitations_profile_id_created_at_index"
+      ],
+      "writes": [
+        "s|idx|public.profile_invitations_profile_id_created_at_index",
+        "n|idx|public.profile_invitations_profile_id_created_at_index",
+        "e|idx|public.profile_invitations_profile_id_created_at_index",
+        "n|rel|public.profile_invitations_profile_id_created_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.profile_invitations",
+        "n|sch|public",
+        "n|col|public.profile_invitations.profile_id",
+        "n|col|public.profile_invitations.created_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "profile_memberships",
+        "profile_memberships_user_id_index"
+      ],
+      "writes": [
+        "s|idx|public.profile_memberships_user_id_index",
+        "n|idx|public.profile_memberships_user_id_index",
+        "e|idx|public.profile_memberships_user_id_index",
+        "n|rel|public.profile_memberships_user_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.profile_memberships",
+        "n|sch|public",
+        "n|col|public.profile_memberships.user_id"
       ]
     },
     {
@@ -1822,6 +2177,121 @@
       "statementTarget": [
         "table",
         "public",
+        "artefacts"
+      ],
+      "writes": [
+        "s|fk|public.artefacts.artefacts_change_set_id_course_change_sets_id_fkey",
+        "n|fk|public.artefacts.artefacts_change_set_id_course_change_sets_id_fkey",
+        "e|fk|public.artefacts.artefacts_change_set_id_course_change_sets_id_fkey",
+        "n|con|public.artefacts.artefacts_change_set_id_course_change_sets_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.artefacts",
+        "n|sch|public",
+        "n|tbl|public.course_change_sets",
+        "n|sch|public",
+        "n|col|public.artefacts.change_set_id",
+        "n|col|public.course_change_sets.id",
+        "e|uniqueness|public.course_change_sets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "artefacts"
+      ],
+      "writes": [
+        "s|fk|public.artefacts.artefacts_source_id_artefacts_id_fkey",
+        "n|fk|public.artefacts.artefacts_source_id_artefacts_id_fkey",
+        "e|fk|public.artefacts.artefacts_source_id_artefacts_id_fkey",
+        "n|con|public.artefacts.artefacts_source_id_artefacts_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.artefacts",
+        "n|sch|public",
+        "n|tbl|public.artefacts",
+        "n|sch|public",
+        "n|col|public.artefacts.source_id",
+        "n|col|public.artefacts.id",
+        "e|uniqueness|public.artefacts.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "course_change_sets"
+      ],
+      "writes": [
+        "s|fk|public.course_change_sets.course_change_sets_course_id_courses_id_fkey",
+        "n|fk|public.course_change_sets.course_change_sets_course_id_courses_id_fkey",
+        "e|fk|public.course_change_sets.course_change_sets_course_id_courses_id_fkey",
+        "n|con|public.course_change_sets.course_change_sets_course_id_courses_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.course_change_sets",
+        "n|sch|public",
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|col|public.course_change_sets.course_id",
+        "n|col|public.courses.id",
+        "e|uniqueness|public.courses.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "course_change_sets"
+      ],
+      "writes": [
+        "s|fk|public.course_change_sets.course_change_sets_opened_by_users_id_fkey",
+        "n|fk|public.course_change_sets.course_change_sets_opened_by_users_id_fkey",
+        "e|fk|public.course_change_sets.course_change_sets_opened_by_users_id_fkey",
+        "n|con|public.course_change_sets.course_change_sets_opened_by_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.course_change_sets",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.course_change_sets.opened_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "course_change_sets"
+      ],
+      "writes": [
+        "s|fk|public.course_change_sets.course_change_sets_decided_by_users_id_fkey",
+        "n|fk|public.course_change_sets.course_change_sets_decided_by_users_id_fkey",
+        "e|fk|public.course_change_sets.course_change_sets_decided_by_users_id_fkey",
+        "n|con|public.course_change_sets.course_change_sets_decided_by_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.course_change_sets",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.course_change_sets.decided_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
         "courses"
       ],
       "writes": [
@@ -1937,6 +2407,29 @@
       "statementTarget": [
         "table",
         "public",
+        "lesson_prerequisites"
+      ],
+      "writes": [
+        "s|fk|public.lesson_prerequisites.lesson_prerequisites_change_set_id_course_change_sets_id_fkey",
+        "n|fk|public.lesson_prerequisites.lesson_prerequisites_change_set_id_course_change_sets_id_fkey",
+        "e|fk|public.lesson_prerequisites.lesson_prerequisites_change_set_id_course_change_sets_id_fkey",
+        "n|con|public.lesson_prerequisites.lesson_prerequisites_change_set_id_course_change_sets_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.lesson_prerequisites",
+        "n|sch|public",
+        "n|tbl|public.course_change_sets",
+        "n|sch|public",
+        "n|col|public.lesson_prerequisites.change_set_id",
+        "n|col|public.course_change_sets.id",
+        "e|uniqueness|public.course_change_sets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
         "lessons"
       ],
       "writes": [
@@ -1960,6 +2453,52 @@
       "statementTarget": [
         "table",
         "public",
+        "lessons"
+      ],
+      "writes": [
+        "s|fk|public.lessons.lessons_change_set_id_course_change_sets_id_fkey",
+        "n|fk|public.lessons.lessons_change_set_id_course_change_sets_id_fkey",
+        "e|fk|public.lessons.lessons_change_set_id_course_change_sets_id_fkey",
+        "n|con|public.lessons.lessons_change_set_id_course_change_sets_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.lessons",
+        "n|sch|public",
+        "n|tbl|public.course_change_sets",
+        "n|sch|public",
+        "n|col|public.lessons.change_set_id",
+        "n|col|public.course_change_sets.id",
+        "e|uniqueness|public.course_change_sets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "lessons"
+      ],
+      "writes": [
+        "s|fk|public.lessons.lessons_source_id_lessons_id_fkey",
+        "n|fk|public.lessons.lessons_source_id_lessons_id_fkey",
+        "e|fk|public.lessons.lessons_source_id_lessons_id_fkey",
+        "n|con|public.lessons.lessons_source_id_lessons_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.lessons",
+        "n|sch|public",
+        "n|tbl|public.lessons",
+        "n|sch|public",
+        "n|col|public.lessons.source_id",
+        "n|col|public.lessons.id",
+        "e|uniqueness|public.lessons.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
         "quizzes"
       ],
       "writes": [
@@ -1976,6 +2515,52 @@
         "n|col|public.quizzes.artefact_id",
         "n|col|public.artefacts.id",
         "e|uniqueness|public.artefacts.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "quizzes"
+      ],
+      "writes": [
+        "s|fk|public.quizzes.quizzes_change_set_id_course_change_sets_id_fkey",
+        "n|fk|public.quizzes.quizzes_change_set_id_course_change_sets_id_fkey",
+        "e|fk|public.quizzes.quizzes_change_set_id_course_change_sets_id_fkey",
+        "n|con|public.quizzes.quizzes_change_set_id_course_change_sets_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.quizzes",
+        "n|sch|public",
+        "n|tbl|public.course_change_sets",
+        "n|sch|public",
+        "n|col|public.quizzes.change_set_id",
+        "n|col|public.course_change_sets.id",
+        "e|uniqueness|public.course_change_sets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "quizzes"
+      ],
+      "writes": [
+        "s|fk|public.quizzes.quizzes_source_id_quizzes_id_fkey",
+        "n|fk|public.quizzes.quizzes_source_id_quizzes_id_fkey",
+        "e|fk|public.quizzes.quizzes_source_id_quizzes_id_fkey",
+        "n|con|public.quizzes.quizzes_source_id_quizzes_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.quizzes",
+        "n|sch|public",
+        "n|tbl|public.quizzes",
+        "n|sch|public",
+        "n|col|public.quizzes.source_id",
+        "n|col|public.quizzes.id",
+        "e|uniqueness|public.quizzes.id"
       ]
     },
     {
@@ -2190,6 +2775,144 @@
       "statementTarget": [
         "table",
         "public",
+        "profile_invitations"
+      ],
+      "writes": [
+        "s|fk|public.profile_invitations.profile_invitations_profile_id_profiles_id_fkey",
+        "n|fk|public.profile_invitations.profile_invitations_profile_id_profiles_id_fkey",
+        "e|fk|public.profile_invitations.profile_invitations_profile_id_profiles_id_fkey",
+        "n|con|public.profile_invitations.profile_invitations_profile_id_profiles_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profile_invitations",
+        "n|sch|public",
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|col|public.profile_invitations.profile_id",
+        "n|col|public.profiles.id",
+        "e|uniqueness|public.profiles.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "profile_invitations"
+      ],
+      "writes": [
+        "s|fk|public.profile_invitations.profile_invitations_invited_by_users_id_fkey",
+        "n|fk|public.profile_invitations.profile_invitations_invited_by_users_id_fkey",
+        "e|fk|public.profile_invitations.profile_invitations_invited_by_users_id_fkey",
+        "n|con|public.profile_invitations.profile_invitations_invited_by_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profile_invitations",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.profile_invitations.invited_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "profile_invitations"
+      ],
+      "writes": [
+        "s|fk|public.profile_invitations.profile_invitations_accepted_by_users_id_fkey",
+        "n|fk|public.profile_invitations.profile_invitations_accepted_by_users_id_fkey",
+        "e|fk|public.profile_invitations.profile_invitations_accepted_by_users_id_fkey",
+        "n|con|public.profile_invitations.profile_invitations_accepted_by_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profile_invitations",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.profile_invitations.accepted_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "profile_memberships"
+      ],
+      "writes": [
+        "s|fk|public.profile_memberships.profile_memberships_profile_id_profiles_id_fkey",
+        "n|fk|public.profile_memberships.profile_memberships_profile_id_profiles_id_fkey",
+        "e|fk|public.profile_memberships.profile_memberships_profile_id_profiles_id_fkey",
+        "n|con|public.profile_memberships.profile_memberships_profile_id_profiles_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profile_memberships",
+        "n|sch|public",
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|col|public.profile_memberships.profile_id",
+        "n|col|public.profiles.id",
+        "e|uniqueness|public.profiles.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "profile_memberships"
+      ],
+      "writes": [
+        "s|fk|public.profile_memberships.profile_memberships_user_id_users_id_fkey",
+        "n|fk|public.profile_memberships.profile_memberships_user_id_users_id_fkey",
+        "e|fk|public.profile_memberships.profile_memberships_user_id_users_id_fkey",
+        "n|con|public.profile_memberships.profile_memberships_user_id_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profile_memberships",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.profile_memberships.user_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "profile_memberships"
+      ],
+      "writes": [
+        "s|fk|public.profile_memberships.profile_memberships_added_by_users_id_fkey",
+        "n|fk|public.profile_memberships.profile_memberships_added_by_users_id_fkey",
+        "e|fk|public.profile_memberships.profile_memberships_added_by_users_id_fkey",
+        "n|con|public.profile_memberships.profile_memberships_added_by_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profile_memberships",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.profile_memberships.added_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
         "profiles"
       ],
       "writes": [
@@ -2345,6 +3068,78 @@
         "n|col|public.profiles.id",
         "e|uniqueness|public.profiles.id"
       ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "public",
+        "live_artefacts"
+      ],
+      "writes": [
+        "s|view|public.live_artefacts",
+        "n|view|public.live_artefacts",
+        "e|view|public.live_artefacts",
+        "n|rel|public.live_artefacts",
+        "n|type|public.live_artefacts"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "public",
+        "live_lesson_prerequisites"
+      ],
+      "writes": [
+        "s|view|public.live_lesson_prerequisites",
+        "n|view|public.live_lesson_prerequisites",
+        "e|view|public.live_lesson_prerequisites",
+        "n|rel|public.live_lesson_prerequisites",
+        "n|type|public.live_lesson_prerequisites"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "public",
+        "live_lessons"
+      ],
+      "writes": [
+        "s|view|public.live_lessons",
+        "n|view|public.live_lessons",
+        "e|view|public.live_lessons",
+        "n|rel|public.live_lessons",
+        "n|type|public.live_lessons"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "public",
+        "live_quizzes"
+      ],
+      "writes": [
+        "s|view|public.live_quizzes",
+        "n|view|public.live_quizzes",
+        "e|view|public.live_quizzes",
+        "n|rel|public.live_quizzes",
+        "n|type|public.live_quizzes"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
     }
   ],
   "ddl": [
@@ -2410,6 +3205,12 @@
     },
     {
       "schema": "public",
+      "name": "course_change_sets",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
       "name": "courses",
       "isRlsEnabled": false,
       "entityType": "tables"
@@ -2464,6 +3265,18 @@
     },
     {
       "schema": "public",
+      "name": "profile_invitations",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "profile_memberships",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
       "name": "profiles",
       "isRlsEnabled": false,
       "entityType": "tables"
@@ -2509,6 +3322,16 @@
     },
     {
       "schema": "public",
+      "name": "change_set_status",
+      "values": [
+        "open",
+        "approved",
+        "discarded"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
       "name": "course_status",
       "values": [
         "draft",
@@ -2549,6 +3372,18 @@
     },
     {
       "schema": "public",
+      "name": "invitation_status",
+      "values": [
+        "pending",
+        "awaiting_confirmation",
+        "accepted",
+        "revoked",
+        "expired"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
       "name": "media_kind",
       "values": [
         "video",
@@ -2576,6 +3411,15 @@
         "processing",
         "ready",
         "errored"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "membership_role",
+      "values": [
+        "manager",
+        "writer"
       ],
       "entityType": "enums"
     },
@@ -3966,6 +4810,58 @@
     {
       "schema": "public",
       "table": "artefacts",
+      "name": "change_set_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "source_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "removed",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "copied_from_live",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
       "name": "created_at",
       "type": "timestamp with time zone",
       "typeSchema": null,
@@ -3985,6 +4881,136 @@
       "notNull": true,
       "dimensions": 0,
       "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "course_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "opened_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "status",
+      "type": "change_set_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'open'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "opened_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "opened_at_snapshot",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "opened_prerequisites",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "resolutions",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "decided_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "decided_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
       "generated": null,
       "identity": null,
       "entityType": "columns"
@@ -4290,6 +5316,19 @@
     },
     {
       "schema": "public",
+      "table": "lesson_prerequisites",
+      "name": "change_set_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
       "table": "lessons",
       "name": "id",
       "type": "uuid",
@@ -4349,6 +5388,58 @@
       "notNull": true,
       "dimensions": 0,
       "default": "0",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "change_set_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "source_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "removed",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "copied_from_live",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
       "generated": null,
       "identity": null,
       "entityType": "columns"
@@ -4453,6 +5544,58 @@
       "notNull": true,
       "dimensions": 0,
       "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "change_set_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "source_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "removed",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "copied_from_live",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
       "generated": null,
       "identity": null,
       "entityType": "columns"
@@ -5202,6 +6345,201 @@
       "schema": "public",
       "table": "payout_accounts",
       "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "profile_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "email",
+      "type": "citext",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "role",
+      "type": "membership_role",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "invited_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "token_hash",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "status",
+      "type": "invitation_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "accepted_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "expires_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_memberships",
+      "name": "profile_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_memberships",
+      "name": "user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_memberships",
+      "name": "role",
+      "type": "membership_role",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_memberships",
+      "name": "added_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profile_memberships",
+      "name": "created_at",
       "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": true,
@@ -6029,6 +7367,90 @@
     },
     {
       "schema": "public",
+      "table": "artefacts",
+      "name": "artefacts_change_set_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "change_set_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "artefacts_source_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "source_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "course_change_sets_one_open_per_course",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"status\" = 'open'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "course_change_sets_course_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
       "table": "courses",
       "name": "courses_profile_id_index",
       "nameExplicit": false,
@@ -6106,6 +7528,27 @@
     },
     {
       "schema": "public",
+      "table": "lesson_prerequisites",
+      "name": "lesson_prerequisites_change_set_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "change_set_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
       "table": "lessons",
       "name": "lessons_course_id_position_index",
       "nameExplicit": false,
@@ -6119,6 +7562,90 @@
         },
         {
           "value": "position",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "lessons_change_set_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "change_set_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "lessons_source_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "source_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "quizzes_change_set_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "change_set_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "quizzes_source_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "source_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -6259,6 +7786,83 @@
       "columns": [
         {
           "value": "provider_asset_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "profile_invitations_one_pending_per_email",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "profile_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "email",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"status\" = 'pending'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "profile_invitations_profile_id_created_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "profile_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "profile_memberships",
+      "name": "profile_memberships_user_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "user_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -6737,6 +8341,91 @@
     },
     {
       "schema": "public",
+      "table": "artefacts",
+      "name": "artefacts_change_set_id_course_change_sets_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "change_set_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "course_change_sets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "artefacts_source_id_artefacts_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "source_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "artefacts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "course_change_sets_course_id_courses_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "course_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "course_change_sets_opened_by_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "opened_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "course_change_sets_decided_by_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "decided_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
       "table": "courses",
       "name": "courses_profile_id_profiles_id_fkey",
       "nameExplicit": false,
@@ -6822,6 +8511,23 @@
     },
     {
       "schema": "public",
+      "table": "lesson_prerequisites",
+      "name": "lesson_prerequisites_change_set_id_course_change_sets_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "change_set_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "course_change_sets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
       "table": "lessons",
       "name": "lessons_course_id_courses_id_fkey",
       "nameExplicit": false,
@@ -6839,6 +8545,40 @@
     },
     {
       "schema": "public",
+      "table": "lessons",
+      "name": "lessons_change_set_id_course_change_sets_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "change_set_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "course_change_sets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "lessons",
+      "name": "lessons_source_id_lessons_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "source_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "lessons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
       "table": "quizzes",
       "name": "quizzes_artefact_id_artefacts_id_fkey",
       "nameExplicit": false,
@@ -6852,6 +8592,40 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "quizzes_change_set_id_course_change_sets_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "change_set_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "course_change_sets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "quizzes_source_id_quizzes_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "source_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "quizzes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
       "entityType": "fks"
     },
     {
@@ -6997,6 +8771,108 @@
       "nameExplicit": false,
       "columns": [
         "name_verified_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "profile_invitations_profile_id_profiles_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "profile_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "profiles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "profile_invitations_invited_by_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "invited_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "profile_invitations_accepted_by_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "accepted_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profile_memberships",
+      "name": "profile_memberships_profile_id_profiles_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "profile_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "profiles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profile_memberships",
+      "name": "profile_memberships_user_id_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profile_memberships",
+      "name": "profile_memberships_added_by_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "added_by"
       ],
       "schemaTo": "public",
       "tableTo": "users",
@@ -7161,6 +9037,17 @@
     },
     {
       "schema": "public",
+      "table": "profile_memberships",
+      "name": "profile_memberships_pkey",
+      "columns": [
+        "profile_id",
+        "user_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
       "table": "webhook_events",
       "name": "webhook_events_pkey",
       "columns": [
@@ -7262,6 +9149,16 @@
     },
     {
       "schema": "public",
+      "table": "course_change_sets",
+      "name": "course_change_sets_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
       "table": "courses",
       "name": "courses_pkey",
       "columns": [
@@ -7324,6 +9221,16 @@
       "schema": "public",
       "table": "payout_accounts",
       "name": "payout_accounts_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "profile_invitations",
+      "name": "profile_invitations_pkey",
       "columns": [
         "id"
       ],
@@ -7540,6 +9447,17 @@
     },
     {
       "schema": "public",
+      "table": "profile_invitations",
+      "name": "profile_invitations_token_hash_key",
+      "nameExplicit": false,
+      "columns": [
+        "token_hash"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
       "table": "profiles",
       "name": "profiles_legal_entity_id_key",
       "nameExplicit": false,
@@ -7548,6 +9466,13 @@
       ],
       "nullsNotDistinct": false,
       "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "artefacts",
+      "name": "artefacts_live_row_is_clean",
+      "value": "\"change_set_id\" is not null or (\"source_id\" is null and not \"removed\" and not \"copied_from_live\")",
+      "entityType": "checks"
     },
     {
       "schema": "public",
@@ -7565,10 +9490,68 @@
     },
     {
       "schema": "public",
+      "table": "lessons",
+      "name": "lessons_live_row_is_clean",
+      "value": "\"change_set_id\" is not null or (\"source_id\" is null and not \"removed\" and not \"copied_from_live\")",
+      "entityType": "checks"
+    },
+    {
+      "schema": "public",
+      "table": "quizzes",
+      "name": "quizzes_live_row_is_clean",
+      "value": "\"change_set_id\" is not null or (\"source_id\" is null and not \"removed\" and not \"copied_from_live\")",
+      "entityType": "checks"
+    },
+    {
+      "schema": "public",
       "table": "profiles",
       "name": "profiles_commission_bps_range",
       "value": "\"commission_bps\" between 0 and 10000",
       "entityType": "checks"
+    },
+    {
+      "schema": "public",
+      "name": "live_artefacts",
+      "definition": "select \"id\", \"lesson_id\", \"type\", \"title\", \"position\", \"media_asset_id\", \"content_json\", \"duration_seconds\", \"change_set_id\", \"source_id\", \"removed\", \"copied_from_live\", \"created_at\", \"updated_at\" from \"artefacts\" where (\"artefacts\".\"change_set_id\" is null)",
+      "with": null,
+      "withNoData": null,
+      "using": null,
+      "tablespace": null,
+      "materialized": false,
+      "entityType": "views"
+    },
+    {
+      "schema": "public",
+      "name": "live_lesson_prerequisites",
+      "definition": "select \"lesson_id\", \"prerequisite_lesson_id\", \"change_set_id\" from \"lesson_prerequisites\" where (\"lesson_prerequisites\".\"change_set_id\" is null)",
+      "with": null,
+      "withNoData": null,
+      "using": null,
+      "tablespace": null,
+      "materialized": false,
+      "entityType": "views"
+    },
+    {
+      "schema": "public",
+      "name": "live_lessons",
+      "definition": "select \"id\", \"course_id\", \"title\", \"summary\", \"position\", \"change_set_id\", \"source_id\", \"removed\", \"copied_from_live\", \"created_at\", \"updated_at\" from \"lessons\" where (\"lessons\".\"change_set_id\" is null)",
+      "with": null,
+      "withNoData": null,
+      "using": null,
+      "tablespace": null,
+      "materialized": false,
+      "entityType": "views"
+    },
+    {
+      "schema": "public",
+      "name": "live_quizzes",
+      "definition": "select \"id\", \"artefact_id\", \"pass_mark_percent\", \"max_attempts\", \"time_limit_minutes\", \"questions_json\", \"change_set_id\", \"source_id\", \"removed\", \"copied_from_live\", \"created_at\", \"updated_at\" from \"quizzes\" where (\"quizzes\".\"change_set_id\" is null)",
+      "with": null,
+      "withNoData": null,
+      "using": null,
+      "tablespace": null,
+      "materialized": false,
+      "entityType": "views"
     }
   ]
 }

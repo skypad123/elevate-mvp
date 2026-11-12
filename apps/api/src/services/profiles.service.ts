@@ -232,8 +232,13 @@ export class ProfilesService {
     if (patch.headline !== undefined) values.headline = patch.headline
     if (patch.bio !== undefined) values.bio = patch.bio
     if (patch.avatarMediaId !== undefined) {
-      if (patch.avatarMediaId)
-        await this.media.getOwnedReadyAsset(user, patch.avatarMediaId, 'image')
+      // The picture is the profile's own file, like its course media.
+      if (patch.avatarMediaId) {
+        await this.media.getProfileAsset(profile.id, patch.avatarMediaId, {
+          ready: true,
+          kind: 'image',
+        })
+      }
       values.avatarMediaId = patch.avatarMediaId
     }
     if (Object.keys(values).length > 0)

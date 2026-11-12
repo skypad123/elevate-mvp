@@ -5,14 +5,17 @@ import {
   check,
   index,
   integer,
+  primaryKey,
   snakeCase,
   text,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
 import { users } from './auth'
-import { createdAt, id, ts, updatedAt } from './columns'
+import { citext, createdAt, id, ts, updatedAt } from './columns'
 import {
+  invitationStatusEnum,
+  membershipRoleEnum,
   payoutAccountStatusEnum,
   profileStatusEnum,
   profileTypeEnum,
@@ -89,3 +92,54 @@ export const payoutAccounts = snakeCase.table('payout_accounts', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })
+
+/**
+ * Managers and writers of a profile. The owner is not here: it is `profiles.owner_user_id`.
+ * Managers exist only on corporate profiles; that rule spans two tables, so the membership
+ * service enforces it, not a column check.
+ */
+export const profileMemberships = snakeCase.table(
+  'profile_memberships',
+  {
+    profileId: uuid()
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: membershipRoleEnum().notNull(),
+    addedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.profileId, t.userId] }), index().on(t.userId)],
+)
+
+/**
+ * One row per invitation email sent. A resend marks the old row `revoked` and adds a new one, so
+ * the rows of the last 24 hours are the count that the sending limit uses.
+ */
+export const profileInvitations = snakeCase.table(
+  'profile_invitations',
+  {
+    id: id(),
+    profileId: uuid()
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    email: citext().notNull(),
+    role: membershipRoleEnum().notNull(),
+    invitedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    /** Keyed hash of the token in the emailed link; the token itself is never stored. */
+    tokenHash: text().notNull().unique(),
+    status: invitationStatusEnum().notNull().default('pending'),
+    /** Who used the link. For a manager invitation this can be a different address. */
+    acceptedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: ts().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('profile_invitations_one_pending_per_email')
+      .on(t.profileId, t.email)
+      .where(sql`${t.status} = 'pending'`),
+    index().on(t.profileId, t.createdAt),
+  ],
+)

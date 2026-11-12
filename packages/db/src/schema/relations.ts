@@ -1,10 +1,17 @@
 import { defineRelations } from 'drizzle-orm'
 import { identities, magicLinks, sessions, userRoles, users } from './auth'
 import { enrollments, payments, promoCodes, refunds } from './commerce'
-import { artefacts, courses, lessonPrerequisites, lessons, quizzes } from './courses'
+import {
+  artefacts,
+  courseChangeSets,
+  courses,
+  lessonPrerequisites,
+  lessons,
+  quizzes,
+} from './courses'
 import { artefactProgress, certificates, quizAttempts } from './learning'
 import { mediaAssets } from './media'
-import { payoutAccounts, profiles } from './profiles'
+import { payoutAccounts, profileInvitations, profileMemberships, profiles } from './profiles'
 import { analyticsEvents, auditLog, webhookEvents } from './system'
 
 /**
@@ -19,8 +26,11 @@ const tables = {
   userRoles,
   profiles,
   payoutAccounts,
+  profileMemberships,
+  profileInvitations,
   mediaAssets,
   courses,
+  courseChangeSets,
   lessons,
   lessonPrerequisites,
   artefacts,
@@ -48,6 +58,11 @@ export const relations = defineRelations(tables, (r) => ({
     sessions: r.many.sessions({ from: r.users.id, to: r.sessions.userId }),
     roles: r.many.userRoles({ from: r.users.id, to: r.userRoles.userId }),
     ownedProfiles: r.many.profiles({ from: r.users.id, to: r.profiles.ownerUserId }),
+    /** The profiles this user is a manager or writer of. */
+    memberships: r.many.profileMemberships({
+      from: r.users.id,
+      to: r.profileMemberships.userId,
+    }),
     enrollments: r.many.enrollments({ from: r.users.id, to: r.enrollments.userId }),
   },
   identities: {
@@ -69,6 +84,32 @@ export const relations = defineRelations(tables, (r) => ({
       from: r.profiles.teachingSampleMediaId,
       to: r.mediaAssets.id,
     }),
+    memberships: r.many.profileMemberships({
+      from: r.profiles.id,
+      to: r.profileMemberships.profileId,
+    }),
+    invitations: r.many.profileInvitations({
+      from: r.profiles.id,
+      to: r.profileInvitations.profileId,
+    }),
+  },
+  profileMemberships: {
+    profile: r.one.profiles({
+      from: r.profileMemberships.profileId,
+      to: r.profiles.id,
+      optional: false,
+    }),
+    user: r.one.users({ from: r.profileMemberships.userId, to: r.users.id, optional: false }),
+    adder: r.one.users({ from: r.profileMemberships.addedBy, to: r.users.id }),
+  },
+  profileInvitations: {
+    profile: r.one.profiles({
+      from: r.profileInvitations.profileId,
+      to: r.profiles.id,
+      optional: false,
+    }),
+    inviter: r.one.users({ from: r.profileInvitations.invitedBy, to: r.users.id }),
+    accepter: r.one.users({ from: r.profileInvitations.acceptedBy, to: r.users.id }),
   },
   payoutAccounts: {
     profile: r.one.profiles({
@@ -84,9 +125,19 @@ export const relations = defineRelations(tables, (r) => ({
   courses: {
     profile: r.one.profiles({ from: r.courses.profileId, to: r.profiles.id, optional: false }),
     thumbnail: r.one.mediaAssets({ from: r.courses.thumbnailMediaId, to: r.mediaAssets.id }),
+    /** Live and draft rows alike: filter on `changeSetId` to pick one. */
     lessons: r.many.lessons({ from: r.courses.id, to: r.lessons.courseId }),
+    changeSets: r.many.courseChangeSets({ from: r.courses.id, to: r.courseChangeSets.courseId }),
     enrollments: r.many.enrollments({ from: r.courses.id, to: r.enrollments.courseId }),
     payments: r.many.payments({ from: r.courses.id, to: r.payments.courseId }),
+  },
+  courseChangeSets: {
+    course: r.one.courses({
+      from: r.courseChangeSets.courseId,
+      to: r.courses.id,
+      optional: false,
+    }),
+    opener: r.one.users({ from: r.courseChangeSets.openedBy, to: r.users.id }),
   },
   lessons: {
     course: r.one.courses({ from: r.lessons.courseId, to: r.courses.id, optional: false }),

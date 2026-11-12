@@ -88,9 +88,11 @@ export function Dashboard() {
   const { user } = usePortalAuth()
   const { displayName, path, can } = useCurrentProfile()
   const courses = useCourses()
-  const earnings = useEarnings(can('earnings.read'))
+  const seesMoney = can('earnings.read')
+  const earnings = useEarnings(seesMoney)
   const list = courses.data ?? []
   const live = list.filter((c) => c.status === 'live').length
+  const waiting = list.filter((c) => c.pendingChanges).length
   return (
     <>
       <PageHeader eyebrow="Dashboard" title={`Welcome, ${displayName}`} description={user?.email} />
@@ -100,19 +102,29 @@ export function Dashboard() {
           value={courses.isPending ? '—' : String(live)}
           hint="Approved and on sale"
         />
-        <StatCard
-          label="Sales"
-          value={earnings.data ? String(earnings.data.totals.paymentCount) : '—'}
-          hint="Paid enrolments across your courses"
-        />
-        <Link to={path('/earnings')} className="block">
+        {seesMoney ? (
+          <>
+            <StatCard
+              label="Sales"
+              value={earnings.data ? String(earnings.data.totals.paymentCount) : '—'}
+              hint="Paid enrolments across your courses"
+            />
+            <Link to={path('/earnings')} className="block">
+              <StatCard
+                label="Net earnings"
+                value={earnings.data ? formatSgd(earnings.data.totals.netCents) : '—'}
+                hint="After Stripe fees and commission · see earnings"
+                className="h-full transition-colors hover:border-brand"
+              />
+            </Link>
+          </>
+        ) : (
           <StatCard
-            label="Net earnings"
-            value={earnings.data ? formatSgd(earnings.data.totals.netCents) : '—'}
-            hint="After Stripe fees and commission · see earnings"
-            className="h-full transition-colors hover:border-brand"
+            label="Changes waiting"
+            value={courses.isPending ? '—' : String(waiting)}
+            hint="Live courses with edits that need approval"
           />
-        </Link>
+        )}
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <StripeCard />

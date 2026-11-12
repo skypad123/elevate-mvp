@@ -8,6 +8,16 @@ export const profileStatusEnum = pgEnum('profile_status', ['applied', 'approved'
 export const profileTypeEnum = pgEnum('profile_type', ['personal', 'corporate'])
 export const payoutAccountStatusEnum = pgEnum('payout_account_status', ['onboarding', 'active'])
 export const stripeBusinessTypeEnum = pgEnum('stripe_business_type', ['individual', 'company'])
+/** The roles a member holds on a profile. The owner is a column on the profile, not a member. */
+export const membershipRoleEnum = pgEnum('membership_role', ['manager', 'writer'])
+export const invitationStatusEnum = pgEnum('invitation_status', [
+  'pending',
+  'awaiting_confirmation',
+  'accepted',
+  'revoked',
+  'expired',
+])
+export const changeSetStatusEnum = pgEnum('change_set_status', ['open', 'approved', 'discarded'])
 export const courseStatusEnum = pgEnum('course_status', [
   'draft',
   'pending_review',

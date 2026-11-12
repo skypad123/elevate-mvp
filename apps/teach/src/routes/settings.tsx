@@ -5,6 +5,7 @@ import {
   Card,
   CardHeader,
   DescriptionList,
+  Dialog,
   formatBps,
   formatDate,
   Input,
@@ -16,10 +17,63 @@ import {
 import { errorMessage, fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
 import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { api } from '../lib/api'
 import { teachKeys } from '../lib/keys'
+import { ROLE_LABEL, ROLE_SUMMARY, useMemberActions } from '../lib/members'
 import { useCurrentProfile } from '../lib/profile'
 import { StripeCard } from './dashboard'
+
+/** For a manager or writer: what their role is, and the way out. The owner cannot leave. */
+function MembershipCard() {
+  const { role, displayName } = useCurrentProfile()
+  const { refreshUser } = usePortalAuth()
+  const actions = useMemberActions()
+  const navigate = useNavigate()
+  const { toast } = useToast()
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  if (role !== 'manager' && role !== 'writer') return null
+
+  async function leave() {
+    setBusy(true)
+    try {
+      await actions.leave()
+      // The profile is gone from the user's list once the session is read again.
+      await refreshUser()
+      toast({ tone: 'success', title: `You left ${displayName}` })
+      navigate('/', { replace: true })
+    } catch (error) {
+      toast({ tone: 'danger', title: 'Could not leave', description: errorMessage(error) })
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card as="section" className="space-y-3">
+      <CardHeader title={`Your role: ${ROLE_LABEL[role]}`} description={ROLE_SUMMARY[role]} />
+      <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
+        Leave this profile
+      </Button>
+      <Dialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={`Leave ${displayName}?`}
+        description="You lose access to this profile and its courses at once. What you wrote stays with the profile. To come back you need a new invitation."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirming(false)}>
+              Stay
+            </Button>
+            <Button variant="danger" loading={busy} onClick={() => void leave()}>
+              Leave
+            </Button>
+          </>
+        }
+      />
+    </Card>
+  )
+}
 
 export function SettingsPage() {
   const { user, refreshUser } = usePortalAuth()
@@ -153,6 +207,7 @@ export function SettingsPage() {
         </div>
         <div className="space-y-6">
           <StripeCard />
+          <MembershipCard />
           <Card as="section">
             <CardHeader title="Account" />
             <DescriptionList

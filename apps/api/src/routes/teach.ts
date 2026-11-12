@@ -1,11 +1,15 @@
 import {
   type Capability,
+  changeRoleSchema,
+  courseViewQuerySchema,
   createArtefactSchema,
   createCourseSchema,
   createLessonSchema,
+  inviteSchema,
   personalApplicationSchema,
   prerequisitesSchema,
   reorderSchema,
+  resolveChangeSetSchema,
   setPriceSchema,
   updateArtefactSchema,
   updateCourseSchema,
@@ -26,29 +30,42 @@ import {
   uuidParam,
 } from '../middleware/auth'
 import { rateLimit } from '../middleware/rate-limit'
+import { ChangeSetsService } from '../services/change-sets.service'
 import { ConnectService } from '../services/connect.service'
 import { CoursesService } from '../services/courses.service'
 import { EarningsService } from '../services/earnings.service'
+import { MembersService } from '../services/members.service'
 import { ProfilesService } from '../services/profiles.service'
 
 /**
- * Elevate Teach. Two routes sit outside a profile: listing the caller's profiles and applying for
- * one. Everything else is under `/profiles/:profileId` and names the capability it needs.
+ * Elevate Teach. A few routes sit outside a profile: listing the caller's profiles, applying for
+ * one, and the two invitation routes, which are for someone who is not a member yet. Everything
+ * else is under `/profiles/:profileId` and names the capability it needs.
  *
  * Content routes (course details, lessons, artefacts, quizzes) ask for `profile.read` here and
  * leave the rest to `CoursesService`, because the capability depends on the course's status:
- * `course.editDraft` for a draft or rejected course, `course.editLive` for a live one.
+ * `course.editDraft` for a draft or rejected course; for a live one `course.editLive`, or
+ * `course.proposeLiveEdit` for edits that wait in a change set.
+ *
+ * Member routes ask for `members.manageWriters` here, and `MembersService` asks for
+ * `members.manageManagers` when the invitation or member in question is a manager.
  */
 export const teachRoutes = (deps: Deps) => {
   const profiles = new ProfilesService(deps)
   const connect = new ConnectService(deps)
   const courses = new CoursesService(deps)
+  const changeSets = new ChangeSetsService(deps)
+  const members = new MembersService(deps)
   const earnings = new EarningsService(deps)
   const on = (capability: Capability) => requireProfile(deps, capability)
   const recentSignIn = requireRecentSignIn(deps)
   const courseId = uuidParam('id', 'Course')
   const lessonId = uuidParam('id', 'Lesson')
   const artefactId = uuidParam('id', 'Artefact')
+  const invitationId = uuidParam('id', 'Invitation')
+  const memberId = uuidParam('userId', 'Member')
+  // The token is 256 random bits, so guessing is not the worry; this keeps the lookups cheap.
+  const invitationLimit = rateLimit({ name: 'invitation', limit: 60, windowMs: 60_000 })
 
   return (
     new Hono<AppEnv>()
@@ -60,6 +77,15 @@ export const teachRoutes = (deps: Deps) => {
       .post('/apply', requireUser(), validate('json', personalApplicationSchema), async (c) => {
         const profile = await profiles.apply(ensureUser(c.get('user')), c.req.valid('json'))
         return c.json({ profile }, 200)
+      })
+      // The invitation page reads this before the invitee has signed in: the token is the proof.
+      .get('/invitations/:token', invitationLimit, async (c) => {
+        const invitation = await members.preview(c.req.param('token'))
+        return c.json({ invitation }, 200)
+      })
+      .post('/invitations/:token/accept', requireUser(), invitationLimit, async (c) => {
+        const accepted = await members.accept(c.req.param('token'), ensureUser(c.get('user')))
+        return c.json({ accepted }, 200)
       })
       // ── the profile ──
       .get('/profiles/:profileId/profile', on('profile.read'), async (c) => {
@@ -110,6 +136,100 @@ export const teachRoutes = (deps: Deps) => {
           return c.json(link, 200)
         },
       )
+      // ── members and invitations ──
+      .get('/profiles/:profileId/members', on('members.read'), async (c) =>
+        c.json(await members.list(ensureActor(c.get('actor'))), 200),
+      )
+      .post(
+        '/profiles/:profileId/invitations',
+        on('members.manageWriters'),
+        validate('json', inviteSchema),
+        async (c) => {
+          const sent = await members.invite(
+            ensureUser(c.get('user')),
+            ensureActor(c.get('actor')),
+            c.req.valid('json'),
+          )
+          return c.json(sent, 200)
+        },
+      )
+      .post(
+        '/profiles/:profileId/invitations/:id/resend',
+        on('members.manageWriters'),
+        invitationId,
+        async (c) => {
+          const sent = await members.resend(
+            ensureUser(c.get('user')),
+            ensureActor(c.get('actor')),
+            c.req.param('id'),
+          )
+          return c.json(sent, 200)
+        },
+      )
+      .delete(
+        '/profiles/:profileId/invitations/:id',
+        on('members.manageWriters'),
+        invitationId,
+        async (c) =>
+          c.json(
+            await members.revoke(
+              ensureUser(c.get('user')),
+              ensureActor(c.get('actor')),
+              c.req.param('id'),
+            ),
+            200,
+          ),
+      )
+      .post(
+        '/profiles/:profileId/invitations/:id/confirm',
+        on('members.manageManagers'),
+        invitationId,
+        async (c) =>
+          c.json(
+            await members.confirm(
+              ensureUser(c.get('user')),
+              ensureActor(c.get('actor')),
+              c.req.param('id'),
+            ),
+            200,
+          ),
+      )
+      // Leaving needs no capability: it is for a member, whatever their role. Registered before
+      // `members/:userId` so that `me` is not read as a user ID.
+      .delete('/profiles/:profileId/members/me', requireProfile(deps), async (c) => {
+        await members.leave(ensureActor(c.get('actor')))
+        return c.json({ ok: true }, 200)
+      })
+      .delete(
+        '/profiles/:profileId/members/:userId',
+        on('members.manageWriters'),
+        memberId,
+        async (c) =>
+          c.json(
+            await members.remove(
+              ensureUser(c.get('user')),
+              ensureActor(c.get('actor')),
+              c.req.param('userId'),
+            ),
+            200,
+          ),
+      )
+      .patch(
+        '/profiles/:profileId/members/:userId',
+        on('members.manageManagers'),
+        memberId,
+        validate('json', changeRoleSchema),
+        async (c) =>
+          c.json(
+            await members.changeRole(
+              ensureUser(c.get('user')),
+              ensureActor(c.get('actor')),
+              c.req.param('userId'),
+              c.req.valid('json').role,
+            ),
+            200,
+          ),
+      )
       // ── earnings ──
       .get('/profiles/:profileId/earnings', on('earnings.read'), async (c) =>
         c.json({ earnings: await earnings.forProfile(ensureActor(c.get('actor'))) }, 200),
@@ -137,10 +257,20 @@ export const teachRoutes = (deps: Deps) => {
           return c.json({ course }, 200)
         },
       )
-      .get('/profiles/:profileId/courses/:id', on('profile.read'), courseId, async (c) => {
-        const course = await courses.view(ensureActor(c.get('actor')), c.req.param('id'))
-        return c.json({ course }, 200)
-      })
+      // `?draft=1` returns the rows of the course's open change set, with their own IDs and
+      // each item's `sourceId`. Without it, or with no change set open, the live rows.
+      .get(
+        '/profiles/:profileId/courses/:id',
+        on('profile.read'),
+        courseId,
+        validate('query', courseViewQuerySchema),
+        async (c) => {
+          const course = await courses.view(ensureActor(c.get('actor')), c.req.param('id'), {
+            draft: c.req.valid('query').draft === '1',
+          })
+          return c.json({ course }, 200)
+        },
+      )
       .patch(
         '/profiles/:profileId/courses/:id',
         on('profile.read'),
@@ -148,7 +278,6 @@ export const teachRoutes = (deps: Deps) => {
         validate('json', updateCourseSchema),
         async (c) => {
           const course = await courses.update(
-            ensureUser(c.get('user')),
             ensureActor(c.get('actor')),
             c.req.param('id'),
             c.req.valid('json'),
@@ -204,6 +333,50 @@ export const teachRoutes = (deps: Deps) => {
             c.req.valid('json').ids,
           )
           return c.json({ course }, 200)
+        },
+      )
+      // ── change sets: a writer's edits to a live course, waiting for approval ──
+      .get(
+        '/profiles/:profileId/courses/:id/change-set',
+        on('profile.read'),
+        courseId,
+        async (c) => {
+          const changeSet = await changeSets.get(ensureActor(c.get('actor')), c.req.param('id'))
+          return c.json({ changeSet }, 200)
+        },
+      )
+      .post(
+        '/profiles/:profileId/courses/:id/change-set/resolve',
+        on('changeSet.review'),
+        courseId,
+        validate('json', resolveChangeSetSchema),
+        async (c) => {
+          const changeSet = await changeSets.resolveConflicts(
+            ensureActor(c.get('actor')),
+            c.req.param('id'),
+            c.req.valid('json').choices,
+          )
+          return c.json({ changeSet }, 200)
+        },
+      )
+      .post(
+        '/profiles/:profileId/courses/:id/change-set/approve',
+        on('changeSet.review'),
+        courseId,
+        async (c) => {
+          const actor = ensureActor(c.get('actor'))
+          await changeSets.approve(actor, c.req.param('id'))
+          return c.json({ course: await courses.view(actor, c.req.param('id')) }, 200)
+        },
+      )
+      .post(
+        '/profiles/:profileId/courses/:id/change-set/discard',
+        on('changeSet.review'),
+        courseId,
+        async (c) => {
+          const actor = ensureActor(c.get('actor'))
+          await changeSets.discard(actor, c.req.param('id'))
+          return c.json({ course: await courses.view(actor, c.req.param('id')) }, 200)
         },
       )
       // ── lessons ──
@@ -275,7 +448,6 @@ export const teachRoutes = (deps: Deps) => {
         validate('json', updateArtefactSchema),
         async (c) => {
           const course = await courses.updateArtefact(
-            ensureUser(c.get('user')),
             ensureActor(c.get('actor')),
             c.req.param('id'),
             c.req.valid('json'),

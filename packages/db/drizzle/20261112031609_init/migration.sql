@@ -4,13 +4,16 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 --> statement-breakpoint
 CREATE TYPE "artefact_type" AS ENUM('video', 'audio', 'text', 'quiz');--> statement-breakpoint
 CREATE TYPE "audience" AS ENUM('learner', 'teach', 'support');--> statement-breakpoint
+CREATE TYPE "change_set_status" AS ENUM('open', 'approved', 'discarded');--> statement-breakpoint
 CREATE TYPE "course_status" AS ENUM('draft', 'pending_review', 'live', 'rejected');--> statement-breakpoint
 CREATE TYPE "enrollment_mode" AS ENUM('self_directed', 'class_based');--> statement-breakpoint
 CREATE TYPE "enrollment_status" AS ENUM('pending_payment', 'active', 'refunded', 'cancelled');--> statement-breakpoint
 CREATE TYPE "identity_provider" AS ENUM('email', 'singpass');--> statement-breakpoint
+CREATE TYPE "invitation_status" AS ENUM('pending', 'awaiting_confirmation', 'accepted', 'revoked', 'expired');--> statement-breakpoint
 CREATE TYPE "media_kind" AS ENUM('video', 'audio', 'image', 'document');--> statement-breakpoint
 CREATE TYPE "media_provider" AS ENUM('local', 'mux', 's3');--> statement-breakpoint
 CREATE TYPE "media_status" AS ENUM('pending', 'processing', 'ready', 'errored');--> statement-breakpoint
+CREATE TYPE "membership_role" AS ENUM('manager', 'writer');--> statement-breakpoint
 CREATE TYPE "payment_status" AS ENUM('succeeded', 'refunded', 'partially_refunded');--> statement-breakpoint
 CREATE TYPE "payout_account_status" AS ENUM('onboarding', 'active');--> statement-breakpoint
 CREATE TYPE "profile_status" AS ENUM('applied', 'approved', 'rejected');--> statement-breakpoint
@@ -151,8 +154,26 @@ CREATE TABLE "artefacts" (
 	"media_asset_id" uuid,
 	"content_json" jsonb,
 	"duration_seconds" integer,
+	"change_set_id" uuid,
+	"source_id" uuid,
+	"removed" boolean DEFAULT false NOT NULL,
+	"copied_from_live" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "artefacts_live_row_is_clean" CHECK ("change_set_id" is not null or ("source_id" is null and not "removed" and not "copied_from_live"))
+);
+--> statement-breakpoint
+CREATE TABLE "course_change_sets" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+	"course_id" uuid NOT NULL,
+	"opened_by" uuid,
+	"status" "change_set_status" DEFAULT 'open'::"change_set_status" NOT NULL,
+	"opened_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"opened_at_snapshot" timestamp with time zone NOT NULL,
+	"opened_prerequisites" jsonb DEFAULT '[]' NOT NULL,
+	"resolutions" jsonb DEFAULT '[]' NOT NULL,
+	"decided_by" uuid,
+	"decided_at" timestamp with time zone
 );
 --> statement-breakpoint
 CREATE TABLE "courses" (
@@ -183,6 +204,7 @@ CREATE TABLE "courses" (
 CREATE TABLE "lesson_prerequisites" (
 	"lesson_id" uuid,
 	"prerequisite_lesson_id" uuid,
+	"change_set_id" uuid,
 	CONSTRAINT "lesson_prerequisites_pkey" PRIMARY KEY("lesson_id","prerequisite_lesson_id"),
 	CONSTRAINT "lesson_prerequisites_not_self" CHECK ("lesson_id" <> "prerequisite_lesson_id")
 );
@@ -193,8 +215,13 @@ CREATE TABLE "lessons" (
 	"title" text NOT NULL,
 	"summary" text,
 	"position" integer DEFAULT 0 NOT NULL,
+	"change_set_id" uuid,
+	"source_id" uuid,
+	"removed" boolean DEFAULT false NOT NULL,
+	"copied_from_live" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "lessons_live_row_is_clean" CHECK ("change_set_id" is not null or ("source_id" is null and not "removed" and not "copied_from_live"))
 );
 --> statement-breakpoint
 CREATE TABLE "quizzes" (
@@ -204,8 +231,13 @@ CREATE TABLE "quizzes" (
 	"max_attempts" integer DEFAULT 1 NOT NULL,
 	"time_limit_minutes" integer,
 	"questions_json" jsonb DEFAULT '[]' NOT NULL,
+	"change_set_id" uuid,
+	"source_id" uuid,
+	"removed" boolean DEFAULT false NOT NULL,
+	"copied_from_live" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "quizzes_live_row_is_clean" CHECK ("change_set_id" is not null or ("source_id" is null and not "removed" and not "copied_from_live"))
 );
 --> statement-breakpoint
 CREATE TABLE "artefact_progress" (
@@ -280,6 +312,28 @@ CREATE TABLE "payout_accounts" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "profile_invitations" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+	"profile_id" uuid NOT NULL,
+	"email" citext NOT NULL,
+	"role" "membership_role" NOT NULL,
+	"invited_by" uuid,
+	"token_hash" text NOT NULL UNIQUE,
+	"status" "invitation_status" DEFAULT 'pending'::"invitation_status" NOT NULL,
+	"accepted_by" uuid,
+	"expires_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "profile_memberships" (
+	"profile_id" uuid,
+	"user_id" uuid,
+	"role" "membership_role" NOT NULL,
+	"added_by" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "profile_memberships_pkey" PRIMARY KEY("profile_id","user_id")
+);
+--> statement-breakpoint
 CREATE TABLE "profiles" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 	"type" "profile_type" NOT NULL,
@@ -345,16 +399,28 @@ CREATE INDEX "payments_user_id_index" ON "payments" ("user_id");--> statement-br
 CREATE INDEX "payments_paid_at_index" ON "payments" ("paid_at");--> statement-breakpoint
 CREATE INDEX "payments_status_paid_at_index" ON "payments" ("status","paid_at");--> statement-breakpoint
 CREATE INDEX "artefacts_lesson_id_position_index" ON "artefacts" ("lesson_id","position");--> statement-breakpoint
+CREATE INDEX "artefacts_change_set_id_index" ON "artefacts" ("change_set_id");--> statement-breakpoint
+CREATE INDEX "artefacts_source_id_index" ON "artefacts" ("source_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "course_change_sets_one_open_per_course" ON "course_change_sets" ("course_id") WHERE "status" = 'open';--> statement-breakpoint
+CREATE INDEX "course_change_sets_course_id_index" ON "course_change_sets" ("course_id");--> statement-breakpoint
 CREATE INDEX "courses_profile_id_index" ON "courses" ("profile_id");--> statement-breakpoint
 CREATE INDEX "courses_status_published_at_index" ON "courses" ("status","published_at");--> statement-breakpoint
 CREATE INDEX "courses_status_enrol_count_index" ON "courses" ("status","enrol_count");--> statement-breakpoint
+CREATE INDEX "lesson_prerequisites_change_set_id_index" ON "lesson_prerequisites" ("change_set_id");--> statement-breakpoint
 CREATE INDEX "lessons_course_id_position_index" ON "lessons" ("course_id","position");--> statement-breakpoint
+CREATE INDEX "lessons_change_set_id_index" ON "lessons" ("change_set_id");--> statement-breakpoint
+CREATE INDEX "lessons_source_id_index" ON "lessons" ("source_id");--> statement-breakpoint
+CREATE INDEX "quizzes_change_set_id_index" ON "quizzes" ("change_set_id");--> statement-breakpoint
+CREATE INDEX "quizzes_source_id_index" ON "quizzes" ("source_id");--> statement-breakpoint
 CREATE INDEX "artefact_progress_enrollment_id_updated_at_index" ON "artefact_progress" ("enrollment_id","updated_at");--> statement-breakpoint
 CREATE INDEX "quiz_attempts_enrollment_id_quiz_id_index" ON "quiz_attempts" ("enrollment_id","quiz_id");--> statement-breakpoint
 CREATE INDEX "media_assets_uploader_id_index" ON "media_assets" ("uploader_id");--> statement-breakpoint
 CREATE INDEX "media_assets_profile_id_index" ON "media_assets" ("profile_id");--> statement-breakpoint
 CREATE INDEX "media_assets_provider_upload_id_index" ON "media_assets" ("provider_upload_id");--> statement-breakpoint
 CREATE INDEX "media_assets_provider_asset_id_index" ON "media_assets" ("provider_asset_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "profile_invitations_one_pending_per_email" ON "profile_invitations" ("profile_id","email") WHERE "status" = 'pending';--> statement-breakpoint
+CREATE INDEX "profile_invitations_profile_id_created_at_index" ON "profile_invitations" ("profile_id","created_at");--> statement-breakpoint
+CREATE INDEX "profile_memberships_user_id_index" ON "profile_memberships" ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "profiles_one_personal_per_owner" ON "profiles" ("owner_user_id") WHERE "type" = 'personal';--> statement-breakpoint
 CREATE INDEX "profiles_owner_user_id_index" ON "profiles" ("owner_user_id");--> statement-breakpoint
 CREATE INDEX "analytics_events_name_created_at_index" ON "analytics_events" ("name","created_at");--> statement-breakpoint
@@ -380,13 +446,23 @@ ALTER TABLE "refunds" ADD CONSTRAINT "refunds_payment_id_payments_id_fkey" FOREI
 ALTER TABLE "refunds" ADD CONSTRAINT "refunds_requested_by_users_id_fkey" FOREIGN KEY ("requested_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "artefacts" ADD CONSTRAINT "artefacts_lesson_id_lessons_id_fkey" FOREIGN KEY ("lesson_id") REFERENCES "lessons"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "artefacts" ADD CONSTRAINT "artefacts_media_asset_id_media_assets_id_fkey" FOREIGN KEY ("media_asset_id") REFERENCES "media_assets"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "artefacts" ADD CONSTRAINT "artefacts_change_set_id_course_change_sets_id_fkey" FOREIGN KEY ("change_set_id") REFERENCES "course_change_sets"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "artefacts" ADD CONSTRAINT "artefacts_source_id_artefacts_id_fkey" FOREIGN KEY ("source_id") REFERENCES "artefacts"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "course_change_sets" ADD CONSTRAINT "course_change_sets_course_id_courses_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "course_change_sets" ADD CONSTRAINT "course_change_sets_opened_by_users_id_fkey" FOREIGN KEY ("opened_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "course_change_sets" ADD CONSTRAINT "course_change_sets_decided_by_users_id_fkey" FOREIGN KEY ("decided_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "courses" ADD CONSTRAINT "courses_profile_id_profiles_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE RESTRICT;--> statement-breakpoint
 ALTER TABLE "courses" ADD CONSTRAINT "courses_thumbnail_media_id_media_assets_id_fkey" FOREIGN KEY ("thumbnail_media_id") REFERENCES "media_assets"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "courses" ADD CONSTRAINT "courses_reviewed_by_users_id_fkey" FOREIGN KEY ("reviewed_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "lesson_prerequisites" ADD CONSTRAINT "lesson_prerequisites_lesson_id_lessons_id_fkey" FOREIGN KEY ("lesson_id") REFERENCES "lessons"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "lesson_prerequisites" ADD CONSTRAINT "lesson_prerequisites_prerequisite_lesson_id_lessons_id_fkey" FOREIGN KEY ("prerequisite_lesson_id") REFERENCES "lessons"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "lesson_prerequisites" ADD CONSTRAINT "lesson_prerequisites_change_set_id_course_change_sets_id_fkey" FOREIGN KEY ("change_set_id") REFERENCES "course_change_sets"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "lessons" ADD CONSTRAINT "lessons_course_id_courses_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "lessons" ADD CONSTRAINT "lessons_change_set_id_course_change_sets_id_fkey" FOREIGN KEY ("change_set_id") REFERENCES "course_change_sets"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "lessons" ADD CONSTRAINT "lessons_source_id_lessons_id_fkey" FOREIGN KEY ("source_id") REFERENCES "lessons"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "quizzes" ADD CONSTRAINT "quizzes_artefact_id_artefacts_id_fkey" FOREIGN KEY ("artefact_id") REFERENCES "artefacts"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "quizzes" ADD CONSTRAINT "quizzes_change_set_id_course_change_sets_id_fkey" FOREIGN KEY ("change_set_id") REFERENCES "course_change_sets"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "quizzes" ADD CONSTRAINT "quizzes_source_id_quizzes_id_fkey" FOREIGN KEY ("source_id") REFERENCES "quizzes"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "artefact_progress" ADD CONSTRAINT "artefact_progress_enrollment_id_enrollments_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "enrollments"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "artefact_progress" ADD CONSTRAINT "artefact_progress_artefact_id_artefacts_id_fkey" FOREIGN KEY ("artefact_id") REFERENCES "artefacts"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "certificates" ADD CONSTRAINT "certificates_enrollment_id_enrollments_id_fkey" FOREIGN KEY ("enrollment_id") REFERENCES "enrollments"("id") ON DELETE CASCADE;--> statement-breakpoint
@@ -396,10 +472,20 @@ ALTER TABLE "media_assets" ADD CONSTRAINT "media_assets_uploader_id_users_id_fke
 ALTER TABLE "media_assets" ADD CONSTRAINT "media_assets_profile_id_profiles_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE RESTRICT;--> statement-breakpoint
 ALTER TABLE "payout_accounts" ADD CONSTRAINT "payout_accounts_profile_id_profiles_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE RESTRICT;--> statement-breakpoint
 ALTER TABLE "payout_accounts" ADD CONSTRAINT "payout_accounts_name_verified_by_users_id_fkey" FOREIGN KEY ("name_verified_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "profile_invitations" ADD CONSTRAINT "profile_invitations_profile_id_profiles_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "profile_invitations" ADD CONSTRAINT "profile_invitations_invited_by_users_id_fkey" FOREIGN KEY ("invited_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "profile_invitations" ADD CONSTRAINT "profile_invitations_accepted_by_users_id_fkey" FOREIGN KEY ("accepted_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "profile_memberships" ADD CONSTRAINT "profile_memberships_profile_id_profiles_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "profile_memberships" ADD CONSTRAINT "profile_memberships_user_id_users_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "profile_memberships" ADD CONSTRAINT "profile_memberships_added_by_users_id_fkey" FOREIGN KEY ("added_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "profiles" ADD CONSTRAINT "profiles_owner_user_id_users_id_fkey" FOREIGN KEY ("owner_user_id") REFERENCES "users"("id") ON DELETE RESTRICT;--> statement-breakpoint
 ALTER TABLE "profiles" ADD CONSTRAINT "profiles_teaching_sample_media_id_media_assets_id_fkey" FOREIGN KEY ("teaching_sample_media_id") REFERENCES "media_assets"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "profiles" ADD CONSTRAINT "profiles_avatar_media_id_media_assets_id_fkey" FOREIGN KEY ("avatar_media_id") REFERENCES "media_assets"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "profiles" ADD CONSTRAINT "profiles_reviewed_by_users_id_fkey" FOREIGN KEY ("reviewed_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "analytics_events" ADD CONSTRAINT "analytics_events_user_id_users_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_actor_id_users_id_fkey" FOREIGN KEY ("actor_id") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
-ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_profile_id_profiles_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE SET NULL;
+ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_profile_id_profiles_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE SET NULL;--> statement-breakpoint
+CREATE VIEW "live_artefacts" AS (select "id", "lesson_id", "type", "title", "position", "media_asset_id", "content_json", "duration_seconds", "change_set_id", "source_id", "removed", "copied_from_live", "created_at", "updated_at" from "artefacts" where ("artefacts"."change_set_id" is null));--> statement-breakpoint
+CREATE VIEW "live_lesson_prerequisites" AS (select "lesson_id", "prerequisite_lesson_id", "change_set_id" from "lesson_prerequisites" where ("lesson_prerequisites"."change_set_id" is null));--> statement-breakpoint
+CREATE VIEW "live_lessons" AS (select "id", "course_id", "title", "summary", "position", "change_set_id", "source_id", "removed", "copied_from_live", "created_at", "updated_at" from "lessons" where ("lessons"."change_set_id" is null));--> statement-breakpoint
+CREATE VIEW "live_quizzes" AS (select "id", "artefact_id", "pass_mark_percent", "max_attempts", "time_limit_minutes", "questions_json", "change_set_id", "source_id", "removed", "copied_from_live", "created_at", "updated_at" from "quizzes" where ("quizzes"."change_set_id" is null));

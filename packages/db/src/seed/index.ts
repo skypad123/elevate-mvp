@@ -17,7 +17,8 @@ export type SeedOptions = {
   /**
    * `admin-only` creates the super admin and nothing else. `demo` also creates a support agent,
    * the demo teachers (as approved personal profiles with no payout account, so their courses
-   * cannot be bought), the demo courses, two promo codes and a learner.
+   * cannot be bought), a writer on the first of those profiles, the demo courses, two promo
+   * codes and a learner.
    */
   mode: 'demo' | 'admin-only'
   /** Null skips the thumbnail files; the media rows are still created. */
@@ -264,6 +265,23 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
   }
   log(`${seedTeachers.length} teacher profiles (no payout accounts: demo courses cannot be bought)`)
 
+  // A writer on the first profile, so there is someone to try member and change-set flows with.
+  const firstTeacher = seedTeachers[0]
+  const firstOwner = firstTeacher ? owners.get(firstTeacher.email) : undefined
+  if (firstTeacher && firstOwner) {
+    const writer = await upsertUser(db, 'writer@example.com', 'Wei Writer')
+    await db
+      .insert(s.profileMemberships)
+      .values({
+        profileId: firstOwner.profileId,
+        userId: writer.id,
+        role: 'writer',
+        addedBy: firstOwner.userId,
+      })
+      .onConflictDoNothing()
+    log(`writer@example.com is a writer on ${firstTeacher.displayName}`)
+  }
+
   for (const course of seedCourses) {
     const owner = owners.get(course.teacherEmail)
     if (!owner) throw new Error(`unknown teacher ${course.teacherEmail}`)
@@ -314,7 +332,7 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
         })
         .returning()
       const firstLesson = await db.query.lessons.findFirst({
-        where: { courseId: sourdoughId },
+        where: { courseId: sourdoughId, changeSetId: { isNull: true } },
         orderBy: { position: 'asc' },
         with: { artefacts: { orderBy: { position: 'asc' } } },
       })

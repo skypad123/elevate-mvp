@@ -28,13 +28,55 @@ export function useCourses() {
   })
 }
 
+/**
+ * The ID an item keeps for as long as the builder is open.
+ *
+ * A writer's first edit to a live course opens a change set, and from then on the builder shows
+ * draft copies, which have IDs of their own. Each copy names the live item it came from, so this
+ * ID is the same before and after that switch. Selections and React keys use it, which is what
+ * keeps the open editor, and what is being typed in it, in place across the switch. Requests can
+ * use either ID: the API reads a live ID as its draft copy.
+ */
+export const stableId = (item: { id: string; sourceId: string | null }): string =>
+  item.sourceId ?? item.id
+
+/**
+ * The course as the builder edits it. Someone who can only propose edits to a live course (a
+ * writer) gets the rows of its open change set when there is one; everyone else gets the live
+ * rows. `course.viewing` says which came back.
+ */
 export function useCourse(id: string) {
-  const { profileId } = useCurrentProfile()
+  const { profileId, can } = useCurrentProfile()
+  const proposes = !can('course.editLive') && can('course.proposeLiveEdit')
   return useQuery({
     queryKey: courseKeys.detail(profileId, id),
     queryFn: async () =>
-      (await unwrap(await scoped.courses[':id'].$get({ param: { profileId, id } })))
-        .course as CourseView,
+      (
+        await unwrap(
+          await scoped.courses[':id'].$get({
+            param: { profileId, id },
+            query: proposes ? { draft: '1' } : {},
+          }),
+        )
+      ).course as CourseView,
+  })
+}
+
+/** One named version of a course: the live rows, or the rows of its open change set. */
+export function useCourseTree(id: string, version: 'live' | 'draft', enabled = true) {
+  const { profileId } = useCurrentProfile()
+  return useQuery({
+    queryKey: courseKeys.tree(profileId, id, version),
+    enabled,
+    queryFn: async () =>
+      (
+        await unwrap(
+          await scoped.courses[':id'].$get({
+            param: { profileId, id },
+            query: version === 'draft' ? { draft: '1' } : {},
+          }),
+        )
+      ).course as CourseView,
   })
 }
 

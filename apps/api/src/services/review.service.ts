@@ -7,6 +7,7 @@ import { errors } from '../lib/errors'
 import type { SessionUser } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
 import { CoursesService } from './courses.service'
+import { ownerAndManagerEmails } from './recipients'
 
 /** Support-side course review. Approval here is the only way a course becomes live. */
 export class ReviewService {
@@ -27,12 +28,9 @@ export class ReviewService {
     return this.courses.loadForSupport(courseId)
   }
 
-  /**
-   * Who hears about a review decision: the profile's owner. Managers are added to this list when
-   * memberships exist, so the lookup lives in one place.
-   */
-  private reviewRecipients(profile: { owner: { email: string } }): string[] {
-    return [profile.owner.email]
+  /** Who hears about a review decision: the profile's owner and its managers. */
+  private reviewRecipients(profile: { id: string }): Promise<string[]> {
+    return ownerAndManagerEmails(this.deps, profile.id)
   }
 
   async approve(actor: SessionUser, courseId: string): Promise<CourseView> {
@@ -67,7 +65,7 @@ export class ReviewService {
       name: ANALYTICS_EVENTS.courseApproved,
       properties: { courseId, profileId: course.profileId },
     })
-    for (const to of this.reviewRecipients(course.profile)) {
+    for (const to of await this.reviewRecipients(course.profile)) {
       await mailer.send(
         simpleEmail({
           to,
@@ -114,7 +112,7 @@ export class ReviewService {
       name: ANALYTICS_EVENTS.courseRejected,
       properties: { courseId, profileId: course.profileId },
     })
-    for (const to of this.reviewRecipients(course.profile)) {
+    for (const to of await this.reviewRecipients(course.profile)) {
       await mailer.send(
         simpleEmail({
           to,

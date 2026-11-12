@@ -13,15 +13,17 @@ import {
   slugify,
   type UpdateCourse,
   validateCourseForSubmission,
+  validateDag,
   withSuffix,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
 import { isPayable } from '../lib/payout'
-import type { ProfileActor, SessionUser } from '../middleware/auth'
+import type { ProfileActor } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
+import { ChangeSetsService } from './change-sets.service'
 import { MediaService } from './media.service'
 
 const EDITABLE_STATUSES = new Set(['draft', 'rejected', 'live'])
@@ -34,46 +36,89 @@ const CONTENT_CAPABILITIES: Capability[] = [
 ]
 
 type CourseRow = typeof s.courses.$inferSelect
+type LessonRow = typeof s.lessons.$inferSelect
+type ArtefactRow = typeof s.artefacts.$inferSelect
 
+/**
+ * Which rows an edit reaches: the live rows (`null`), or the draft rows of a change set. Every
+ * read and write inside an edit is limited to one of the two, so a draft and its live row are
+ * never mixed.
+ */
+type Scope = string | null
+
+const inScope = (column: typeof s.lessons.changeSetId, scope: Scope) =>
+  scope === null ? isNull(column) : eq(column, scope)
+
+/**
+ * The course builder: reads and edits of course content for Teach, and the read Support uses to
+ * preview a course.
+ *
+ * This file and `change-sets.service.ts` are the only two that touch the `lessons`, `artefacts`,
+ * `quizzes` and `lesson_prerequisites` tables directly. Those tables hold a writer's draft rows
+ * beside the live ones, so everything learner-facing reads the live views through `learnerDb`
+ * instead (`schema-guard.test.ts` enforces this).
+ */
 export class CoursesService {
   private readonly media: MediaService
+  private readonly changeSets: ChangeSetsService
   constructor(private readonly deps: Deps) {
     this.media = new MediaService(deps)
+    this.changeSets = new ChangeSetsService(deps)
   }
 
   // ── loading ──────────────────────────────────────────────────────────────
 
   /**
-   * The full builder view of a course. With `profileId`, the course must belong to that profile;
-   * a course of another profile is reported as not found.
+   * The full builder view of a course.
+   *
+   * - `profileId`: the course must belong to that profile; another profile's course is reported
+   *   as not found.
+   * - `draft`: show the open change set's rows in place of the live ones. With no open change
+   *   set there is nothing else to show, and the live rows are returned.
+   *
+   * This is the one place where a filter in code, not a view, keeps drafts out of a read: a draft
+   * artefact always sits under a draft lesson, so choosing the lessons chooses the whole tree.
    */
-  async loadCourseView(courseId: string, profileId?: string): Promise<CourseView> {
+  async loadCourseView(
+    courseId: string,
+    options: { profileId?: string; draft?: boolean } = {},
+  ): Promise<CourseView> {
     const { db } = this.deps
     const course = await db.query.courses.findFirst({
-      where: { id: courseId, ...(profileId ? { profileId } : {}) },
+      where: { id: courseId, ...(options.profileId ? { profileId: options.profileId } : {}) },
       with: {
         thumbnail: true,
         profile: { with: { owner: true, payoutAccount: true } },
-        lessons: {
-          orderBy: { position: 'asc', createdAt: 'asc' },
-          with: {
-            prerequisites: true,
-            artefacts: {
-              orderBy: { position: 'asc', createdAt: 'asc' },
-              with: { media: true, quiz: true },
-            },
-          },
-        },
+        changeSets: { where: { status: 'open' }, with: { opener: true } },
       },
     })
     if (!course) throw errors.notFound('Course')
+    const open = course.changeSets[0] ?? null
+    const scope: Scope = options.draft && open ? open.id : null
+    const lessonRows = await db.query.lessons.findMany({
+      where: {
+        courseId,
+        removed: false,
+        ...(scope ? { changeSetId: scope } : { changeSetId: { isNull: true } }),
+      },
+      orderBy: { position: 'asc', createdAt: 'asc' },
+      with: {
+        prerequisites: true,
+        artefacts: {
+          where: { removed: false },
+          orderBy: { position: 'asc', createdAt: 'asc' },
+          with: { media: true, quiz: true },
+        },
+      },
+    })
 
     const lessons: LessonView[] = []
-    for (const lesson of course.lessons) {
+    for (const lesson of lessonRows) {
       const artefacts: ArtefactView[] = []
       for (const a of lesson.artefacts) {
         artefacts.push({
           id: a.id,
+          sourceId: a.sourceId,
           lessonId: a.lessonId,
           type: a.type,
           title: a.title,
@@ -86,6 +131,7 @@ export class CoursesService {
       }
       lessons.push({
         id: lesson.id,
+        sourceId: lesson.sourceId,
         courseId: lesson.courseId,
         title: lesson.title,
         summary: lesson.summary,
@@ -140,6 +186,14 @@ export class CoursesService {
         ownerEmail: course.profile.owner.email,
         payable,
       },
+      viewing: scope ? 'draft' : 'live',
+      changeSet: open
+        ? {
+            id: open.id,
+            openedBy: open.opener ? open.opener.name?.trim() || open.opener.email : null,
+            openedAt: open.openedAt.toISOString(),
+          }
+        : null,
       lessons,
       checklist,
       enrolCount: course.enrolCount,
@@ -151,7 +205,7 @@ export class CoursesService {
     }
   }
 
-  /** Support's read of a course: any profile's, with no actor. */
+  /** Support's read of a course: any profile's, with no actor. Always the live rows. */
   async loadForSupport(courseId: string): Promise<CourseView> {
     return this.loadCourseView(courseId)
   }
@@ -171,7 +225,12 @@ export class CoursesService {
       with: {
         thumbnail: true,
         profile: { with: { owner: true } },
-        lessons: { with: { artefacts: { columns: { id: true } } }, columns: { id: true } },
+        lessons: {
+          where: { changeSetId: { isNull: true } },
+          with: { artefacts: { columns: { id: true } } },
+          columns: { id: true },
+        },
+        changeSets: { where: { status: 'open' }, columns: { id: true } },
       },
       orderBy: orderBy === 'submitted' ? { submittedAt: 'asc' } : { updatedAt: 'desc' },
     })
@@ -191,6 +250,7 @@ export class CoursesService {
         profileId: c.profileId,
         profileName: c.profile.displayName,
         ownerEmail: c.profile.owner.email,
+        pendingChanges: c.changeSets.length > 0,
         submittedAt: c.submittedAt?.toISOString() ?? null,
         updatedAt: c.updatedAt.toISOString(),
       })
@@ -203,13 +263,23 @@ export class CoursesService {
   // Every function here takes the actor that `requireProfile` resolved. Each lookup filters by the
   // actor's profile in the same query that loads the row, so a course, lesson or artefact of
   // another profile is simply not found.
+  //
+  // A content edit (lessons, artefacts, quizzes, prerequisites) first works out its scope: the
+  // live rows, or the draft rows of the course's change set. Owners, managers and staff edit a
+  // live course's live rows. A writer cannot, so their edit goes to the draft rows, and the first
+  // one opens the change set. Course details and price are not part of a change set.
 
   async listForProfile(actor: ProfileActor): Promise<CourseSummary[]> {
     return this.listSummaries({ profileId: actor.profileId })
   }
 
-  async view(actor: ProfileActor, courseId: string): Promise<CourseView> {
-    return this.loadCourseView(courseId, actor.profileId)
+  /** `draft` asks for the open change set's rows; see `loadCourseView`. */
+  async view(
+    actor: ProfileActor,
+    courseId: string,
+    options: { draft?: boolean } = {},
+  ): Promise<CourseView> {
+    return this.loadCourseView(courseId, { profileId: actor.profileId, draft: options.draft })
   }
 
   /** Refuses early when the actor cannot change course content on any course. */
@@ -217,52 +287,110 @@ export class CoursesService {
     if (!CONTENT_CAPABILITIES.some((capability) => can(actor, capability))) throw errors.forbidden()
   }
 
-  /** The content rule for one course: locked while under review, otherwise by status. */
-  private assertEditable(actor: ProfileActor, course: CourseRow): void {
+  /** A course under review is locked for everyone. */
+  private assertUnlocked(course: CourseRow): void {
     if (!EDITABLE_STATUSES.has(course.status)) {
       throw errors.conflict(
         'course_locked',
         'This course is under review and cannot be edited until the review is complete',
       )
     }
-    const needed: Capability = course.status === 'live' ? 'course.editLive' : 'course.editDraft'
-    if (!can(actor, needed)) throw errors.forbidden()
   }
 
-  private async profileCourse(
-    actor: ProfileActor,
-    courseId: string,
-    options: { forEdit?: boolean } = {},
-  ): Promise<CourseRow> {
-    if (options.forEdit) this.assertCanEditContent(actor)
+  /**
+   * The rows this actor's content edit reaches on this course. An actor who may not edit a live
+   * course directly, but may propose edits to it, gets the course's change set, opened here if
+   * the course has none.
+   */
+  private async editScope(actor: ProfileActor, course: CourseRow): Promise<Scope> {
+    this.assertUnlocked(course)
+    if (course.status !== 'live') {
+      if (!can(actor, 'course.editDraft')) throw errors.forbidden()
+      return null
+    }
+    if (can(actor, 'course.editLive')) return null
+    if (!can(actor, 'course.proposeLiveEdit')) throw errors.forbidden()
+    return (await this.changeSets.openFor(course, actor.userId)).id
+  }
+
+  private async profileCourse(actor: ProfileActor, courseId: string): Promise<CourseRow> {
     const course = await this.deps.db.query.courses.findFirst({
       where: { id: courseId, profileId: actor.profileId },
     })
     if (!course) throw errors.notFound('Course')
-    if (options.forEdit) this.assertEditable(actor, course)
     return course
   }
 
-  private async profileLesson(actor: ProfileActor, lessonId: string) {
+  private async courseForEdit(
+    actor: ProfileActor,
+    courseId: string,
+  ): Promise<{ course: CourseRow; scope: Scope }> {
     this.assertCanEditContent(actor)
-    const lesson = await this.deps.db.query.lessons.findFirst({
+    const course = await this.profileCourse(actor, courseId)
+    return { course, scope: await this.editScope(actor, course) }
+  }
+
+  /**
+   * The lesson an edit applies to. With a draft scope the caller may name the live lesson or its
+   * draft copy, and gets the copy either way. With the live scope a draft's ID finds nothing.
+   */
+  private async lessonForEdit(
+    actor: ProfileActor,
+    lessonId: string,
+  ): Promise<{ lesson: LessonRow; course: CourseRow; scope: Scope }> {
+    this.assertCanEditContent(actor)
+    const { db } = this.deps
+    const found = await db.query.lessons.findFirst({
       where: { id: lessonId, course: { profileId: actor.profileId } },
       with: { course: true },
     })
-    if (!lesson) throw errors.notFound('Lesson')
-    this.assertEditable(actor, lesson.course)
-    return { lesson, course: lesson.course }
+    if (!found) throw errors.notFound('Lesson')
+    const { course, ...row } = found
+    const scope = await this.editScope(actor, course)
+    let lesson: LessonRow | undefined
+    if (row.changeSetId === scope) lesson = row
+    else if (scope !== null && row.changeSetId === null) {
+      lesson = await db.query.lessons.findFirst({ where: { changeSetId: scope, sourceId: row.id } })
+    }
+    if (!lesson || lesson.removed) throw errors.notFound('Lesson')
+    return { lesson, course, scope }
   }
 
-  private async profileArtefact(actor: ProfileActor, artefactId: string) {
+  /** As `lessonForEdit`, for an artefact. An artefact under a removed lesson is gone too. */
+  private async artefactForEdit(
+    actor: ProfileActor,
+    artefactId: string,
+  ): Promise<{ artefact: ArtefactRow; course: CourseRow; scope: Scope }> {
     this.assertCanEditContent(actor)
-    const artefact = await this.deps.db.query.artefacts.findFirst({
+    const { db } = this.deps
+    const found = await db.query.artefacts.findFirst({
       where: { id: artefactId, lesson: { course: { profileId: actor.profileId } } },
       with: { lesson: { with: { course: true } } },
     })
-    if (!artefact) throw errors.notFound('Artefact')
-    this.assertEditable(actor, artefact.lesson.course)
-    return { artefact, course: artefact.lesson.course }
+    if (!found) throw errors.notFound('Artefact')
+    const { lesson: parent, ...row } = found
+    const scope = await this.editScope(actor, parent.course)
+    let artefact: ArtefactRow | undefined
+    if (row.changeSetId === scope) artefact = row
+    else if (scope !== null && row.changeSetId === null) {
+      artefact = await db.query.artefacts.findFirst({
+        where: { changeSetId: scope, sourceId: row.id },
+      })
+    }
+    if (!artefact || artefact.removed) throw errors.notFound('Artefact')
+    if (artefact.lessonId !== parent.id) {
+      const lesson = await db.query.lessons.findFirst({
+        where: { id: artefact.lessonId },
+        columns: { removed: true },
+      })
+      if (!lesson || lesson.removed) throw errors.notFound('Artefact')
+    } else if (parent.removed) throw errors.notFound('Artefact')
+    return { artefact, course: parent.course, scope }
+  }
+
+  /** The course after an edit, showing the rows the edit was made to. */
+  private edited(courseId: string, scope: Scope): Promise<CourseView> {
+    return this.loadCourseView(courseId, { draft: scope !== null })
   }
 
   private async uniqueSlug(title: string): Promise<string> {
@@ -292,22 +420,30 @@ export class CoursesService {
     return this.loadCourseView(course.id)
   }
 
-  /** Course details. Price is not among them: see `setPrice`. */
-  async update(
-    user: SessionUser,
-    actor: ProfileActor,
-    courseId: string,
-    patch: UpdateCourse,
-  ): Promise<CourseView> {
-    const course = await this.profileCourse(actor, courseId, { forEdit: true })
+  /**
+   * Course details: title, summary, description, category and thumbnail. Price is not among them
+   * (see `setPrice`), and they are not part of a change set: on a live course they need
+   * `course.editLive`, which a writer does not have.
+   */
+  async update(actor: ProfileActor, courseId: string, patch: UpdateCourse): Promise<CourseView> {
+    this.assertCanEditContent(actor)
+    const course = await this.profileCourse(actor, courseId)
+    this.assertUnlocked(course)
+    if (!can(actor, course.status === 'live' ? 'course.editLive' : 'course.editDraft')) {
+      throw errors.forbidden()
+    }
     const values: Partial<typeof s.courses.$inferInsert> = {}
     if (patch.title !== undefined) values.title = patch.title
     if (patch.summary !== undefined) values.summary = patch.summary
     if (patch.descriptionJson !== undefined) values.descriptionJson = patch.descriptionJson
     if (patch.category !== undefined) values.category = patch.category
     if (patch.thumbnailMediaId !== undefined) {
-      if (patch.thumbnailMediaId)
-        await this.media.getOwnedReadyAsset(user, patch.thumbnailMediaId, 'image')
+      if (patch.thumbnailMediaId) {
+        await this.media.getProfileAsset(actor.profileId, patch.thumbnailMediaId, {
+          ready: true,
+          kind: 'image',
+        })
+      }
       values.thumbnailMediaId = patch.thumbnailMediaId
     }
     if (patch.title && patch.title !== course.title && course.status !== 'live')
@@ -320,12 +456,7 @@ export class CoursesService {
   /** The route requires `course.setPrice`; a price change is always written to the audit log. */
   async setPrice(actor: ProfileActor, courseId: string, priceCents: number): Promise<CourseView> {
     const course = await this.profileCourse(actor, courseId)
-    if (!EDITABLE_STATUSES.has(course.status)) {
-      throw errors.conflict(
-        'course_locked',
-        'This course is under review and cannot be edited until the review is complete',
-      )
-    }
+    this.assertUnlocked(course)
     if (priceCents !== course.priceCents) {
       await this.deps.db.update(s.courses).set({ priceCents }).where(eq(s.courses.id, courseId))
       await recordAudit(this.deps, {
@@ -392,15 +523,26 @@ export class CoursesService {
     courseId: string,
     input: { title: string; summary?: string | null },
   ): Promise<CourseView> {
-    await this.profileCourse(actor, courseId, { forEdit: true })
-    const [{ max }] = (await this.deps.db
+    const { course, scope } = await this.courseForEdit(actor, courseId)
+    const { db } = this.deps
+    const [{ max }] = (await db
       .select({ max: sql<number>`coalesce(max(${s.lessons.position}), -1)::int` })
       .from(s.lessons)
-      .where(eq(s.lessons.courseId, courseId))) as [{ max: number }]
-    await this.deps.db
-      .insert(s.lessons)
-      .values({ courseId, title: input.title, summary: input.summary ?? null, position: max + 1 })
-    return this.loadCourseView(courseId)
+      .where(
+        and(
+          eq(s.lessons.courseId, course.id),
+          inScope(s.lessons.changeSetId, scope),
+          eq(s.lessons.removed, false),
+        ),
+      )) as [{ max: number }]
+    await db.insert(s.lessons).values({
+      courseId: course.id,
+      title: input.title,
+      summary: input.summary ?? null,
+      position: max + 1,
+      changeSetId: scope,
+    })
+    return this.edited(course.id, scope)
   }
 
   async updateLesson(
@@ -408,32 +550,57 @@ export class CoursesService {
     lessonId: string,
     patch: { title?: string; summary?: string | null },
   ): Promise<CourseView> {
-    const { course } = await this.profileLesson(actor, lessonId)
-    await this.deps.db.update(s.lessons).set(patch).where(eq(s.lessons.id, lessonId))
-    return this.loadCourseView(course.id)
+    const { lesson, course, scope } = await this.lessonForEdit(actor, lessonId)
+    await this.deps.db.update(s.lessons).set(patch).where(eq(s.lessons.id, lesson.id))
+    return this.edited(course.id, scope)
   }
 
   async removeLesson(actor: ProfileActor, lessonId: string): Promise<CourseView> {
-    const { course } = await this.profileLesson(actor, lessonId)
-    await this.deps.db.delete(s.lessons).where(eq(s.lessons.id, lessonId))
-    return this.loadCourseView(course.id)
+    const { lesson, course, scope } = await this.lessonForEdit(actor, lessonId)
+    if (scope !== null && lesson.copiedFromLive) {
+      // The copy stays as a marker, so approval knows to delete the live lesson. Its links go
+      // now, in both directions, as they would with the lesson itself.
+      await this.deps.db.transaction(async (tx) => {
+        await tx.update(s.lessons).set({ removed: true }).where(eq(s.lessons.id, lesson.id))
+        await tx
+          .delete(s.lessonPrerequisites)
+          .where(
+            or(
+              eq(s.lessonPrerequisites.lessonId, lesson.id),
+              eq(s.lessonPrerequisites.prerequisiteLessonId, lesson.id),
+            ),
+          )
+      })
+    } else {
+      // A live lesson, or a draft the writer added: nothing else refers to it.
+      await this.deps.db.delete(s.lessons).where(eq(s.lessons.id, lesson.id))
+    }
+    return this.edited(course.id, scope)
   }
 
   async reorderLessons(actor: ProfileActor, courseId: string, ids: string[]): Promise<CourseView> {
-    await this.profileCourse(actor, courseId, { forEdit: true })
-    const existing = await this.deps.db.query.lessons.findMany({
-      where: { courseId },
-      columns: { id: true },
-    })
+    const { course, scope } = await this.courseForEdit(actor, courseId)
+    const { db } = this.deps
+    const existing = await db
+      .select({ id: s.lessons.id, sourceId: s.lessons.sourceId })
+      .from(s.lessons)
+      .where(
+        and(
+          eq(s.lessons.courseId, course.id),
+          inScope(s.lessons.changeSetId, scope),
+          eq(s.lessons.removed, false),
+        ),
+      )
+    const order = toScope(existing, ids)
     assertSameSet(
       existing.map((l) => l.id),
-      ids,
+      order,
       'lessons',
     )
-    for (const [index, id] of ids.entries()) {
-      await this.deps.db.update(s.lessons).set({ position: index }).where(eq(s.lessons.id, id))
+    for (const [index, id] of order.entries()) {
+      await db.update(s.lessons).set({ position: index }).where(eq(s.lessons.id, id))
     }
-    return this.loadCourseView(courseId)
+    return this.edited(course.id, scope)
   }
 
   async setPrerequisites(
@@ -441,29 +608,41 @@ export class CoursesService {
     lessonId: string,
     prerequisiteIds: string[],
   ): Promise<CourseView> {
-    const { course } = await this.profileLesson(actor, lessonId)
+    const { lesson, course, scope } = await this.lessonForEdit(actor, lessonId)
     const { db } = this.deps
     const courseLessons = await db.query.lessons.findMany({
-      where: { courseId: course.id },
+      where: {
+        courseId: course.id,
+        removed: false,
+        ...(scope ? { changeSetId: scope } : { changeSetId: { isNull: true } }),
+      },
       with: { prerequisites: true },
     })
-    const lessonIds = courseLessons.map((l) => l.id)
+    const wanted = [...new Set(toScope(courseLessons, prerequisiteIds))]
     const edges = courseLessons
-      .filter((l) => l.id !== lessonId)
+      .filter((l) => l.id !== lesson.id)
       .flatMap((l) =>
         l.prerequisites.map((p) => ({ lessonId: l.id, prerequisiteId: p.prerequisiteLessonId })),
       )
-      .concat(prerequisiteIds.map((prerequisiteId) => ({ lessonId, prerequisiteId })))
-    const { validateDag } = await import('@elevate/core')
-    const result = validateDag(lessonIds, edges)
+      .concat(wanted.map((prerequisiteId) => ({ lessonId: lesson.id, prerequisiteId })))
+    const result = validateDag(
+      courseLessons.map((l) => l.id),
+      edges,
+    )
     if (!result.ok) throw errors.unprocessable('prerequisite_cycle', result.message, result)
-    await db.delete(s.lessonPrerequisites).where(eq(s.lessonPrerequisites.lessonId, lessonId))
-    if (prerequisiteIds.length) {
-      await db
-        .insert(s.lessonPrerequisites)
-        .values(prerequisiteIds.map((prerequisiteLessonId) => ({ lessonId, prerequisiteLessonId })))
-    }
-    return this.loadCourseView(course.id)
+    await db.transaction(async (tx) => {
+      await tx.delete(s.lessonPrerequisites).where(eq(s.lessonPrerequisites.lessonId, lesson.id))
+      if (wanted.length) {
+        await tx.insert(s.lessonPrerequisites).values(
+          wanted.map((prerequisiteLessonId) => ({
+            lessonId: lesson.id,
+            prerequisiteLessonId,
+            changeSetId: scope,
+          })),
+        )
+      }
+    })
+    return this.edited(course.id, scope)
   }
 
   // artefacts
@@ -473,27 +652,38 @@ export class CoursesService {
     lessonId: string,
     input: { type: ArtefactView['type']; title: string },
   ): Promise<CourseView> {
-    const { course } = await this.profileLesson(actor, lessonId)
+    const { lesson, course, scope } = await this.lessonForEdit(actor, lessonId)
     const { db } = this.deps
     const [{ max }] = (await db
       .select({ max: sql<number>`coalesce(max(${s.artefacts.position}), -1)::int` })
       .from(s.artefacts)
-      .where(eq(s.artefacts.lessonId, lessonId))) as [{ max: number }]
+      .where(and(eq(s.artefacts.lessonId, lesson.id), eq(s.artefacts.removed, false)))) as [
+      { max: number },
+    ]
     const [artefact] = await db
       .insert(s.artefacts)
-      .values({ lessonId, type: input.type, title: input.title, position: max + 1 })
+      .values({
+        lessonId: lesson.id,
+        type: input.type,
+        title: input.title,
+        position: max + 1,
+        changeSetId: scope,
+      })
       .returning()
     if (!artefact) throw new Error('failed to create artefact')
     if (input.type === 'quiz') {
-      await db
-        .insert(s.quizzes)
-        .values({ artefactId: artefact.id, passMarkPercent: 70, maxAttempts: 1, questionsJson: [] })
+      await db.insert(s.quizzes).values({
+        artefactId: artefact.id,
+        passMarkPercent: 70,
+        maxAttempts: 1,
+        questionsJson: [],
+        changeSetId: scope,
+      })
     }
-    return this.loadCourseView(course.id)
+    return this.edited(course.id, scope)
   }
 
   async updateArtefact(
-    user: SessionUser,
     actor: ProfileActor,
     artefactId: string,
     patch: {
@@ -503,7 +693,7 @@ export class CoursesService {
       durationSeconds?: number | null
     },
   ): Promise<CourseView> {
-    const { artefact, course } = await this.profileArtefact(actor, artefactId)
+    const { artefact, course, scope } = await this.artefactForEdit(actor, artefactId)
     const values: Partial<typeof s.artefacts.$inferInsert> = {}
     if (patch.title !== undefined) values.title = patch.title
     if (patch.durationSeconds !== undefined) values.durationSeconds = patch.durationSeconds
@@ -516,7 +706,7 @@ export class CoursesService {
       if (artefact.type !== 'video' && artefact.type !== 'audio')
         throw errors.badRequest('wrong_type', 'Only video and audio artefacts have media')
       if (patch.mediaAssetId) {
-        const asset = await this.media.getOwnedAsset(user, patch.mediaAssetId)
+        const asset = await this.media.getProfileAsset(actor.profileId, patch.mediaAssetId)
         if (asset.kind !== artefact.type)
           throw errors.badRequest('wrong_kind', `Expected a ${artefact.type} file`)
         if (asset.durationSeconds && patch.durationSeconds === undefined)
@@ -525,14 +715,20 @@ export class CoursesService {
       values.mediaAssetId = patch.mediaAssetId
     }
     if (Object.keys(values).length)
-      await this.deps.db.update(s.artefacts).set(values).where(eq(s.artefacts.id, artefactId))
-    return this.loadCourseView(course.id)
+      await this.deps.db.update(s.artefacts).set(values).where(eq(s.artefacts.id, artefact.id))
+    return this.edited(course.id, scope)
   }
 
   async removeArtefact(actor: ProfileActor, artefactId: string): Promise<CourseView> {
-    const { course } = await this.profileArtefact(actor, artefactId)
-    await this.deps.db.delete(s.artefacts).where(eq(s.artefacts.id, artefactId))
-    return this.loadCourseView(course.id)
+    const { artefact, course, scope } = await this.artefactForEdit(actor, artefactId)
+    const { db } = this.deps
+    if (scope !== null && artefact.copiedFromLive) {
+      // As with a lesson: the copy stays as a marker for approval.
+      await db.update(s.artefacts).set({ removed: true }).where(eq(s.artefacts.id, artefact.id))
+    } else {
+      await db.delete(s.artefacts).where(eq(s.artefacts.id, artefact.id))
+    }
+    return this.edited(course.id, scope)
   }
 
   async reorderArtefacts(
@@ -540,20 +736,22 @@ export class CoursesService {
     lessonId: string,
     ids: string[],
   ): Promise<CourseView> {
-    const { course } = await this.profileLesson(actor, lessonId)
-    const existing = await this.deps.db.query.artefacts.findMany({
-      where: { lessonId },
-      columns: { id: true },
-    })
+    const { lesson, course, scope } = await this.lessonForEdit(actor, lessonId)
+    const { db } = this.deps
+    const existing = await db
+      .select({ id: s.artefacts.id, sourceId: s.artefacts.sourceId })
+      .from(s.artefacts)
+      .where(and(eq(s.artefacts.lessonId, lesson.id), eq(s.artefacts.removed, false)))
+    const order = toScope(existing, ids)
     assertSameSet(
       existing.map((a) => a.id),
-      ids,
+      order,
       'artefacts',
     )
-    for (const [index, id] of ids.entries()) {
-      await this.deps.db.update(s.artefacts).set({ position: index }).where(eq(s.artefacts.id, id))
+    for (const [index, id] of order.entries()) {
+      await db.update(s.artefacts).set({ position: index }).where(eq(s.artefacts.id, id))
     }
-    return this.loadCourseView(course.id)
+    return this.edited(course.id, scope)
   }
 
   async upsertQuiz(
@@ -561,7 +759,7 @@ export class CoursesService {
     artefactId: string,
     definition: QuizDefinition,
   ): Promise<CourseView> {
-    const { artefact, course } = await this.profileArtefact(actor, artefactId)
+    const { artefact, course, scope } = await this.artefactForEdit(actor, artefactId)
     if (artefact.type !== 'quiz')
       throw errors.badRequest('wrong_type', 'Only quiz artefacts have questions')
     const values = {
@@ -570,16 +768,28 @@ export class CoursesService {
       timeLimitMinutes: definition.timeLimitMinutes,
       questionsJson: definition.questions,
     }
+    // A draft artefact has its own quiz row, so this never touches the live quiz.
     await this.deps.db
       .insert(s.quizzes)
-      .values({ artefactId, ...values })
+      .values({ artefactId: artefact.id, changeSetId: scope, ...values })
       .onConflictDoUpdate({ target: s.quizzes.artefactId, set: values })
     await this.deps.db
       .update(s.artefacts)
       .set({ durationSeconds: Math.max(60, definition.questions.length * 45) })
-      .where(eq(s.artefacts.id, artefactId))
-    return this.loadCourseView(course.id)
+      .where(eq(s.artefacts.id, artefact.id))
+    return this.edited(course.id, scope)
   }
+}
+
+/**
+ * A writer's request may still name live rows, from before their change set was opened. Each
+ * live ID stands for its draft copy. On live rows `sourceId` is empty and nothing is changed.
+ */
+function toScope(rows: Array<{ id: string; sourceId: string | null }>, ids: string[]): string[] {
+  const copyOf = new Map(
+    rows.flatMap((row) => (row.sourceId ? [[row.sourceId, row.id] as const] : [])),
+  )
+  return ids.map((id) => copyOf.get(id) ?? id)
 }
 
 export function quizFromRow(row: typeof s.quizzes.$inferSelect): QuizDefinition {

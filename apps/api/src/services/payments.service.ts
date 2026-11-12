@@ -47,7 +47,6 @@ export class PaymentsService {
       with: {
         thumbnail: true,
         profile: { with: { payoutAccount: true } },
-        lessons: { columns: { id: true } },
       },
     })
     if (!course) throw errors.notFound('Course')

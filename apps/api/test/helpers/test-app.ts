@@ -24,7 +24,7 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     SUPPORT_URL: 'http://support.test',
     ...overrides,
   })
-  const { db, client } = await createPgliteDb()
+  const { db, learnerDb, client } = await createPgliteDb()
   const mailer = new FakeMailer()
   const storage = new FakeStorage(env.API_URL)
   const video = new FakeVideoProvider()
@@ -33,6 +33,7 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
   const deps: Deps = {
     env,
     db,
+    learnerDb,
     mailer,
     storage,
     video,
@@ -165,6 +166,24 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     return { user, profile, payoutAccount }
   }
 
+  /** Makes `email` a manager or writer of a profile, written straight to the database. */
+  async function addMember(profileId: string, email: string, role: 'manager' | 'writer') {
+    const user = await ensureUser(email)
+    await db.insert(s.profileMemberships).values({ profileId, userId: user.id, role })
+    return user
+  }
+
+  /** An active enrolment for `email` in a course, written straight to the database. */
+  async function enrol(email: string, courseId: string) {
+    const user = await ensureUser(email)
+    const [enrollment] = await db
+      .insert(s.enrollments)
+      .values({ userId: user.id, courseId, status: 'active', enrolledAt: clock })
+      .returning()
+    if (!enrollment) throw new Error('failed to enrol')
+    return enrollment
+  }
+
   let courseCounter = 0
 
   /**
@@ -269,6 +288,8 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     grantRole,
     createProfile,
     createCourse,
+    addMember,
+    enrol,
     makePayable,
     stripeWebhook,
     setClock: (date: Date) => {

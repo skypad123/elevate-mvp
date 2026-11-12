@@ -79,12 +79,16 @@ const TABLE: Record<ActorRole, Record<ProfileType, ReadonlySet<Capability>>> = {
   staff: { personal: new Set(STAFF), corporate: new Set(STAFF) },
 }
 
-/** All that the owner and members of a profile get until Support approves it. */
+/**
+ * The most that the owner and members of a profile get until Support approves it. A role never
+ * gains from this: a writer cannot edit the profile when it is approved, so not before either.
+ */
 const UNAPPROVED: ReadonlySet<Capability> = new Set<Capability>(['profile.read', 'profile.edit'])
 
 export function can(actor: Actor, capability: Capability): boolean {
+  const granted = TABLE[actor.role][actor.profileType].has(capability)
   if (actor.profileStatus !== 'approved' && actor.role !== 'staff') {
-    return UNAPPROVED.has(capability)
+    return granted && UNAPPROVED.has(capability)
   }
-  return TABLE[actor.role][actor.profileType].has(capability)
+  return granted
 }

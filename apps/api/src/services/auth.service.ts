@@ -219,6 +219,13 @@ export class AuthService {
           columns: { id: true, type: true, displayName: true, status: true },
           orderBy: { appliedAt: 'asc' },
         },
+        memberships: {
+          columns: { role: true },
+          orderBy: { createdAt: 'asc' },
+          with: {
+            profile: { columns: { id: true, type: true, displayName: true, status: true } },
+          },
+        },
       },
     })
     if (!user) throw errors.notFound('User')
@@ -228,7 +235,11 @@ export class AuthService {
       name: user.name,
       avatarUrl: user.avatarUrl,
       roles: user.roles.map((r) => r.role),
-      profiles: user.ownedProfiles.map((p) => profileSummary(p, 'owner')),
+      // Owned profiles first, then the ones the user is a manager or writer of.
+      profiles: [
+        ...user.ownedProfiles.map((p) => profileSummary(p, 'owner')),
+        ...user.memberships.map((m) => profileSummary(m.profile, m.role)),
+      ],
       createdAt: user.createdAt.toISOString(),
     }
   }
@@ -248,9 +259,10 @@ export function profileSummary(
 }
 
 /**
- * Who `user` is on a profile: its owner, or platform staff (`super_admin`) acting inside it.
- * Returns null when the profile does not exist or the user has no access, and callers answer 404
- * for both, so a profile's ID is never confirmed to someone outside it.
+ * Who `user` is on a profile: its owner, a member with a role, or platform staff (`super_admin`)
+ * acting inside it, checked in that order. Returns null when the profile does not exist or the
+ * user has no access, and callers answer 404 for both, so a profile's ID is never confirmed to
+ * someone outside it.
  */
 export async function loadActor(
   deps: Deps,
@@ -269,6 +281,11 @@ export async function loadActor(
     userId: user.id,
   }
   if (profile.ownerUserId === user.id) return { ...on, role: 'owner' }
+  const membership = await deps.db.query.profileMemberships.findFirst({
+    where: { profileId: profile.id, userId: user.id },
+    columns: { role: true },
+  })
+  if (membership) return { ...on, role: membership.role }
   if (user.roles.includes('super_admin')) return { ...on, role: 'staff' }
   return null
 }

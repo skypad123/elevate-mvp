@@ -40,22 +40,28 @@ export class LearningService {
     this.media = new MediaService(deps)
   }
 
-  /** Loads an active enrollment with its course graph and the learner's progress rows. */
+  /**
+   * Loads an active enrollment with its course graph and the learner's progress rows.
+   *
+   * The graph comes through `learnerDb`, so it holds live rows only. Every write below finds its
+   * artefact or quiz in this graph first, which is why a draft row's ID answers 404 here with no
+   * check of its own.
+   */
   private async loadGraph(user: SessionUser, enrollmentId: string) {
-    const enrollment = await this.deps.db.query.enrollments.findFirst({
+    const enrollment = await this.deps.learnerDb.query.enrollments.findFirst({
       where: { id: enrollmentId },
       with: {
         course: {
           with: {
             thumbnail: true,
             profile: true,
-            lessons: {
+            liveLessons: {
               orderBy: { position: 'asc', createdAt: 'asc' },
               with: {
-                prerequisites: true,
-                artefacts: {
+                livePrerequisites: true,
+                liveArtefacts: {
                   orderBy: { position: 'asc', createdAt: 'asc' },
-                  with: { media: true, quiz: true },
+                  with: { media: true, liveQuiz: true },
                 },
               },
             },
@@ -73,11 +79,11 @@ export class LearningService {
 
   private states(enrollment: EnrollmentGraph) {
     return computeLessonStates(
-      enrollment.course.lessons.map((l) => ({
+      enrollment.course.liveLessons.map((l) => ({
         id: l.id,
         position: l.position,
-        artefactIds: l.artefacts.map((a) => a.id),
-        prerequisiteIds: l.prerequisites.map((p) => p.prerequisiteLessonId),
+        artefactIds: l.liveArtefacts.map((a) => a.id),
+        prerequisiteIds: l.livePrerequisites.map((p) => p.prerequisiteLessonId),
       })),
       enrollment.progress.map((p) => ({
         artefactId: p.artefactId,
@@ -104,7 +110,7 @@ export class LearningService {
     const st = this.states(enrollment)
     const byLesson = new Map(st.lessons.map((l) => [l.id, l]))
     const byArtefact = new Map(enrollment.progress.map((p) => [p.artefactId, p]))
-    const titles = new Map(enrollment.course.lessons.map((l) => [l.id, l.title]))
+    const titles = new Map(enrollment.course.liveLessons.map((l) => [l.id, l.title]))
     return {
       id: enrollment.id,
       status: enrollment.status,
@@ -117,18 +123,18 @@ export class LearningService {
         thumbnailUrl: await this.media.publicUrl(enrollment.course.thumbnail),
         teacherName: enrollment.course.profile.displayName,
       },
-      lessons: enrollment.course.lessons.map((l) => {
+      lessons: enrollment.course.liveLessons.map((l) => {
         const state = byLesson.get(l.id)
         return {
           id: l.id,
           title: l.title,
           summary: l.summary,
           position: l.position,
-          prerequisiteIds: l.prerequisites.map((p) => p.prerequisiteLessonId),
+          prerequisiteIds: l.livePrerequisites.map((p) => p.prerequisiteLessonId),
           status: state?.status ?? 'available',
           percent: state?.percent ?? 0,
           blockedBy: (state?.blockedBy ?? []).map((id) => titles.get(id) ?? 'another lesson'),
-          artefacts: l.artefacts.map((a) => ({
+          artefacts: l.liveArtefacts.map((a) => ({
             id: a.id,
             type: a.type,
             title: a.title,
@@ -154,7 +160,7 @@ export class LearningService {
     lessonId: string,
   ): Promise<LessonContentView> {
     const enrollment = await this.loadGraph(user, enrollmentId)
-    const lessons = enrollment.course.lessons
+    const lessons = enrollment.course.liveLessons
     const index = lessons.findIndex((l) => l.id === lessonId)
     const lesson = lessons[index]
     if (!lesson) throw errors.notFound('Lesson')
@@ -173,7 +179,7 @@ export class LearningService {
     }
     const byArtefact = new Map(enrollment.progress.map((p) => [p.artefactId, p]))
     const artefacts: ArtefactContentView[] = []
-    for (const a of lesson.artefacts) {
+    for (const a of lesson.liveArtefacts) {
       const base = {
         id: a.id,
         type: a.type,
@@ -184,13 +190,13 @@ export class LearningService {
       if (a.type === 'text')
         artefacts.push({ ...base, type: 'text', content: a.contentJson ?? null })
       else if (a.type === 'quiz') {
-        const quiz = a.quiz ? quizFromRow(a.quiz) : null
+        const quiz = a.liveQuiz ? quizFromRow(a.liveQuiz) : null
         artefacts.push({
           ...base,
           type: 'quiz',
-          quizId: a.quiz?.id ?? null,
+          quizId: a.liveQuiz?.id ?? null,
           quiz: quiz?.questions.length ? stripAnswers(quiz) : null,
-          attempts: this.attemptSummary(enrollment, a.quiz?.id ?? null, quiz?.maxAttempts ?? 1),
+          attempts: this.attemptSummary(enrollment, a.liveQuiz?.id ?? null, quiz?.maxAttempts ?? 1),
         })
       } else {
         let playback = null
@@ -263,10 +269,10 @@ export class LearningService {
     input: ProgressUpdate,
   ): Promise<ProgressUpdateResult> {
     const enrollment = await this.loadGraph(user, enrollmentId)
-    const lesson = enrollment.course.lessons.find((l) =>
-      l.artefacts.some((a) => a.id === artefactId),
+    const lesson = enrollment.course.liveLessons.find((l) =>
+      l.liveArtefacts.some((a) => a.id === artefactId),
     )
-    const artefact = lesson?.artefacts.find((a) => a.id === artefactId)
+    const artefact = lesson?.liveArtefacts.find((a) => a.id === artefactId)
     if (!lesson || !artefact) throw errors.notFound('Artefact')
     const st = this.states(enrollment)
     if (st.lessons.find((l) => l.id === lesson.id)?.status === 'locked')
@@ -311,15 +317,15 @@ export class LearningService {
     quizId: string,
   ): Promise<QuizAttemptStart> {
     const enrollment = await this.loadGraph(user, enrollmentId)
-    const lesson = enrollment.course.lessons.find((l) =>
-      l.artefacts.some((a) => a.quiz?.id === quizId),
+    const lesson = enrollment.course.liveLessons.find((l) =>
+      l.liveArtefacts.some((a) => a.liveQuiz?.id === quizId),
     )
-    const artefact = lesson?.artefacts.find((a) => a.quiz?.id === quizId)
-    if (!lesson || !artefact?.quiz) throw errors.notFound('Quiz')
+    const artefact = lesson?.liveArtefacts.find((a) => a.liveQuiz?.id === quizId)
+    if (!lesson || !artefact?.liveQuiz) throw errors.notFound('Quiz')
     const st = this.states(enrollment)
     if (st.lessons.find((l) => l.id === lesson.id)?.status === 'locked')
       throw errors.forbidden('This lesson is locked')
-    const quiz = quizFromRow(artefact.quiz)
+    const quiz = quizFromRow(artefact.liveQuiz)
     if (!quiz.questions.length)
       throw errors.conflict('quiz_empty', 'This quiz has no questions yet')
     const summary = this.attemptSummary(enrollment, quizId, quiz.maxAttempts)
@@ -360,16 +366,16 @@ export class LearningService {
     answers: QuizAnswers,
   ): Promise<QuizSubmitResult> {
     const enrollment = await this.loadGraph(user, enrollmentId)
-    const artefact = enrollment.course.lessons
-      .flatMap((l) => l.artefacts)
-      .find((a) => a.quiz?.id === quizId)
-    if (!artefact?.quiz) throw errors.notFound('Quiz')
+    const artefact = enrollment.course.liveLessons
+      .flatMap((l) => l.liveArtefacts)
+      .find((a) => a.liveQuiz?.id === quizId)
+    if (!artefact?.liveQuiz) throw errors.notFound('Quiz')
     const attempt = enrollment.attempts.find((x) => x.id === attemptId && x.quizId === quizId)
     if (!attempt) throw errors.notFound('Attempt')
     if (attempt.submittedAt)
       throw errors.conflict('already_submitted', 'This attempt was already submitted')
     const now = this.deps.now()
-    const quiz = quizFromRow(artefact.quiz)
+    const quiz = quizFromRow(artefact.liveQuiz)
     const expired = !!attempt.expiresAt && attempt.expiresAt.getTime() + 15_000 < now.getTime()
     const grade = expired
       ? { ...gradeQuiz(quiz, {}), scorePercent: 0, passed: false, correctCount: 0 }

@@ -77,19 +77,30 @@ describe('can', () => {
     }
   })
 
-  it('lets the owner and members only read and edit a profile that is not approved', () => {
+  it('lets the owner and members at most read and edit a profile that is not approved', () => {
     for (const profileStatus of ['applied', 'rejected'] as const) {
       for (const profileType of TYPES) {
-        for (const role of ['owner', 'manager', 'writer'] as const) {
+        for (const [index, role] of (['owner', 'manager', 'writer'] as const).entries()) {
           for (const capability of CAPABILITIES) {
-            const allowed = capability === 'profile.read' || capability === 'profile.edit'
+            const readOrEdit = capability === 'profile.read' || capability === 'profile.edit'
+            // Never more than the role has on an approved profile: a writer still cannot edit
+            // the profile, and a manager on a personal profile still has nothing.
+            const onApproved =
+              role === 'manager' && profileType === 'personal' ? false : EXPECTED[capability][index]
             expect(
               can(actor(role, profileType, { profileStatus }), capability),
               `${role} ${profileType} ${profileStatus} ${capability}`,
-            ).toBe(allowed)
+            ).toBe(readOrEdit && onApproved)
           }
         }
       }
+    }
+  })
+
+  it('gives a writer on a profile that is not approved read access only', () => {
+    for (const profileStatus of ['applied', 'rejected'] as const) {
+      const writer = actor('writer', 'personal', { profileStatus })
+      expect(CAPABILITIES.filter((capability) => can(writer, capability))).toEqual(['profile.read'])
     }
   })
 

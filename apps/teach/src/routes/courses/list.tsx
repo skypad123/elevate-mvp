@@ -99,7 +99,10 @@ export function CoursesPage() {
                     {c.lessonCount} lesson{c.lessonCount === 1 ? '' : 's'} ·{' '}
                     {formatSgd(c.priceCents, { showFree: true })}
                   </p>
-                  <p className="text-caption text-ink-tertiary">{c.enrolCount} enrolled</p>
+                  <p className="flex flex-wrap items-center gap-2 text-caption text-ink-tertiary">
+                    {c.enrolCount} enrolled
+                    {c.pendingChanges ? <Badge tone="warning">Changes waiting</Badge> : null}
+                  </p>
                 </div>
               </Card>
             </Link>

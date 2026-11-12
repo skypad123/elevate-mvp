@@ -208,17 +208,41 @@ export class MediaService {
   }
 
   /**
-   * An asset the user may use: one they uploaded, one that belongs to a profile they are on, or
-   * any asset for staff (support agents review teaching samples and course media).
+   * An asset the user may read. A profile's course media belongs to the profile: everyone on the
+   * profile may read it, and someone who has left it may not, even if they uploaded the file. An
+   * asset with no profile (an avatar, a teaching sample) belongs to whoever uploaded it. Staff
+   * may read any asset, because support agents review teaching samples and course media.
    */
   async getOwnedAsset(user: SessionUser, assetId: string): Promise<MediaAssetRow> {
     const asset = await this.deps.db.query.mediaAssets.findFirst({ where: { id: assetId } })
     if (!asset) throw errors.notFound('Asset')
     const allowed =
-      asset.uploaderId === user.id ||
       hasRole(user, 'support_agent') ||
-      (asset.profileId !== null && (await loadActor(this.deps, user, asset.profileId)) !== null)
+      (asset.profileId === null
+        ? asset.uploaderId === user.id
+        : (await loadActor(this.deps, user, asset.profileId)) !== null)
     if (!allowed) throw errors.forbidden()
+    return asset
+  }
+
+  /**
+   * An asset to put on a profile's course: it must be that profile's own. Another profile's
+   * asset is reported as not found, even to someone who belongs to both profiles, so one
+   * profile's media cannot be attached to another profile's course.
+   */
+  async getProfileAsset(
+    profileId: string,
+    assetId: string,
+    options: { ready?: boolean; kind?: MediaAssetRow['kind'] } = {},
+  ): Promise<MediaAssetRow> {
+    const asset = await this.deps.db.query.mediaAssets.findFirst({
+      where: { id: assetId, profileId },
+    })
+    if (!asset) throw errors.notFound('Asset')
+    if (options.ready && asset.status !== 'ready')
+      throw errors.conflict('asset_not_ready', 'That file has not finished uploading')
+    if (options.kind && asset.kind !== options.kind)
+      throw errors.badRequest('wrong_kind', `Expected a ${options.kind}`)
     return asset
   }
 
