@@ -47,4 +47,6 @@ export const applicationZh = {
     '我们正在核对 Stripe 账户上的法定名称是否为 {legalName}，即我们批准的公司。核对通常需要一个工作日，完成后会有邮件发送至 {email}。如果名称不一致，我们会说明需要修改的地方。',
   'companySetup.name.later':
     'Stripe 完成验证后，我们会核对 Stripe 账户上的法定名称是否为 {legalName}，即我们批准的公司。',
+
+  'application.checked': '仍在审核中（刚刚已刷新）。',
 } satisfies Record<keyof typeof applicationEn, string>

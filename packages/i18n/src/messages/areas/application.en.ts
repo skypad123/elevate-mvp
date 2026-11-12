@@ -81,4 +81,7 @@ export const applicationEn = {
     'We are checking that the legal name on the Stripe account is {legalName}, the company we approved. This usually takes one working day, and an email goes to {email} when it is done. If the names differ, we will say what to change.',
   'companySetup.name.later':
     'When Stripe has finished, we check that the legal name on the Stripe account is {legalName}, the company we approved.',
+
+  // After "Check status" when nothing has changed
+  'application.checked': 'Still under review. Checked just now.',
 } as const

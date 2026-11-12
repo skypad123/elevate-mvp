@@ -147,3 +147,16 @@ export function NativeSelect({
 }
 
 export { fieldBase }
+
+/**
+ * After a submit that came back with errors, bring the first one into view and focus it: on a
+ * long form the errors are otherwise far above the button, and the click seems to do nothing.
+ */
+export function focusFirstInvalid(form: HTMLElement | null) {
+  window.requestAnimationFrame(() => {
+    const field = form?.querySelector<HTMLElement>('[aria-invalid="true"], [role="alert"]')
+    if (!field) return
+    field.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    field.focus({ preventScroll: true })
+  })
+}

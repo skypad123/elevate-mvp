@@ -44,4 +44,7 @@ export const companyApplyZh = {
   'companyApply.sent.title': '申请已提交',
   'companyApply.sent.description': '审核完成后，我们会发邮件通知您。',
   'companyApply.submit.failed': '提交失败',
+
+  'companyApply.sample.kept': '除非您上传新的视频，否则将沿用上次申请时的视频。',
+  'companyApply.backTo': '返回 {name}',
 } satisfies Record<keyof typeof companyApplyEn, string>

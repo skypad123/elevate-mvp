@@ -14,6 +14,7 @@ import {
   Card,
   EmptyState,
   Eyebrow,
+  focusFirstInvalid,
   Input,
   MediaUploader,
   NativeSelect,
@@ -23,17 +24,35 @@ import {
 import { fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
 import { fillSlots, useErrorMessage, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { type FormEvent, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { api } from '../lib/api'
 import { teachKeys } from '../lib/keys'
-import { useCurrentProfile } from '../lib/profile'
+import { lastProfileId, useCurrentProfile } from '../lib/profile'
 import { profilePath } from '../lib/urls'
 
 /** `/apply/company`: a registered company applies for a corporate profile. */
 export function CorporateApplyPage() {
-  return <CompanyApplicationForm existing={null} />
+  const { user } = usePortalAuth()
+  const t = useT()
+  // Someone who already teaches on a profile came here from the profile menu: give them a way back.
+  const profiles = user?.profiles ?? []
+  const last = lastProfileId()
+  const back = profiles.find((p) => p.id === last) ?? profiles.find((p) => p.status === 'approved')
+  return (
+    <>
+      {back ? (
+        <Link
+          to={profilePath(back.id)}
+          className="mb-4 inline-flex items-center gap-1 text-small text-ink-secondary hover:text-ink"
+        >
+          <ArrowLeft className="size-4" /> {t('companyApply.backTo', { name: back.displayName })}
+        </Link>
+      ) : null}
+      <CompanyApplicationForm existing={null} />
+    </>
+  )
 }
 
 /**
@@ -52,9 +71,9 @@ export function CorporateReapplyPage() {
         title={t('companyApply.ownerOnly.title')}
         body={t('companyApply.ownerOnly.body')}
         action={
-          <Link to={path()}>
-            <Button variant="secondary">{t('common.back')}</Button>
-          </Link>
+          <Button asChild variant="secondary">
+            <Link to={path()}>{t('common.back')}</Link>
+          </Button>
         }
       />
     )
@@ -95,20 +114,26 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
   const [sample, setSample] = useState<MediaAssetView | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
+  // The UEN is checked once the field is left or the form is sent, not from the first keystroke.
+  const [uenChecked, setUenChecked] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
 
   const set = (key: keyof Fields) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }))
 
   const uen = normaliseUen(form.uen)
   const uenLooksWrong = uen.length > 0 && !isValidUen(uen, form.entityType)
+  const showUenError = uenChecked && uenLooksWrong
   const documentId =
     document?.status === 'ready' ? document.id : (entity?.registryDocumentMediaId ?? null)
   const isResubmission = existing !== null
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (!documentId) {
-      setErrors({ registryDocumentMediaId: t('companyApply.document.required') })
+    setUenChecked(true)
+    if (uenLooksWrong || !documentId) {
+      setErrors(documentId ? {} : { registryDocumentMediaId: t('companyApply.document.required') })
+      focusFirstInvalid(formRef.current)
       return
     }
     setBusy(true)
@@ -145,6 +170,7 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
     } catch (error) {
       const fields = fieldErrors(error)
       setErrors(fields)
+      focusFirstInvalid(formRef.current)
       if (Object.keys(fields).length === 0)
         toast({
           tone: 'danger',
@@ -187,7 +213,7 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
         ) : null}
       </div>
 
-      <form onSubmit={submit} className="space-y-6">
+      <form ref={formRef} onSubmit={submit} className="space-y-6">
         <Card as="section" className="space-y-5">
           <h2 className="font-display text-h2 font-semibold text-ink">
             {t('companyApply.company.title')}
@@ -209,9 +235,10 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
             hint={t('companyApply.uen.hint', { example: UEN_EXAMPLE[form.entityType] })}
             value={form.uen}
             onChange={set('uen')}
+            onBlur={() => setUenChecked(true)}
             error={
               errors.uen ??
-              (uenLooksWrong
+              (showUenError
                 ? t('companyApply.uen.invalid', { example: UEN_EXAMPLE[form.entityType] })
                 : undefined)
             }
@@ -306,6 +333,9 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
             label={t('companyApply.sample.upload')}
             hint={t('companyApply.sample.upload.hint')}
           />
+          {existing?.teachingSampleMediaId && !sample ? (
+            <p className="text-small text-ink-tertiary">{t('companyApply.sample.kept')}</p>
+          ) : null}
           <Input
             label={t('companyApply.sample.link')}
             placeholder="https://youtube.com/…"
@@ -316,14 +346,13 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
           />
         </Card>
 
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-small text-ink-tertiary">{t('companyApply.agreement')}</p>
           <Button
             type="submit"
             variant="accent"
             size="lg"
             loading={busy}
-            disabled={uenLooksWrong}
             iconRight={ArrowRight}
             className="shrink-0"
           >

@@ -76,4 +76,10 @@ export const companyApplyEn = {
   'companyApply.sent.description': 'We will email you when it has been reviewed.',
   // Title of the toast when sending fails; the description is the error itself
   'companyApply.submit.failed': 'Could not submit',
+
+  // Under the video uploader when the earlier application had a video and no new one is chosen
+  'companyApply.sample.kept':
+    'The video from your last application is kept unless you upload a new one.',
+  // A link above the form for someone who already has a profile. {name} is that profile's name.
+  'companyApply.backTo': 'Back to {name}',
 } as const

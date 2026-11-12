@@ -8,10 +8,10 @@ import {
   Clock,
   CreditCard,
   ExternalLink,
-  MailCheck,
+  RefreshCw,
   XCircle,
 } from 'lucide-react'
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { teachKeys } from '../lib/keys'
 import { useCurrentProfile } from '../lib/profile'
@@ -32,6 +32,8 @@ function ApplicationStatus() {
   const { profile, profileId, role, type, path, actingAsStaff } = useCurrentProfile()
   const queryClient = useQueryClient()
   const t = useT()
+  const [checking, setChecking] = useState(false)
+  const [checked, setChecked] = useState(false)
   if (!profile) return null
   const rejected = profile.status === 'rejected'
   const company = profile.legalEntity
@@ -40,8 +42,16 @@ function ApplicationStatus() {
   const editPath = type === 'corporate' ? path('/apply') : '/apply'
 
   async function checkStatus() {
-    await refreshUser()
-    await queryClient.invalidateQueries({ queryKey: teachKeys.profile(profileId) })
+    setChecking(true)
+    setChecked(false)
+    try {
+      await refreshUser()
+      await queryClient.invalidateQueries({ queryKey: teachKeys.profile(profileId) })
+      // If the status had changed, the page would have moved on; say that it has not.
+      setChecked(true)
+    } finally {
+      setChecking(false)
+    }
   }
 
   return (
@@ -72,9 +82,9 @@ function ApplicationStatus() {
               {profile.reviewNote}
             </blockquote>
             {canEdit ? (
-              <Link to={editPath}>
-                <Button variant="accent">{t('application.editAndResubmit')}</Button>
-              </Link>
+              <Button asChild variant="accent">
+                <Link to={editPath}>{t('application.editAndResubmit')}</Link>
+              </Button>
             ) : null}
           </>
         ) : (
@@ -95,14 +105,24 @@ function ApplicationStatus() {
             </p>
             <div className="flex flex-wrap gap-2">
               {canEdit ? (
-                <Link to={editPath}>
-                  <Button variant="secondary">{t('application.edit')}</Button>
-                </Link>
+                <Button asChild variant="secondary">
+                  <Link to={editPath}>{t('application.edit')}</Link>
+                </Button>
               ) : null}
-              <Button variant="ghost" icon={MailCheck} onClick={checkStatus}>
+              <Button
+                variant="ghost"
+                icon={RefreshCw}
+                loading={checking}
+                onClick={() => void checkStatus()}
+              >
                 {t('application.checkStatus')}
               </Button>
             </div>
+            {checked ? (
+              <p role="status" className="text-small text-ink-tertiary">
+                {t('application.checked')}
+              </p>
+            ) : null}
           </>
         )}
       </Card>
@@ -157,7 +177,9 @@ function CompanySetup() {
     <div className="space-y-6 animate-rise">
       <Card as="section" className="space-y-6">
         <div>
-          <Eyebrow>{t('companySetup.eyebrow', { name: profile.displayName })}</Eyebrow>
+          <Eyebrow className="normal-case tracking-normal">
+            {t('companySetup.eyebrow', { name: profile.displayName })}
+          </Eyebrow>
           <h1 className="font-display text-h1 font-semibold text-ink">{t('companySetup.title')}</h1>
           <p className="mt-2 text-body text-ink-secondary">{t('companySetup.intro')}</p>
         </div>
@@ -206,7 +228,7 @@ function CompanySetup() {
         </ol>
         <Button
           variant="ghost"
-          icon={MailCheck}
+          icon={RefreshCw}
           loading={stripe.isFetching}
           onClick={() => void stripe.refetch()}
         >
