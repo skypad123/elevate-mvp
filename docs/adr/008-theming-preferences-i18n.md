@@ -1,4 +1,4 @@
-# ADR 005 — Per-portal palettes, device preferences and typed i18n
+# ADR 008 — Per-portal palettes, device preferences and typed i18n
 
 **Status:** accepted · 2026-11-09
 

@@ -5,6 +5,12 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["VITE_*", "EXPO_PUBLIC_*"],
+      "outputs": ["dist/**"]
+    },
+    "build:web": {
+      "dependsOn": ["^build"],
+      "env": ["EXPO_PUBLIC_*"],
       "outputs": ["dist/**"]
     },
     "build:types": {

@@ -7,7 +7,6 @@ import { createTestApp, type TestApp } from './helpers/test-app'
 let t: TestApp
 let learner: string
 let sourdoughId: string
-let sourdoughTeacherId: string
 
 const stripePost = (event: unknown) =>
   t.app.request('/api/webhooks/stripe', {
@@ -18,24 +17,14 @@ const stripePost = (event: unknown) =>
 
 beforeAll(async () => {
   t = await createTestApp()
-  await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', storageDir: null })
+  await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', mode: 'demo', storage: null })
   learner = (await t.signIn('buyer@example.com')).token as string
   const course = await t.db.query.courses.findFirst({
-    where: eq(s.courses.slug, 'sourdough-from-scratch'),
+    where: { slug: 'sourdough-from-scratch' },
   })
   sourdoughId = course?.id as string
-  sourdoughTeacherId = course?.teacherId as string
-  // the teacher must be payable: give them a fake connected account with charges enabled
-  const { accountId } = await t.payments.createConnectedAccount({
-    email: 'daniel@example.com',
-    userId: sourdoughTeacherId,
-    displayName: 'Daniel',
-  })
-  t.payments.enableAccount(accountId)
-  await t.db
-    .update(s.teacherProfiles)
-    .set({ stripeAccountId: accountId, stripeChargesEnabled: true, stripeDetailsSubmitted: true })
-    .where(eq(s.teacherProfiles.userId, sourdoughTeacherId))
+  // the course's profile must be payable: give it an active payout account with charges enabled
+  await t.makePayable(course?.profileId as string)
 })
 afterAll(async () => {
   await t.close()
@@ -138,7 +127,7 @@ describe('checkout', () => {
     expect(await hook.json()).toMatchObject({ outcome: 'applied' })
 
     const payment = await t.db.query.payments.findFirst({
-      where: eq(s.payments.stripeCheckoutSessionId, sessionId),
+      where: { stripeCheckoutSessionId: sessionId },
     })
     expect(payment?.amountCents).toBe(8010)
     expect(payment?.discountCents).toBe(890)
@@ -149,10 +138,10 @@ describe('checkout', () => {
     expect(payment?.stripeTransferId).toContain('tr_')
     expect(t.mailer.last()?.subject).toContain("You're enrolled")
 
-    const course = await t.db.query.courses.findFirst({ where: eq(s.courses.id, sourdoughId) })
+    const course = await t.db.query.courses.findFirst({ where: { id: sourdoughId } })
     expect(course?.enrolCount).toBe(2) // seed learner + this purchase
     const promo = await t.db.query.promoCodes.findFirst({
-      where: eq(s.promoCodes.code, 'WELCOME10'),
+      where: { code: 'WELCOME10' },
     })
     expect(promo?.redeemedCount).toBe(1)
 
@@ -181,7 +170,7 @@ describe('checkout', () => {
 
   it('refuses teachers who cannot be paid, and enrols free courses directly', async () => {
     const figma = await t.db.query.courses.findFirst({
-      where: eq(s.courses.slug, 'figma-to-prototype'),
+      where: { slug: 'figma-to-prototype' },
     })
     const blocked = await t.api('POST', `/api/checkout/courses/${figma?.id}`, {
       token: learner,

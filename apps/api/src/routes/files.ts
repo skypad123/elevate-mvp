@@ -4,7 +4,10 @@ import { errors } from '../lib/errors'
 import type { AppEnv } from '../middleware/auth'
 import { assertSafeKey, isPublicKey, LocalDiskStorage } from '../providers/storage'
 
-/** Serves objects from the local storage driver. Public keys are cacheable; others need a signature. */
+/**
+ * Serves `public/` keys from any storage driver (cacheable), and signed private files for the
+ * local driver. With S3, private files are read through presigned bucket URLs instead.
+ */
 export const filesRoutes = (deps: Deps) =>
   new Hono<AppEnv>().get('/*', async (c) => {
     const key = decodeURIComponent(c.req.path.replace(/^\/api\/files\//, ''))

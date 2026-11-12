@@ -7,7 +7,7 @@ import {
   type TransactionSummary,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, desc, eq, exists, ilike, or, type SQL, sql } from 'drizzle-orm'
+import { and, EmptyFilter, eq, exists, ilike, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { simpleEmail } from '../emails/templates'
 import { errors } from '../lib/errors'
@@ -17,8 +17,15 @@ import { recordAudit, trackEvent } from './audit.service'
 type PaymentWithRelations = typeof s.payments.$inferSelect & {
   user: { email: string }
   course: { title: string; slug: string }
-  teacher: { name: string | null; teacherProfile: { displayName: string } | null }
+  profile: { displayName: string }
 }
+
+/** The relations every transaction row is shown with. */
+const SUMMARY_RELATIONS = {
+  user: { columns: { email: true } },
+  course: { columns: { title: true, slug: true } },
+  profile: { columns: { displayName: true } },
+} as const
 
 const encodeCursor = (offset: number) => Buffer.from(String(offset)).toString('base64url')
 const decodeCursor = (cursor?: string) => {
@@ -38,7 +45,9 @@ function summary(p: PaymentWithRelations): TransactionSummary {
     learnerEmail: p.user.email,
     courseTitle: p.course.title,
     courseSlug: p.course.slug,
-    teacherName: p.teacher.teacherProfile?.displayName ?? p.teacher.name ?? '—',
+    profileId: p.profileId,
+    profileName: p.profile.displayName,
+    payoutAccountId: p.payoutAccountId,
   }
 }
 
@@ -52,42 +61,39 @@ export class TransactionsService {
     limit: number
   }): Promise<Page<TransactionSummary>> {
     const { db } = this.deps
-    const conditions: SQL[] = []
-    if (query.status) conditions.push(eq(s.payments.status, query.status))
-    if (query.q) {
-      const like = `%${query.q.replace(/[%_]/g, '\\$&')}%`
-      // Subqueries, not raw column refs: the relational builder re-aliases bare columns to `payments`.
-      const match = or(
-        exists(
-          db
-            .select({ one: sql`1` })
-            .from(s.users)
-            .where(and(eq(s.users.id, s.payments.userId), ilike(s.users.email, like))),
-        ),
-        exists(
-          db
-            .select({ one: sql`1` })
-            .from(s.courses)
-            .where(and(eq(s.courses.id, s.payments.courseId), ilike(s.courses.title, like))),
-        ),
-        ilike(s.payments.stripePaymentIntentId, like),
-      )
-      if (match) conditions.push(match)
-    }
+    const like = query.q ? `%${query.q.replace(/[%_]/g, '\\$&')}%` : null
     const offset = decodeCursor(query.cursor)
     const rows = await db.query.payments.findMany({
-      where: conditions.length ? and(...conditions) : undefined,
-      orderBy: [desc(s.payments.paidAt)],
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        // Search matches the learner's email, the course title or the Stripe payment intent ID.
+        // The callback's `payment` is the query's own alias for the table, which the subqueries
+        // must refer to.
+        ...(like
+          ? {
+              RAW: (payment) =>
+                or(
+                  exists(
+                    db
+                      .select({ one: sql`1` })
+                      .from(s.users)
+                      .where(and(eq(s.users.id, payment.userId), ilike(s.users.email, like))),
+                  ),
+                  exists(
+                    db
+                      .select({ one: sql`1` })
+                      .from(s.courses)
+                      .where(and(eq(s.courses.id, payment.courseId), ilike(s.courses.title, like))),
+                  ),
+                  ilike(payment.stripePaymentIntentId, like),
+                ) ?? EmptyFilter,
+            }
+          : {}),
+      },
+      orderBy: { paidAt: 'desc' },
       limit: query.limit + 1,
       offset,
-      with: {
-        user: { columns: { email: true } },
-        course: { columns: { title: true, slug: true } },
-        teacher: {
-          columns: { name: true },
-          with: { teacherProfile: { columns: { displayName: true } } },
-        },
-      },
+      with: SUMMARY_RELATIONS,
     })
     return {
       items: rows.slice(0, query.limit).map(summary),
@@ -97,14 +103,9 @@ export class TransactionsService {
 
   async detail(paymentId: string): Promise<TransactionDetail> {
     const p = await this.deps.db.query.payments.findFirst({
-      where: eq(s.payments.id, paymentId),
+      where: { id: paymentId },
       with: {
-        user: { columns: { email: true } },
-        course: { columns: { title: true, slug: true } },
-        teacher: {
-          columns: { name: true },
-          with: { teacherProfile: { columns: { displayName: true } } },
-        },
+        ...SUMMARY_RELATIONS,
         enrollment: { columns: { id: true, status: true } },
         promoCode: { columns: { code: true } },
         refunds: true,
@@ -115,7 +116,7 @@ export class TransactionsService {
     for (const r of p.refunds) {
       if (r.requestedBy && !requesters.has(r.requestedBy)) {
         const u = await this.deps.db.query.users.findFirst({
-          where: eq(s.users.id, r.requestedBy),
+          where: { id: r.requestedBy },
           columns: { email: true },
         })
         if (u) requesters.set(r.requestedBy, u.email)
@@ -154,11 +155,8 @@ export class TransactionsService {
 
   /** Full refund through Stripe (reverses the transfer and the application fee), then revokes access. */
   async refund(actor: SessionUser, paymentId: string, reason: string): Promise<TransactionDetail> {
-    const { db, payments, mailer } = this.deps
-    const p = await db.query.payments.findFirst({
-      where: eq(s.payments.id, paymentId),
-      with: { user: true, course: true },
-    })
+    const { db, payments } = this.deps
+    const p = await db.query.payments.findFirst({ where: { id: paymentId } })
     if (!p) throw errors.notFound('Payment')
     if (p.status === 'refunded')
       throw errors.conflict('already_refunded', 'This payment was already refunded')
@@ -169,7 +167,7 @@ export class TransactionsService {
       reason,
       metadata: { paymentId, actorId: actor.id },
     })
-    await this.applyRefund({
+    const recorded = await this.applyRefund({
       paymentId,
       stripeRefundId: result.refundId,
       amountCents: result.amountCents,
@@ -181,6 +179,7 @@ export class TransactionsService {
       action: 'payment.refund',
       entityType: 'payment',
       entityId: paymentId,
+      profileId: p.profileId,
       metadata: { reason, amountCents: result.amountCents, stripeRefundId: result.refundId },
     })
     await trackEvent(this.deps, {
@@ -188,28 +187,62 @@ export class TransactionsService {
       name: ANALYTICS_EVENTS.refundIssued,
       properties: { paymentId, amountCents: result.amountCents },
     })
+    if (recorded) await this.sendRefundNotices(paymentId, result.amountCents, reason)
+    return this.detail(paymentId)
+  }
+
+  /**
+   * Tells the learner and the owner of the profile that was paid. Sent once per refund: by
+   * whichever of the Support action and the `charge.refunded` webhook records the refund first.
+   */
+  private async sendRefundNotices(
+    paymentId: string,
+    amountCents: number,
+    reason: string,
+  ): Promise<void> {
+    const { db, env, mailer } = this.deps
+    const p = await db.query.payments.findFirst({
+      where: { id: paymentId },
+      with: { user: true, course: true, profile: { with: { owner: true } } },
+    })
+    if (!p) return
+    const amount = `${(amountCents / 100).toFixed(2)} SGD`
     await mailer.send(
       simpleEmail({
         to: p.user.email,
         title: `Refund issued for ${p.course.title}`,
         paragraphs: [
-          `We have refunded ${(result.amountCents / 100).toFixed(2)} SGD to your original payment method. It can take 5–10 working days to appear.`,
+          `We have refunded ${amount} to your original payment method. It can take 5–10 working days to appear.`,
           `Reason: ${reason}`,
-          'Access to the course has been removed.',
+          ...(p.status === 'refunded' ? ['Access to the course has been removed.'] : []),
         ],
       }),
     )
-    return this.detail(paymentId)
+    await mailer.send(
+      simpleEmail({
+        to: p.profile.owner.email,
+        title: `A sale of "${p.course.title}" was refunded`,
+        paragraphs: [
+          `${amount} was refunded to a learner who bought "${p.course.title}" from ${p.profile.displayName}.`,
+          `Reason: ${reason}`,
+          'Your earnings in Elevate Teach show the sale after this refund.',
+        ],
+        cta: { href: `${env.TEACH_URL}/p/${p.profileId}/earnings`, label: 'View earnings' },
+      }),
+    )
   }
 
-  /** Shared by the Support action and the charge.refunded webhook. Idempotent per Stripe refund id. */
+  /**
+   * Shared by the Support action and the charge.refunded webhook. Idempotent per Stripe refund
+   * id; returns whether this call recorded the refund (false when it was already on record).
+   */
   async applyRefund(input: {
     paymentId: string
     stripeRefundId: string
     amountCents: number
     reason: string | null
     requestedBy: string | null
-  }): Promise<void> {
+  }): Promise<boolean> {
     const { db } = this.deps
     const inserted = await db
       .insert(s.refunds)
@@ -222,9 +255,9 @@ export class TransactionsService {
       })
       .onConflictDoNothing()
       .returning()
-    if (inserted.length === 0) return
-    const p = await db.query.payments.findFirst({ where: eq(s.payments.id, input.paymentId) })
-    if (!p) return
+    if (inserted.length === 0) return false
+    const p = await db.query.payments.findFirst({ where: { id: input.paymentId } })
+    if (!p) return true
     const refundedCents = Math.min(p.amountCents, p.refundedCents + input.amountCents)
     const status = refundedCents >= p.amountCents ? 'refunded' : 'partially_refunded'
     await db.update(s.payments).set({ refundedCents, status }).where(eq(s.payments.id, p.id))
@@ -238,6 +271,7 @@ export class TransactionsService {
         .set({ enrolCount: sql`greatest(${s.courses.enrolCount} - 1, 0)` })
         .where(eq(s.courses.id, p.courseId))
     }
+    return true
   }
 
   /** Webhook: charge.refunded (covers refunds made from the Stripe dashboard). */
@@ -248,10 +282,10 @@ export class TransactionsService {
     const chargeId = typeof charge.id === 'string' ? charge.id : null
     const p = await this.deps.db.query.payments.findFirst({
       where: paymentIntentId
-        ? eq(s.payments.stripePaymentIntentId, paymentIntentId)
+        ? { stripePaymentIntentId: paymentIntentId }
         : chargeId
-          ? eq(s.payments.stripeChargeId, chargeId)
-          : sql`false`,
+          ? { stripeChargeId: chargeId }
+          : { RAW: sql`false` },
     })
     if (!p) return 'unmatched'
     const refundedTotal = typeof charge.amount_refunded === 'number' ? charge.amount_refunded : null
@@ -260,11 +294,13 @@ export class TransactionsService {
       | { data?: Array<{ id?: string; amount?: number }> }
       | undefined
     const latest = refundsObj?.data?.[0]
-    await this.applyRefund({
+    const amountCents = refundedTotal - p.refundedCents
+    const reason = 'Refunded in Stripe'
+    const recorded = await this.applyRefund({
       paymentId: p.id,
       stripeRefundId: latest?.id ?? `re_${chargeId ?? paymentIntentId}_${refundedTotal}`,
-      amountCents: refundedTotal - p.refundedCents,
-      reason: 'Refunded in Stripe',
+      amountCents,
+      reason,
       requestedBy: null,
     })
     await recordAudit(this.deps, {
@@ -272,34 +308,41 @@ export class TransactionsService {
       action: 'payment.refund.webhook',
       entityType: 'payment',
       entityId: p.id,
+      profileId: p.profileId,
       metadata: { refundedTotal },
     })
+    // A refund made in the Stripe dashboard reaches us only here, so this is where its two
+    // notices are sent. A Support refund is already on record by now and sends nothing more.
+    if (recorded) await this.sendRefundNotices(p.id, amountCents, reason)
     return 'applied'
   }
 
+  /** One row per payout account that has been paid, with the profile it belongs to. */
   async payouts(): Promise<PayoutLedgerRow[]> {
     const { db } = this.deps
     const rows = await db
       .select({
-        teacherId: s.payments.teacherId,
+        payoutAccountId: s.payments.payoutAccountId,
         transferCount: sql<number>`count(*) filter (where ${s.payments.stripeTransferId} is not null)::int`,
         transferredCents: sql<number>`coalesce(sum(${s.payments.teacherNetCents}), 0)::int`,
         refundedCents: sql<number>`coalesce(sum(${s.payments.refundedCents}), 0)::int`,
       })
       .from(s.payments)
-      .groupBy(s.payments.teacherId)
+      .groupBy(s.payments.payoutAccountId)
     const out: PayoutLedgerRow[] = []
     for (const r of rows) {
-      const teacher = await db.query.users.findFirst({
-        where: eq(s.users.id, r.teacherId),
-        with: { teacherProfile: true },
+      const account = await db.query.payoutAccounts.findFirst({
+        where: { id: r.payoutAccountId },
+        with: { profile: { with: { owner: { columns: { email: true } } } } },
       })
+      if (!account) continue
       out.push({
-        teacherId: r.teacherId,
-        teacherName: teacher?.teacherProfile?.displayName ?? teacher?.name ?? '—',
-        teacherEmail: teacher?.email ?? '—',
-        stripeAccountId: teacher?.teacherProfile?.stripeAccountId ?? null,
-        payoutsEnabled: teacher?.teacherProfile?.stripePayoutsEnabled ?? false,
+        payoutAccountId: account.id,
+        stripeAccountId: account.stripeAccountId,
+        payoutsEnabled: account.payoutsEnabled,
+        profileId: account.profileId,
+        profileName: account.profile.displayName,
+        ownerEmail: account.profile.owner.email,
         transferCount: r.transferCount,
         transferredCents: r.transferredCents,
         refundedCents: r.refundedCents,
@@ -311,7 +354,7 @@ export class TransactionsService {
   async audit(cursor?: string, limit = 50): Promise<Page<AuditEntry>> {
     const offset = decodeCursor(cursor)
     const rows = await this.deps.db.query.auditLog.findMany({
-      orderBy: [desc(s.auditLog.createdAt)],
+      orderBy: { createdAt: 'desc' },
       limit: limit + 1,
       offset,
     })
@@ -319,7 +362,7 @@ export class TransactionsService {
     const actors = new Map<string, string>()
     for (const id of actorIds) {
       const u = await this.deps.db.query.users.findFirst({
-        where: eq(s.users.id, id),
+        where: { id },
         columns: { email: true },
       })
       if (u) actors.set(id, u.email)
@@ -330,6 +373,7 @@ export class TransactionsService {
         action: r.action,
         entityType: r.entityType,
         entityId: r.entityId,
+        profileId: r.profileId,
         actorEmail: r.actorId ? (actors.get(r.actorId) ?? null) : null,
         metadata: r.metadata ?? null,
         createdAt: r.createdAt.toISOString(),

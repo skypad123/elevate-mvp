@@ -26,15 +26,16 @@ for. Budget about 30 minutes the first time.
 
 1. **Teacher applies.** Teach → sign in with a fresh email → fill the application (name, headline,
    bio, credentials, a sample link or upload) → "Application received".
-2. **Support approves the teacher.** Support → People → Applications → open → Approve. The teacher's
-   next request carries the `teacher` role (no re-login needed).
+2. **Support approves the profile.** Support → Profiles → Applications → open → Approve. No role is
+   granted: the profile itself is approved, and the teacher sees it on their next request
+   ("Check status", no re-login needed).
 3. **Teacher connects Stripe.** Teach dashboard → Connect Stripe → complete the hosted Express
-   onboarding with Stripe's test data shortcuts → back on `/stripe/return` the card should read
-   "Payments enabled" (via `account.updated` or the return-page re-check).
+   onboarding with Stripe's test data shortcuts → back on `/p/<profile id>/stripe/return` the card
+   should read "Payments enabled" (via `account.updated` or the return-page re-check).
 4. **Teacher builds and submits a course.** Courses → New → Details (title, summary, description,
    category, thumbnail, price ≥ S$1) → Curriculum (a lesson with a text or video artefact, a second
    lesson with a quiz; set the pass mark) → Map (make lesson 2 require lesson 1) → Review → Submit.
-   The checklist tells you what is missing; it needs Stripe charges enabled.
+   The checklist tells you what is missing; it needs the profile's payout account to be active.
 5. **Support approves the course.** Support → Review queue → open → walk the preview → Approve.
    This is the only path to `live`.
 6. **Learner pays.** Learner web → Explore → the course → Enrol → sign in with a third email →
@@ -50,9 +51,13 @@ for. Budget about 30 minutes the first time.
    the difference must be S$0.00 (acceptance criterion 5). "Open Stripe dashboard" shows the same
    transfer in the Express dashboard.
 10. **Support sees the money.** Support → Transactions: the payment with its fee split and Stripe
-    ids; Payout ledger: the teacher's transferred total; Audit log: approvals, payment, completion
-    and certificate. As super admin, Refund in full reverses the transfer and application fee and
-    removes the learner's access; the learner gets a refund email.
+    ids; Payout ledger: the total transferred to the profile's payout account; Audit log:
+    approvals, payment, completion and certificate. As super admin, Refund in full reverses the
+    transfer and application fee and removes the learner's access; the learner and the profile's
+    owner each get a refund email.
+11. **Support helps the teacher directly.** As super admin: Support → Profiles → the profile →
+    Open in Teach. Teach shows a staff banner. Fix a typo in a lesson; the price field and the
+    Stripe buttons are not available. Support → Audit log shows the change under your name.
 
 ## Mobile (Expo Go)
 

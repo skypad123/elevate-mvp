@@ -20,18 +20,12 @@ import {
   TH,
   THead,
   TR,
-  useToast,
 } from '@elevate/web-ui'
 import { errorMessage } from '@elevate/web-ui/portal'
 import { ArrowLeft, ExternalLink, Receipt, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import {
-  openStripeDashboard,
-  useCourseEarnings,
-  useEarnings,
-  useReconciliation,
-} from '../lib/queries'
+import { useCurrentProfile } from '../lib/profile'
+import { useCourseEarnings, useEarnings, useReconciliation, useStripeLinks } from '../lib/queries'
 
 const dateTime: Intl.DateTimeFormatOptions = {
   day: 'numeric',
@@ -143,26 +137,13 @@ function ReconcilePanel({ stripe }: { stripe: EarningsView['stripe'] }) {
   )
 }
 
-function useOpenDashboard() {
-  const { toast } = useToast()
-  const [opening, setOpening] = useState(false)
-  async function open() {
-    setOpening(true)
-    try {
-      await openStripeDashboard()
-    } catch (error) {
-      toast({ tone: 'danger', title: 'Stripe', description: errorMessage(error) })
-    } finally {
-      setOpening(false)
-    }
-  }
-  return { open, opening }
-}
-
 export function EarningsPage() {
   const earnings = useEarnings()
   const navigate = useNavigate()
-  const dashboard = useOpenDashboard()
+  const { path, can } = useCurrentProfile()
+  const links = useStripeLinks()
+  // Stripe links are the owner's; everyone else who can read earnings sees the figures only.
+  const canManageStripe = can('stripe.links')
 
   if (earnings.isPending)
     return (
@@ -191,17 +172,17 @@ export function EarningsPage() {
         description="Gross, Stripe fees, commission and net per course, derived from Stripe events. Payouts land in your bank on Stripe’s schedule."
       />
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        {e.stripe.connected ? (
+        {!canManageStripe ? null : e.stripe.connected ? (
           <Button
             variant="secondary"
             icon={ExternalLink}
-            loading={dashboard.opening}
-            onClick={dashboard.open}
+            loading={links.busy}
+            onClick={links.openDashboard}
           >
             Open Stripe dashboard
           </Button>
         ) : (
-          <Link to="/">
+          <Link to={path()}>
             <Button variant="accent">Connect Stripe to get paid</Button>
           </Link>
         )}
@@ -241,7 +222,7 @@ export function EarningsPage() {
                   <TR
                     key={c.courseId}
                     className="cursor-pointer"
-                    onClick={() => navigate(`/earnings/${c.courseId}`)}
+                    onClick={() => navigate(path(`/earnings/${c.courseId}`))}
                   >
                     <TD className="font-semibold">{c.title}</TD>
                     <TD>
@@ -315,6 +296,7 @@ export function EarningsPage() {
 }
 
 export function CourseEarningsPage() {
+  const { path } = useCurrentProfile()
   const { courseId = '' } = useParams()
   const query = useCourseEarnings(courseId)
   if (query.isPending) return <Skeleton className="h-64 w-full" />
@@ -330,7 +312,7 @@ export function CourseEarningsPage() {
   return (
     <>
       <Link
-        to="/earnings"
+        to={path('/earnings')}
         className="mb-4 inline-flex items-center gap-1 text-small text-ink-secondary hover:text-ink"
       >
         <ArrowLeft className="size-4" /> Earnings

@@ -111,3 +111,84 @@ describe('magic link auth', () => {
     expect(invalid.body.error.code).toBe('validation')
   })
 })
+
+describe('sign-in with a stale session token', () => {
+  // The portals keep their session token in localStorage and send it on every request, the two
+  // that sign a user in included. A session the API no longer accepts must not stop them.
+  async function revokedToken(email: string): Promise<string> {
+    const { token } = await t.signIn(email)
+    if (!token) throw new Error(`could not sign in ${email}`)
+    expect((await t.api('POST', '/api/auth/sign-out', { token })).status).toBe(200)
+    return token
+  }
+
+  it('signs in by code although the request carries an unknown token', async () => {
+    const email = 'stale-code@example.com'
+    const r = await t.api('POST', '/api/auth/magic-link', { body: { email, audience: 'learner' } })
+    const v = await t.api('POST', '/api/auth/verify', {
+      token: 'not-a-real-token',
+      body: { email, code: r.body.dev.code },
+    })
+    expect(v.status).toBe(200)
+    expect(v.body.user.email).toBe(email)
+    expect((await t.api('GET', '/api/auth/me', { token: v.body.token })).status).toBe(200)
+  })
+
+  it('signs in by link although the request carries a revoked session', async () => {
+    const email = 'stale-link@example.com'
+    const stale = await revokedToken(email)
+    const r = await t.api('POST', '/api/auth/magic-link', { body: { email, audience: 'learner' } })
+    const token = new URL(r.body.dev.link).searchParams.get('token')
+    const v = await t.api('POST', '/api/auth/verify', { token: stale, body: { token } })
+    expect(v.status).toBe(200)
+    expect(v.body.user.email).toBe(email)
+    expect(v.body.token).not.toBe(stale)
+    expect((await t.api('GET', '/api/auth/me', { token: v.body.token })).status).toBe(200)
+  })
+
+  it('accepts a magic-link request that carries a stale token', async () => {
+    const email = 'stale-request@example.com'
+    const stale = await revokedToken(email)
+    const r = await t.api('POST', '/api/auth/magic-link', {
+      token: stale,
+      body: { email, audience: 'learner' },
+    })
+    expect(r.status).toBe(200)
+    expect(t.mailer.last()?.to).toBe(email)
+  })
+
+  it('still answers 401 invalid_session for a stale token on any other route', async () => {
+    const stale = await revokedToken('stale-other@example.com')
+    const routes: [method: string, path: string][] = [
+      ['GET', '/api/auth/me'],
+      ['POST', '/api/auth/sign-out'],
+      ['GET', '/api/me'],
+      ['GET', '/api/health'],
+      // the exemption is for POST magic-link and POST verify, not other methods on those paths
+      ['GET', '/api/auth/magic-link'],
+      ['GET', '/api/auth/verify'],
+    ]
+    for (const [method, path] of routes) {
+      const r = await t.api(method, path, { token: stale })
+      expect(r.status, `${method} ${path}`).toBe(401)
+      expect(r.body.error.code, `${method} ${path}`).toBe('invalid_session')
+    }
+  })
+
+  it('still signs in when the request carries a valid token', async () => {
+    const email = 'valid-token@example.com'
+    const { token } = await t.signIn(email)
+    const r = await t.api('POST', '/api/auth/magic-link', {
+      token,
+      body: { email, audience: 'learner' },
+    })
+    expect(r.status).toBe(200)
+    const v = await t.api('POST', '/api/auth/verify', {
+      token,
+      body: { email, code: r.body.dev.code },
+    })
+    expect(v.status).toBe(200)
+    expect(v.body.user.email).toBe(email)
+    expect(v.body.token).not.toBe(token)
+  })
+})

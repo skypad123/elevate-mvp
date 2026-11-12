@@ -8,10 +8,11 @@ import {
   quote,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, eq, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { simpleEmail } from '../emails/templates'
 import { errors } from '../lib/errors'
+import { isPayable } from '../lib/payout'
 import type { SessionUser } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
 import { MediaService } from './media.service'
@@ -26,6 +27,14 @@ export type FulfilmentInput = {
   metadata: Record<string, string>
 }
 
+/**
+ * `unattributed`: the session's metadata does not say which payout account was paid, or names one
+ * that does not exist. No payment is written; the caller reports it so Support can act.
+ */
+export type FulfilmentOutcome = 'applied' | 'ignored' | 'unmatched' | 'unattributed'
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export class PaymentsService {
   private readonly media: MediaService
   constructor(private readonly deps: Deps) {
@@ -34,11 +43,10 @@ export class PaymentsService {
 
   private async loadCourse(courseId: string) {
     const course = await this.deps.db.query.courses.findFirst({
-      where: eq(s.courses.id, courseId),
+      where: { id: courseId },
       with: {
         thumbnail: true,
-        teacher: { with: { teacherProfile: true } },
-        lessons: { columns: { id: true } },
+        profile: { with: { payoutAccount: true } },
       },
     })
     if (!course) throw errors.notFound('Course')
@@ -48,9 +56,7 @@ export class PaymentsService {
   /** Validates a promo code for a course; returns null when no code was given. */
   async resolvePromo(code: string | undefined, courseId: string): Promise<PromoRow | null> {
     if (!code) return null
-    const promo = await this.deps.db.query.promoCodes.findFirst({
-      where: eq(s.promoCodes.code, code),
-    })
+    const promo = await this.deps.db.query.promoCodes.findFirst({ where: { code } })
     const now = this.deps.now()
     if (!promo?.active) throw errors.badRequest('promo_invalid', 'That promo code is not valid')
     if (promo.courseId && promo.courseId !== courseId)
@@ -73,7 +79,7 @@ export class PaymentsService {
     const q = quote({
       listPriceCents: course.priceCents,
       promo: discount,
-      commissionBps: course.teacher.teacherProfile?.commissionBps ?? env.DEFAULT_COMMISSION_BPS,
+      commissionBps: course.profile.commissionBps,
       stripeFeeBps: env.STRIPE_FEE_BPS,
       stripeFixedCents: env.STRIPE_FEE_FIXED_CENTS,
     })
@@ -86,8 +92,7 @@ export class PaymentsService {
         title: course.title,
         priceCents: course.priceCents,
         thumbnailUrl: await this.media.publicUrl(course.thumbnail),
-        teacherName:
-          course.teacher.teacherProfile?.displayName ?? course.teacher.name ?? 'Elevate teacher',
+        teacherName: course.profile.displayName,
       },
     }
   }
@@ -101,14 +106,14 @@ export class PaymentsService {
     const course = await this.loadCourse(courseId)
     if (course.status !== 'live') throw errors.notFound('Course')
     const existing = await db.query.enrollments.findFirst({
-      where: and(eq(s.enrollments.userId, user.id), eq(s.enrollments.courseId, courseId)),
+      where: { userId: user.id, courseId },
     })
     if (existing?.status === 'active')
       throw errors.conflict('already_enrolled', 'You are already enrolled in this course')
 
     const { quote: q, promo } = await this.quoteFor(courseId, promoCode)
     const promoRow = promo
-      ? await db.query.promoCodes.findFirst({ where: eq(s.promoCodes.code, promo.code) })
+      ? await db.query.promoCodes.findFirst({ where: { code: promo.code } })
       : null
 
     // Free enrolment: no Stripe involved.
@@ -157,8 +162,9 @@ export class PaymentsService {
         'below_minimum',
         `The discounted price is below the minimum chargeable amount (${formatSgd(100)})`,
       )
-    const teacher = course.teacher.teacherProfile
-    if (!teacher?.stripeAccountId || !teacher.stripeChargesEnabled) {
+    // The error code keeps its old name so clients do not change.
+    const account = course.profile.payoutAccount
+    if (!isPayable(account)) {
       throw errors.conflict(
         'teacher_not_payable',
         'This teacher cannot accept payments yet. Please try again later.',
@@ -187,14 +193,18 @@ export class PaymentsService {
       enrollmentId = row.id
     }
 
+    // The payee is fixed here, when checkout starts, and travels in the session's metadata.
+    // Fulfilment reads it from there, never from the course as it is later.
     const session = await payments.createCheckoutSession({
       enrollmentId,
+      payoutAccountId: account.id,
+      profileId: course.profileId,
       courseTitle: course.title,
       courseImageUrl: await this.media.publicUrl(course.thumbnail),
       amountCents: q.amountCents,
       currency: env.PLATFORM_CURRENCY,
       applicationFeeCents: q.applicationFeeCents,
-      destinationAccountId: teacher.stripeAccountId,
+      destinationAccountId: account.stripeAccountId,
       customerEmail: user.email,
       successUrl: `${env.LEARNER_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${env.LEARNER_URL}/course/${course.slug}?checkout=cancelled`,
@@ -202,7 +212,8 @@ export class PaymentsService {
         enrollmentId,
         courseId,
         userId: user.id,
-        teacherId: course.teacherId,
+        elevatePayoutAccountId: account.id,
+        elevateProfileId: course.profileId,
         promoCodeId: promoRow?.id ?? '',
         listPriceCents: String(q.listPriceCents),
         discountCents: String(q.discountCents),
@@ -229,7 +240,7 @@ export class PaymentsService {
   async syncSession(user: SessionUser, sessionId: string): Promise<CheckoutSyncResponse> {
     const { db, payments } = this.deps
     const enrollment = await db.query.enrollments.findFirst({
-      where: eq(s.enrollments.stripeCheckoutSessionId, sessionId),
+      where: { stripeCheckoutSessionId: sessionId },
       with: { course: true },
     })
     if (!enrollment || enrollment.userId !== user.id) throw errors.notFound('Checkout session')
@@ -237,35 +248,52 @@ export class PaymentsService {
       return { status: 'paid', enrollmentId: enrollment.id, courseSlug: enrollment.course.slug }
     const session = await payments.retrieveCheckoutSession(sessionId)
     if (session.paymentStatus === 'paid') {
-      await this.fulfilCheckout({
+      const outcome = await this.fulfilCheckout({
         sessionId,
         paymentIntentId: session.paymentIntentId,
         amountTotal: session.amountTotal,
         customerEmail: session.customerEmail,
         metadata: session.metadata,
       })
+      if (outcome === 'unattributed') {
+        // Paid, but we cannot tell whom it paid. The learner keeps seeing "pending" and the
+        // error is logged for Support; the webhook path stores the same failure with its event.
+        this.deps.log.error('paid checkout session has no payout account', { sessionId })
+        return { status: 'pending' }
+      }
       return { status: 'paid', enrollmentId: enrollment.id, courseSlug: enrollment.course.slug }
     }
     return { status: session.status === 'expired' ? 'expired' : 'pending' }
   }
 
   /** Idempotent: a payment row exists per Checkout session, so webhook + sync cannot double-fulfil. */
-  async fulfilCheckout(input: FulfilmentInput): Promise<'applied' | 'ignored' | 'unmatched'> {
+  async fulfilCheckout(input: FulfilmentInput): Promise<FulfilmentOutcome> {
     const { db, env, payments, mailer } = this.deps
     const already = await db.query.payments.findFirst({
-      where: eq(s.payments.stripeCheckoutSessionId, input.sessionId),
+      where: { stripeCheckoutSessionId: input.sessionId },
     })
     if (already) return 'ignored'
     const enrollment = await db.query.enrollments.findFirst({
-      where: eq(s.enrollments.stripeCheckoutSessionId, input.sessionId),
-      with: { course: { with: { teacher: { with: { teacherProfile: true } } } }, user: true },
+      where: { stripeCheckoutSessionId: input.sessionId },
+      with: { course: true, user: true },
     })
     if (!enrollment) return 'unmatched'
     if (!input.paymentIntentId)
       throw new Error(`checkout session ${input.sessionId} has no payment intent`)
 
-    const details = await payments.retrievePaymentDetails(input.paymentIntentId)
+    // Who was paid comes from the session, as it was when checkout started.
     const m = input.metadata
+    const payoutAccountId = m.elevatePayoutAccountId
+    const profileId = m.elevateProfileId
+    if (!payoutAccountId || !profileId || !UUID.test(payoutAccountId) || !UUID.test(profileId))
+      return 'unattributed'
+    const [payoutAccount, profile] = await Promise.all([
+      db.query.payoutAccounts.findFirst({ where: { id: payoutAccountId } }),
+      db.query.profiles.findFirst({ where: { id: profileId } }),
+    ])
+    if (!payoutAccount || !profile) return 'unattributed'
+
+    const details = await payments.retrievePaymentDetails(input.paymentIntentId)
     const num = (key: string, fallback: number) =>
       m[key] !== undefined && m[key] !== '' ? Number(m[key]) : fallback
     const amountCents =
@@ -285,7 +313,8 @@ export class PaymentsService {
           enrollmentId: enrollment.id,
           userId: enrollment.userId,
           courseId: enrollment.courseId,
-          teacherId: enrollment.course.teacherId,
+          profileId,
+          payoutAccountId,
           stripeCheckoutSessionId: input.sessionId,
           stripePaymentIntentId: input.paymentIntentId,
           stripeChargeId: details.chargeId,
@@ -339,15 +368,22 @@ export class PaymentsService {
       action: 'payment.succeeded',
       entityType: 'enrollment',
       entityId: enrollment.id,
-      metadata: { sessionId: input.sessionId, amountCents },
+      profileId,
+      metadata: { sessionId: input.sessionId, amountCents, payoutAccountId },
     })
-    const teacherId = enrollment.course.teacherId
-    if ((await this.deps.db.$count(s.payments, eq(s.payments.teacherId, teacherId))) === 1) {
-      const approvedAt = enrollment.course.teacher.teacherProfile?.reviewedAt ?? null
+    // Counted once per profile: the first payment on its payout account.
+    const paidToAccount = await db.$count(
+      s.payments,
+      eq(s.payments.payoutAccountId, payoutAccountId),
+    )
+    if (paidToAccount === 1) {
+      const approvedAt = profile.reviewedAt ?? null
       await trackEvent(this.deps, {
-        userId: teacherId,
+        userId: profile.ownerUserId,
         name: ANALYTICS_EVENTS.firstPayout,
         properties: {
+          profileId,
+          payoutAccountId,
           courseId: enrollment.courseId,
           amountCents,
           teacherNetCents,
@@ -362,7 +398,7 @@ export class PaymentsService {
         to: input.customerEmail ?? enrollment.user.email,
         title: `You're enrolled: ${enrollment.course.title}`,
         paragraphs: [
-          `Thanks for your purchase. You paid ${formatSgd(amountCents)} for "${enrollment.course.title}" by ${enrollment.course.teacher.teacherProfile?.displayName ?? 'your teacher'}.`,
+          `Thanks for your purchase. You paid ${formatSgd(amountCents)} for "${enrollment.course.title}" by ${profile.displayName}.`,
           details.receiptUrl
             ? `Your Stripe receipt: ${details.receiptUrl}`
             : 'A receipt is available from your Stripe payment confirmation.',

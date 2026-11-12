@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars (gitignored) and edit.
+root_domain = "example.com"
+github_repo = "skypad123/elevate-mvp"
+
+# Flip each one to true after putting real keys in its SSM parameters (infra/README.md, step 4).
+integrations = {
+  resend = false
+  stripe = false
+  mux    = false
+}
+
+# seed_super_admin_email = "you@example.com"
+
+# Switch to false once the browser console shows no CSP violations on the three sites.
+csp_report_only = true

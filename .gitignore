@@ -44,3 +44,11 @@ yarn-error.*
 # certificate fallback fonts are provisioned per host, see apps/api/assets/fonts/fallback/README.md
 apps/api/assets/fonts/fallback/*
 !apps/api/assets/fonts/fallback/README.md
+
+# Terraform (the provider lock file .terraform.lock.hcl is committed)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

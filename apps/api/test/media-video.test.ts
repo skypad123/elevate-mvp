@@ -106,7 +106,7 @@ describe('video uploads through the video provider', () => {
     })
     expect(created.body.mode).toBe('put')
     const row = await t.db.query.mediaAssets.findFirst({
-      where: (m, { eq }) => eq(m.id, created.body.asset.id),
+      where: { id: created.body.asset.id },
     })
     await t.storage.put(row?.storageKey as string, new Uint8Array([1, 2, 3]), 'audio/mpeg')
     await t.api('POST', `/api/media/assets/${created.body.asset.id}/complete`, { token })

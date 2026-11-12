@@ -3,6 +3,7 @@ import { RequireRole, usePortalAuth } from '@elevate/web-ui/portal'
 import { useT } from '@elevate/web-ui/preferences'
 import {
   ClipboardCheck,
+  GraduationCap,
   LogOut,
   Receipt,
   ScrollText,
@@ -40,6 +41,7 @@ export function SupportLayout() {
         tone="brand"
         items={[
           { to: '/review', label: t('nav.reviewQueue'), icon: ClipboardCheck },
+          { to: '/profiles', label: 'Profiles', icon: GraduationCap },
           { to: '/people', label: t('nav.people'), icon: Users },
           { to: '/transactions', label: t('nav.transactions'), icon: Receipt },
           { to: '/insights', label: t('nav.insights'), icon: TrendingUp },

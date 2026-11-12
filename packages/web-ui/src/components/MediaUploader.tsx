@@ -30,6 +30,12 @@ export type MediaUploaderProps = {
   kind: MediaKind
   value: MediaAssetView | null
   onChange: (asset: MediaAssetView | null) => void
+  /**
+   * The teaching profile the file belongs to. Set it for a profile's own media (course content,
+   * thumbnails, its avatar), so everyone on the profile can use the file; leave it out for a
+   * person's own files, such as a teaching sample sent with an application.
+   */
+  profileId?: string
   label?: string
   hint?: string
   disabled?: boolean
@@ -68,6 +74,7 @@ export function MediaUploader({
   kind,
   value,
   onChange,
+  profileId,
   label,
   hint,
   disabled,
@@ -121,7 +128,13 @@ export function MediaUploader({
     try {
       const instructions = await unwrap(
         await api.media.uploads.$post({
-          json: { kind, filename: file.name, mimeType: file.type, sizeBytes: file.size },
+          json: {
+            kind,
+            filename: file.name,
+            mimeType: file.type,
+            sizeBytes: file.size,
+            ...(profileId ? { profileId } : {}),
+          },
         }),
       )
       if (instructions.mode === 'put') {

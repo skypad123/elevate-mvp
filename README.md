@@ -43,6 +43,17 @@ Everything runs locally without third-party accounts (`VIDEO_DRIVER=local`, `STO
 Mailpit for email). Stripe test keys are needed for the real money loop — see
 [`docs/runbooks/`](docs/runbooks/).
 
+## Environments
+
+| Environment | Branch       | Where                                  |
+| ----------- | ------------ | -------------------------------------- |
+| dev         | `main`, `v0` | local, as in Quick start               |
+| staging     | `staging`    | AWS; every push deploys                |
+| production  | `production` | AWS; every push deploys after approval |
+
+The AWS environments are defined in Terraform. [`infra/README.md`](infra/README.md) covers setup
+and day-to-day use.
+
 ## Scripts
 
 | Command                                                       | What it does                                          |

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { ProfileRole, ProfileStatus, ProfileType } from '../domain/permissions'
 import { audienceSchema, emailSchema, type roleSchema } from './common'
 
 export const magicLinkRequestSchema = z.object({
@@ -21,13 +22,13 @@ export const updateMeSchema = z.object({
 })
 export type UpdateMe = z.infer<typeof updateMeSchema>
 
-export type TeacherSummary = {
-  status: 'applied' | 'approved' | 'rejected'
+/** A teaching profile the user owns or belongs to, with their role on it. */
+export type ProfileSummary = {
+  id: string
+  type: ProfileType
   displayName: string
-  stripeChargesEnabled: boolean
-  stripePayoutsEnabled: boolean
-  stripeDetailsSubmitted: boolean
-  commissionBps: number
+  status: ProfileStatus
+  role: ProfileRole
 }
 
 export type AuthUser = {
@@ -36,7 +37,8 @@ export type AuthUser = {
   name: string | null
   avatarUrl: string | null
   roles: z.infer<typeof roleSchema>[]
-  teacher: TeacherSummary | null
+  /** Every profile the user owns or is a member of; empty for a user who only learns. */
+  profiles: ProfileSummary[]
   createdAt: string
 }
 
