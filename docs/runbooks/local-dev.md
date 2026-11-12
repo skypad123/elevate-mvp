@@ -34,6 +34,12 @@ the edits wait as changes, and the owner approves or discards them from the cour
 changes" button. To add another member, invite an address from the profile's Members page; the
 invitation email lands in Mailpit like any other.
 
+It also creates one approved company, Kiln & Co Studio (UEN `201912345K`), owned by
+`founder@example.com` with `manager@example.com` as a manager. It has no payout account and no
+courses. To try the whole company journey, apply from Teach's "Create a company profile" entry
+with a new address, then approve it and run the legal-name check in Support
+(`docs/runbooks/stripe.md`, section 7).
+
 ## Ports
 
 | Service            | URL                              |

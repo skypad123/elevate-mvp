@@ -43,6 +43,9 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 - Course media belongs to a profile. A file put on a course is looked up with
   `MediaService.getProfileAsset(profileId, id)`, so one profile's media cannot go on another's
   course; uploads for a course send `profileId`.
+- A payout account's status is decided only by `ConnectService.applyAccountState` (via
+  `payoutStatus`): a company account needs a recorded legal-name match as well as charges. A
+  profile's owner changes only through `RecoveryService` (Support, `super_admin`).
 - Text that a person typed (names, titles, notes) goes into an email only through `simpleEmail`,
   which escapes it. Invitations reach addresses that are not Elevate users yet.
 - Run `npm run lint` (Biome) and `npx turbo run typecheck test` before committing.

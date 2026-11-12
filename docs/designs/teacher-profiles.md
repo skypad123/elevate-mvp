@@ -1,8 +1,9 @@
 # Teacher profiles separate from users
 
 -   **Author:** sky
--   **Status:** In progress. Step 0 (the Drizzle 1.0 upgrade), step 1 (Structure) and step 2
-    (Helpers) were implemented on 2026-11-12; step 3 is not started.
+-   **Status:** Implemented. Step 0 (the Drizzle 1.0 upgrade), step 1 (Structure), step 2
+    (Helpers) and step 3 (Corporate) were implemented on 2026-11-12. The Stripe company-account
+    test in Open Questions has not been run, and Goal 8 has not been run on staging.
 -   **Date:** 2026-11-11
 -   **Related:** reviews in [reviews/teacher-profiles/](reviews/teacher-profiles/); the brief this design came from, [teacher-profiles-brief.md](teacher-profiles-brief.md).
     Changes [ADR 003](../adr/003-payments-destination-charges.md): the destination charge goes to
@@ -2417,6 +2418,126 @@ Teach); a writer sees the profile's commission rate on the Settings page.
 #### Step 3: Corporate
 
 Step 3 starts only after the Stripe company-account test in Open Questions passes.
+
+**Status:** implemented on 2026-11-12, **without that test**. The author asked for step 3 to
+start before it, and the test needs Stripe test keys, which the development environment does not
+have. Step 3 was built and checked against the fake payments provider, so the four Stripe
+assumptions in Open Questions are still untested (see "Not checked" below). The items below
+describe the change as planned; this block records what was built differently and how it was
+checked.
+
+**Built differently from the items below**
+
+Data:
+
+- **The database enforces "corporate if and only if a legal entity" (3.1).** A check constraint,
+  `profiles_corporate_has_legal_entity`, refuses a corporate profile without a legal entity and a
+  personal profile with one, and `profiles.legal_entity_id` is unique. A corporate profile can no
+  longer be written to the database on its own.
+- **`registry_document_media_id` is nullable, with `on delete restrict` (3.1).** Only the seeded
+  demo company has none; every application through the API needs one.
+- **The UEN patterns were checked against the published format (3.2):** Annex E, "UEN Format", of
+  the press release "Unique Entity Number Brings Convenience to Entities" (Ministry of Finance,
+  ACRA and IDA, 6 August 2008). A local company is `yyyynnnnnX` and an LLP is `TyyLLnnnnX`. The
+  source is cited in `uen.ts`.
+
+Application and review:
+
+- **The owner can resubmit while the application is `applied` as well as `rejected` (3.4)**, so
+  a mistake can be corrected before Support reads it. An approved application cannot be
+  resubmitted (`409 already_approved`).
+- **Support's profile list is searchable by UEN and legal name, and shows both (3.11).** The
+  review queue in 3.6 is the list of courses, so corporate applications are labelled in the
+  profile list, where applications are reviewed, rather than in `review-queue.tsx`.
+
+Payout accounts and the name check:
+
+- **`payoutStatus` is one pure function (3.5)**, used by `applyAccountState`: an account is
+  `active` when Stripe allows charges and, for a company, a match is recorded. `activatedAt` keeps
+  the first activation.
+- **A mismatch needs a note of at least 10 characters (3.6)**, and the note is emailed to the
+  owner. A mismatch recorded after a match withdraws it: the account goes back to `onboarding`.
+  A match that activates an account emails the owner that the company can now be paid.
+- **The decision re-reads Stripe (3.6).** `decideNameCheck` reads the account from Stripe and
+  passes those flags to `applyAccountState`, so a stale stored copy cannot activate an account.
+- **A name read in the Stripe dashboard is typed in (3.6).** With `source: 'dashboard'` the body
+  carries `stripeLegalName`, so the audit entry holds both names whichever way the Stripe name was
+  read. With `source: 'api'` the name Stripe returned is stored.
+- **The last decision is shown (3.6, 3.11).** `NameCheckView.lastDecision` is read back from the
+  audit log, which is the only place a mismatch and its note are kept, so the next person to open
+  the check sees what was decided, by whom, and what the owner was told.
+- **The dashboard URL is built, not fetched (3.6).** `accountDashboardUrl` returns
+  `https://dashboard.stripe.com/[test/]connect/accounts/<id>`. The format is an assumption, to be
+  confirmed in the Stripe test.
+
+Owner recovery:
+
+- **The authorisation must be a finished PDF uploaded by the super admin doing the recovery
+  (3.8)**, and its ID is stored in the audit entry. Errors: `400 wrong_recovery` when the body
+  does not fit the profile type, `409 same_email`, `409 email_taken`, `409 already_owner`.
+- **Support's people data lists memberships (3.11).** A person's profiles were only those they
+  own, so after a recovery the previous owner showed no profile. They now list owned profiles
+  first, then the ones they are a manager or writer of, with the role.
+
+Teach:
+
+- **The gate holds a company until its payout account has been active once (3.10).**
+  `PayoutView.activated` says so. Afterwards a company whose account drops back to `onboarding`
+  (charges withdrawn, or a match withdrawn) keeps the portal, and the Payments card on the
+  dashboard says what is pending.
+- **While a company is held, two kinds of page stay open:** its application form
+  (`/p/:profileId/apply`, owner only, until approved) and the pages Stripe returns to. The Stripe
+  pages render outside both layouts, so they run once even when the profile becomes ready while
+  they wait.
+- **The profile switcher is in the onboarding header too, and always offers "Create a company
+  profile" (3.10)**, so someone whose company is being set up is not stuck on it.
+- **The owner can open the Stripe dashboard while the name check is pending**, from the set-up
+  page and the Payments card, to correct the company's details when the names differ.
+
+Seed:
+
+- **The demo company has no courses and no registry document (3.12).** It is "Kiln & Co Studio",
+  UEN `201912345K`, owned by `founder@example.com` with `manager@example.com` as a manager.
+
+**How it was checked**
+
+- `npm run lint`, `npm run check:dupes` and `npx turbo run typecheck test build` pass with nothing
+  cached. The API suite is 26 files and 200 tests; the core suite is 45 tests.
+- Goals 13 and 14 and CUJ 4: `corporate.test.ts` (16 tests), including the order of events (a
+  match recorded before charges are enabled), charges withdrawn and returned, a match withdrawn,
+  and a person holding two payout accounts. CUJ 7: `owner-recovery.test.ts` (6 tests).
+  `uen.test.ts` covers both patterns. `role-routes.test.ts` has the resubmission route, owner
+  only. `migration-guard.test.ts` checks the legal-entity link and the check constraint.
+- **Goal 8, local migration check**, on a throwaway Postgres 17: reset, migrate and seed; a second
+  seed changes nothing; `npm run db:generate` reports no changes; `drizzle/` holds one folder
+  (`20261112044644_init`); the database has 27 tables and the 4 views. The built `reset-schema`
+  (which refuses without `ALLOW_SCHEMA_RESET=yes`), `migrate` and `seed --demo` commands were run
+  against the same database.
+- **In a browser**, against that database and an API server with the fake payments provider:
+  - CUJ 4: a new user applies as a company (a UEN of the wrong form is flagged as typed);
+    Support finds the application by UEN, opens the registry document, rejects it with a reason;
+    the owner corrects the legal name and resubmits; Support approves; the owner's set-up page
+    shows the steps; Stripe onboarding finishes; Support records a mismatch from the dashboard
+    path and then, once Stripe reports the name, a match; the owner's Teach portal opens with
+    payments enabled. Withdrawing the match shows "Name check pending" on the Payments card.
+  - CUJ 7: a super admin names the seeded manager as the new owner of the demo company with an
+    uploaded authorisation; the previous owner is a manager and the audit entry and both emails
+    are there. On a personal profile, an address already in use is refused, then the owner's
+    address is changed; the new address signs in as the owner, and the old one reaches no profile.
+
+**Not checked:**
+
+- **The Stripe company-account test in Open Questions**, so all four of its assumptions: creating
+  a company account with these settings, one person holding two connected accounts, the dashboard
+  login link for a company account and whom it signs in, and reading the legal name from the API.
+  The dashboard URL format and what Stripe's login shows after an owner recovery are untested too.
+- Email delivery (the console mail driver was used), the Docker image (the built commands ran from
+  `dist`), and staging (Goal 8 there).
+
+**Found and left alone:** an owner recovery changes who controls the profile in Elevate, not the
+person Stripe holds as the company's representative; the new owner may need Stripe's own process
+for that. The design's "the review queue includes corporate applications" is met in the profile
+list, since the review queue lists courses.
 
 ##### 3.1 `packages/db/src/schema/profiles.ts`, `enums.ts` (Modify)
 

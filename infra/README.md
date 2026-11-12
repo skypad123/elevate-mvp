@@ -198,7 +198,8 @@ The API image has a seed command, run as a one-off task (the `run-task` call is 
 "Resetting an environment" below, with a different command):
 
 - `["node", "dist/seed.js", "--demo"]` for staging: the super admin, a support agent, demo
-  teachers with their courses, a writer on the first demo profile, two promo codes and a learner.
+  teachers with their courses, a writer on the first demo profile, a demo company with a manager
+  (no courses), two promo codes and a learner.
   The demo teachers have no payout account, so their paid courses cannot be bought until someone
   connects Stripe.
 - `["node", "dist/seed.js", "--admin-only"]` for production: the super admin and nothing else.

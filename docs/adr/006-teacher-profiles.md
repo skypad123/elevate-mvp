@@ -58,8 +58,9 @@ decisions.
 
 Profiles, the owner column, the permission table, profile URLs, staff acting and the audit trail
 are built (step 1 of the design). Memberships, invitations, held edits to live courses and
-profile-owned media are built too (step 2). Corporate applications and owner recovery are step 3;
-until then a corporate profile can exist only if it is written to the database directly.
+profile-owned media are built too (step 2), and so are corporate applications, the legal-name
+check and owner recovery (step 3). A corporate profile always has a legal entity; the database
+refuses one without.
 
 ## Consequences
 

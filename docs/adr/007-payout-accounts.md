@@ -27,7 +27,12 @@ Builds on [ADR 003](003-payments-destination-charges.md) (destination charges) a
 - **One rule activates an account.** `applyAccountState` stores Stripe's flags and decides the
   status; the `account.updated` webhook and the status check both call it. An individual account
   becomes `active` the first time Stripe enables charges. A company account stays `onboarding`
-  until Support has recorded that its legal name matches (built with corporate profiles).
+  until Support has recorded that its legal name matches; the order of the two does not matter.
+- **Support checks a company's legal name before it is paid.** Any Support staff member compares
+  the legal name on the Stripe account with the company approved from its registry document, and
+  records a match or a mismatch with a note for the owner. The Stripe name comes from the API, or,
+  when Stripe returns none, is read in the Stripe dashboard and typed in. Each decision is audited
+  with both names and where the Stripe name was read. A mismatch after a match withdraws it.
 - **A course can be bought only when its profile's account is `active` and Stripe allows
   charges.** Stripe can withdraw charges later, and selling stops when it does.
 - **Stripe links are the owner's, and need a recent sign-in.** Onboarding and dashboard links
@@ -35,6 +40,9 @@ Builds on [ADR 003](003-payments-destination-charges.md) (destination charges) a
   asked to sign in again. Each request is audited and emails the owner.
 
 ## Consequences
+
+- The legal-name check rests on assumptions about Stripe company accounts that have not been
+  tested (the design's Open Questions); `docs/runbooks/stripe.md` lists what to try.
 
 - An `account.updated` event for an account with no row is stored as a webhook error instead of
   being ignored.

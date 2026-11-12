@@ -92,3 +92,31 @@ Create two endpoints in Dashboard → Developers → Webhooks, both pointing at
 - **Stripe links.** Only the profile's owner can open onboarding or the Stripe dashboard, and only
   with a sign-in from the last 24 hours; an older session is sent to sign in again. Each request
   is written to the audit log and emailed to the owner.
+
+## 7. Company accounts and the legal-name check
+
+- A corporate profile's payout account is created with `business_type: company`. It becomes
+  `active` only when Stripe allows charges **and** Support has recorded that the legal name on the
+  Stripe account matches the company Elevate approved. Either can come first.
+- **The check** is on the profile's page in Support ("Legal-name check"): the name Stripe holds
+  beside the company's legal name and UEN. Record "Names match", or "Names do not match" with a
+  note; the note is emailed to the owner. When Stripe's API returns no legal name, open the
+  account in Stripe ("Open in Stripe"), type the name the dashboard shows, and record the decision.
+  The page shows the last decision and its note. If the company later changes its details in
+  Stripe, record "Names no longer match": the account goes back to `onboarding` and selling stops.
+- **API:** `GET` and `POST /api/support/profiles/:id/payout-account/name-check`, body
+  `{ match, source: 'api' | 'dashboard', stripeLegalName?, note? }`. Each decision is audited as
+  `payout_account.name_check`.
+
+**Not yet tested against Stripe.** The company flow was built and checked with the fake payments
+provider only. Before relying on it, in test mode:
+
+1. Create a corporate profile, open Stripe onboarding from Teach, and complete it as a Singapore
+   company with test data. Confirm Stripe accepts the account settings used for individuals.
+2. With the same Elevate user, onboard a second profile (personal and corporate): confirm one
+   person can hold two connected accounts.
+3. Open the Stripe dashboard link from Teach for the company account: confirm it works, and note
+   whom it signs in (the company's representative, or whoever controls the owner's email).
+4. In Support, open the name check: confirm Stripe's API returns the company's legal name, and
+   that "Open in Stripe" opens the right account (the URL is built as
+   `https://dashboard.stripe.com/test/connect/accounts/<id>`).
