@@ -6,6 +6,8 @@ export const uiEn = {
 
   // Icon buttons: the close button of a dialog, the dismiss button of a toast
   'ui.close': 'Close',
+  // The button that opens the navigation drawer on a phone
+  'ui.menu.open': 'Open menu',
   'ui.dismiss': 'Dismiss',
 
   // MediaUploader: the drop zone, by kind of file

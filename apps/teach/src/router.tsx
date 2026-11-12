@@ -9,15 +9,16 @@ import { CourseChangesPage } from './routes/courses/changes'
 import { CoursesPage } from './routes/courses/list'
 import { Dashboard } from './routes/dashboard'
 import { CourseEarningsPage, EarningsPage } from './routes/earnings'
-import { HomeRedirect, OnboardingLayout, ProfileGate } from './routes/gate'
+import { HomeRedirect, OnboardingLayout, ProfileGate, StartPage } from './routes/gate'
 import { InvitationPage } from './routes/invitation'
 import { MembersPage } from './routes/members'
 import { SettingsPage } from './routes/settings'
 import { StripeRefresh, StripeReturn } from './routes/stripe'
 
 /**
- * Three pages sit outside a profile: the home redirect, the application form, and the page an
- * invitation link opens (the invitee is not on the profile yet, and may not be signed in).
+ * A few pages sit outside a profile: the home redirect, the start page for someone on no profile,
+ * the application forms, and the page an invitation link opens (the invitee is not on the profile
+ * yet, and may not be signed in).
  * Everything else is under `/p/:profileId`, so the profile a page acts on is always in its URL.
  */
 export const router = createBrowserRouter([
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
           </RequireAuth>
         ),
         children: [
+          { path: 'start', element: <StartPage /> },
           { path: 'apply', element: <ApplyPage /> },
           { path: 'apply/company', element: <CorporateApplyPage /> },
         ],

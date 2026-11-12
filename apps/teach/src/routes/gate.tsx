@@ -1,16 +1,17 @@
-import { Button, Logo } from '@elevate/web-ui'
+import { Button, Card, Logo, PageHeader } from '@elevate/web-ui'
 import { FullPageSpinner, usePortalAuth } from '@elevate/web-ui/portal'
 import { PreferencesButton, useT } from '@elevate/web-ui/preferences'
 import type { ReactNode } from 'react'
-import { Navigate, Outlet, useLocation, useParams } from 'react-router'
-import { lastProfileId, useCurrentProfile } from '../lib/profile'
+import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router'
+import { lastProfileId, useCurrentProfile, useOptionalProfile } from '../lib/profile'
 import { profilePath } from '../lib/urls'
-import { ProfileSwitcher, TeachLayout } from './layout'
+import { ProfileSwitcher, StaffBanner, TeachLayout } from './layout'
 import { PendingPage } from './pending'
 
 /**
  * `/` has no page of its own. It opens the profile last used in this browser if the user is still
- * on it, else their first approved profile, else their first profile, else the application form.
+ * on it, else their first approved profile, else their first profile, else the start page (which
+ * offers both applications and explains invitations).
  */
 export function HomeRedirect() {
   const { user, status } = usePortalAuth()
@@ -21,7 +22,7 @@ export function HomeRedirect() {
     profiles.find((p) => p.id === last) ??
     profiles.find((p) => p.status === 'approved') ??
     profiles[0]
-  return <Navigate to={target ? profilePath(target.id) : '/apply'} replace />
+  return <Navigate to={target ? profilePath(target.id) : '/start'} replace />
 }
 
 /**
@@ -60,23 +61,69 @@ export function ProfileGate() {
 export function OnboardingLayout({ children }: { children?: ReactNode }) {
   const { user, signOut } = usePortalAuth()
   const { profileId } = useParams()
+  // Outside `/p/:profileId` (the application forms, the start page) there is no current profile.
+  const current = useOptionalProfile()
   const t = useT()
+  const staff = current?.actingAsStaff ? current.displayName : undefined
   return (
     <div className="min-h-full bg-canvas">
-      <header className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-5">
+      <header className="mx-auto flex w-full max-w-3xl flex-wrap items-end justify-between gap-x-4 gap-y-3 px-4 py-5">
         <Logo size="sm" suffix="Teach" />
-        <div className="flex items-end gap-3 text-small text-ink-secondary">
-          {/* Someone with another profile is not stuck on this one while it is being set up. */}
-          <ProfileSwitcher current={profileId} className="w-56" />
-          <span className="hidden pb-2 sm:inline">{user?.email}</span>
+        <div className="flex flex-wrap items-center gap-2 text-small text-ink-secondary sm:flex-nowrap">
+          <span className="hidden truncate sm:inline">{user?.email}</span>
           {/* Settings is out of reach until a profile is approved; language and theme are not. */}
           <PreferencesButton />
           <Button variant="ghost" size="sm" onClick={signOut}>
             {t('nav.signOut')}
           </Button>
         </div>
+        {/* Someone with another profile is not stuck on this one while it is being set up. */}
+        <ProfileSwitcher current={profileId} staffLabel={staff} className="w-full sm:w-72" />
       </header>
-      <main className="mx-auto w-full max-w-3xl px-4 pb-16">{children ?? <Outlet />}</main>
+      <main className="mx-auto w-full max-w-3xl px-4 pb-16">
+        {staff ? <StaffBanner name={staff} /> : null}
+        {children ?? <Outlet />}
+      </main>
     </div>
+  )
+}
+
+/**
+ * For someone signed in who is on no teaching profile: both applications side by side, and what
+ * to do with an invitation. A person who has just left their last profile is told so here.
+ */
+export function StartPage() {
+  const t = useT()
+  const { state } = useLocation()
+  const left = (state as { left?: string } | null)?.left
+  const choices = [
+    { key: 'person', to: '/apply' },
+    { key: 'company', to: '/apply/company' },
+  ] as const
+  return (
+    <>
+      <PageHeader
+        eyebrow={t('start.eyebrow')}
+        title={t('start.title')}
+        description={left ? t('start.left', { name: left }) : t('start.description')}
+      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        {choices.map((choice) => (
+          <Card key={choice.key} as="section" className="flex flex-col gap-3">
+            <h2 className="font-display text-h3 font-semibold text-ink">
+              {t(`start.${choice.key}.title`)}
+            </h2>
+            <p className="flex-1 text-small text-ink-secondary">{t(`start.${choice.key}.body`)}</p>
+            <Button asChild variant={choice.key === 'person' ? 'primary' : 'secondary'}>
+              <Link to={choice.to}>{t(`start.${choice.key}.action`)}</Link>
+            </Button>
+          </Card>
+        ))}
+      </div>
+      <Card as="section" className="mt-4">
+        <h2 className="font-display text-h3 font-semibold text-ink">{t('start.invited.title')}</h2>
+        <p className="mt-1 text-small text-ink-secondary">{t('start.invited.body')}</p>
+      </Card>
+    </>
   )
 }

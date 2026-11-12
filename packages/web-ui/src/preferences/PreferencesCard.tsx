@@ -1,7 +1,7 @@
 import { supportedLocales, type ThemePreference, themePreferenceSchema } from '@elevate/core'
 import { localeNames } from '@elevate/i18n'
 import type { LucideIcon } from 'lucide-react'
-import { Languages, Monitor, Moon, Sun } from 'lucide-react'
+import { Monitor, Moon, Settings2, Sun } from 'lucide-react'
 import { type ReactNode, useId, useState } from 'react'
 import { Button } from '../components/Button'
 import { Card, CardHeader } from '../components/Card'
@@ -143,13 +143,14 @@ export function PreferencesButton({ className }: { className?: string }) {
     <>
       <Button
         variant="ghost"
-        size="icon"
+        size="sm"
         aria-label={t('prefs.title')}
         title={t('prefs.title')}
         className={className}
         onClick={() => setOpen(true)}
       >
-        <Languages className="size-4" />
+        <Settings2 className="size-4" />
+        <span className="hidden sm:inline">{t('prefs.title')}</span>
       </Button>
       <PreferencesDialog open={open} onOpenChange={setOpen} />
     </>

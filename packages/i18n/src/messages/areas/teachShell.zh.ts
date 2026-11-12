@@ -4,10 +4,14 @@ export const teachShellZh = {
   'switcher.label': '教学档案',
   'switcher.ariaLabel': '切换教学档案',
   'switcher.placeholder': '您的教学档案…',
-  'switcher.option.staff': '{name}（以员工身份）',
-  'switcher.option.applied': '{name}（审核中）',
-  'switcher.option.rejected': '{name}（未获批准）',
-  'switcher.createCompany': '+ 创建公司档案…',
+  'switcher.detail.approved': '{role}',
+  'switcher.detail.applied': '{role} · 审核中',
+  'switcher.detail.rejected': '{role} · 未获批准',
+  'switcher.detail.staff': '以 Elevate 员工身份',
+  'switcher.createCompany': '创建公司档案',
+
+  'teachNav.changesWaiting.one': '1 门课程有待批准的更改',
+  'teachNav.changesWaiting.other': '{count} 门课程有待批准的更改',
 
   'staffBanner.title': '您正在以 Elevate 员工身份操作。',
   'staffBanner.body':
@@ -17,4 +21,18 @@ export const teachShellZh = {
   'profileNotFound.title': '未找到教学档案',
   'profileNotFound.body': '此教学档案不存在，或者您的账户不是其成员。',
   'profileNotFound.action': '前往您的教学档案',
+
+  'start.eyebrow': 'Elevate Teach',
+  'start.title': '在 Elevate 上授课',
+  'start.left': '您已离开 {name}，目前不属于任何教学档案。',
+  'start.description': '您目前还不属于任何教学档案。您可以申请授课，或加入邀请您的教学档案。',
+  'start.person.title': '以个人名义授课',
+  'start.person.body': '适用于个人，包括独资经营者。',
+  'start.person.action': '以个人身份申请',
+  'start.company.title': '以公司名义授课',
+  'start.company.body': '适用于在新加坡注册的私人有限公司或有限责任合伙企业。',
+  'start.company.action': '以公司身份申请',
+  'start.invited.title': '收到了邀请？',
+  'start.invited.body':
+    '请打开邀请邮件中的链接。如果您是用另一个邮箱地址接受的邀请，需要等教学档案的所有者确认，确认后您会收到邮件。',
 } satisfies Record<keyof typeof teachShellEn, string>

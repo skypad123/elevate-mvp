@@ -117,13 +117,18 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         title={t('profileNotFound.title')}
         body={t('profileNotFound.body')}
         action={
-          <Link to="/">
-            <Button variant="secondary">{t('profileNotFound.action')}</Button>
-          </Link>
+          <Button asChild variant="secondary">
+            <Link to="/">{t('profileNotFound.action')}</Link>
+          </Button>
         }
       />
     </div>
   )
+}
+
+/** The current profile under `/p/:profileId`, or `undefined` on a page outside one. */
+export function useOptionalProfile(): CurrentProfile | undefined {
+  return useContext(Ctx) ?? undefined
 }
 
 export function useCurrentProfile(): CurrentProfile {

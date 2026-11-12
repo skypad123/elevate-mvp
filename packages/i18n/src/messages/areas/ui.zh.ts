@@ -5,6 +5,7 @@ export const uiZh = {
   'ui.error.unreachable': '无法连接 Elevate API，请确认它是否正在运行。',
 
   'ui.close': '关闭',
+  'ui.menu.open': '打开菜单',
   'ui.dismiss': '关闭通知',
 
   'ui.upload.video': '上传视频',
