@@ -42,7 +42,7 @@
 2. **Media pipeline** — direct-to-storage uploads, transcoding via Mux or Cloudflare Stream (no custom pipeline), signed URLs for playback.
 3. **Stripe scaffold** — Stripe Connect (destination charges); application fee = per-profile commission field (~2.9% + S$0.50 netted from gross first). Test mode from the start.
 4. **Teacher onboarding** — application form (credentials, bio, teaching sample) → pending/approved status of the profile; in-app Stripe Connect onboarding link. A company applies as a corporate profile with its UEN and registry document.
-5. **Course Builder** (Teach) — create course → lessons → artefacts; video upload, rich-text artefact, reorder, prerequisite config, quiz authoring (MCQ, single attempt window, teacher-set pass mark); submit → `pending_review`.
+5. **Course Builder** (Teach) — create course → lessons → artefacts; video upload, rich-text artefact, reorder, prerequisite config, quiz authoring (MCQ, single attempt window, teacher-set pass mark); submit → `pending_review`. The owner can invite writers by email (and managers, on a corporate profile); a writer builds courses but cannot price, publish or see earnings, and a writer's edits to a live course wait for the owner or a manager to approve them.
 6. **Support: Review Queue** — preview pending course, approve / reject-with-reason. Approval is the only path to `live`.
 7. **Explore + Course detail** (Learner) — card grid, search, category filters, newest/most-enrolled ranking (no recommendation engine); detail = syllabus tree, instructor bio, net-fee price, enrol CTA.
 8. **Checkout** — Stripe Checkout / Payment Element, promo code field, receipt email. Web only.

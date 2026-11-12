@@ -35,6 +35,16 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
   a new route also needs a row in `apps/api/test/role-routes.test.ts`.
 - A lookup of a course, lesson or artefact for Teach filters by the actor's profile in the same
   query and answers 404 when it is not there. Money queries select payments by `payout_account_id`.
+- `lessons`, `artefacts`, `quizzes` and `lesson_prerequisites` hold a writer's draft rows beside
+  the live ones (a row with a `change_set_id` is a draft). Only `courses.service.ts` and
+  `change-sets.service.ts` touch those tables. Everything a learner is shown or sold reads the live
+  views through `deps.learnerDb`, whose relation keys are `liveLessons`, `liveArtefacts`,
+  `liveQuiz` and `livePrerequisites`; `apps/api/test/schema-guard.test.ts` fails on anything else.
+- Course media belongs to a profile. A file put on a course is looked up with
+  `MediaService.getProfileAsset(profileId, id)`, so one profile's media cannot go on another's
+  course; uploads for a course send `profileId`.
+- Text that a person typed (names, titles, notes) goes into an email only through `simpleEmail`,
+  which escapes it. Invitations reach addresses that are not Elevate users yet.
 - Run `npm run lint` (Biome) and `npx turbo run typecheck test` before committing.
 
 ## Expo conventions (apps/learner)

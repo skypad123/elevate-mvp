@@ -28,6 +28,12 @@ profiles have no payout account, so their paid courses cannot be bought (checkou
 `teacher_not_payable`). To try a purchase, sign in to Teach as a demo teacher and connect Stripe,
 or follow `docs/runbooks/money-loop.md` with a new teacher.
 
+It also makes `writer@example.com` a writer on the first demo profile (Mei Lin Tan,
+`meilin@example.com`). Sign in to Teach as the writer and edit one of that profile's live courses:
+the edits wait as changes, and the owner approves or discards them from the course's "Review
+changes" button. To add another member, invite an address from the profile's Members page; the
+invitation email lands in Mailpit like any other.
+
 ## Ports
 
 | Service            | URL                              |

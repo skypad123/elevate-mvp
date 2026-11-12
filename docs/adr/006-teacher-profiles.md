@@ -34,23 +34,44 @@ decisions.
   in Teach gets the `staff` actor: they can fix content and read the profile, and cannot set
   prices, publish, manage members or request Stripe links. Each change they make writes an audit
   entry under their own user ID with the profile ID, and Teach shows a banner.
-- **A writer's edits to a live course are held for approval** as a draft copy of the course
-  content, hidden from learners by database views that learner code reads through.
+- **Members join by invitation.** The owner invites writers and, on a corporate profile,
+  managers; a manager invites writers. The emailed link holds a token that is stored only as a
+  keyed hash and works for 7 days. Anyone who signs in can accept a writer invitation; a manager
+  invitation accepted from another address waits for the owner to confirm. Each email sent is a
+  row, and a profile may send 20 in any 24 hours, counted in the database.
+- **A writer's edits to a live course are held for approval.** The first edit copies the course's
+  lessons, artefacts, quizzes and prerequisite links into draft rows (a change set, one open per
+  course), and the writer edits the copies. Approval by the owner or a manager applies all of it
+  or none of it, and live rows keep their IDs, so learner progress and quiz attempts stay attached.
+  Where the live course was changed in the meantime, the two versions are not merged: the approver
+  picks one for each clash. Course details and price are not part of a change set.
+- **Learners read live rows only, by construction.** Four database views leave the draft rows
+  out, and learner-facing services read course content through a second database client
+  (`learnerDb`) that knows the content only by those views. A test reads the source and fails if
+  any file but the two that manage drafts touches the raw tables.
+- **Course media belongs to the profile.** Everyone on the profile can use it whoever uploaded it,
+  someone who has left cannot, and it cannot be put on another profile's course.
 - **Drizzle is pinned to `1.0.0-rc.5`**, a release candidate, because relational queries over
   views need Drizzle 1.0. Both packages are pinned to the exact version and moved only on purpose.
 
 ## Built so far
 
 Profiles, the owner column, the permission table, profile URLs, staff acting and the audit trail
-are built (step 1 of the design). Memberships, invitations and held edits to live courses are
-step 2. Corporate applications and owner recovery are step 3.
+are built (step 1 of the design). Memberships, invitations, held edits to live courses and
+profile-owned media are built too (step 2). Corporate applications and owner recovery are step 3;
+until then a corporate profile can exist only if it is written to the database directly.
 
 ## Consequences
 
 - A user on two profiles cannot reach one through the other; a test calls every Teach route on
   one profile with the other profile's IDs.
 - Adding a role or a capability is a change to one table in `packages/core`, and its test
-  repeats the table in full.
+  repeats the table in full. A second test calls every Teach route as each role, on a course in
+  each status, and compares the answers with that table.
+- Opening a change set copies the whole course. That is cheap at tens of lessons, and is the
+  thing to revisit if a course grows to a few hundred items.
+- An owner who edits a live course while a change set is open gets a clash to resolve for each
+  item they changed, even one the writer did not touch: the draft still holds the older copy.
 - Support reaches profiles directly (`/support/profiles`), and a person's page lists their
   profiles instead of holding a teacher section.
 - The repo depends on a release candidate until Drizzle 1.0 is final. A move to a later version

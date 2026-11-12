@@ -1,8 +1,8 @@
 # Teacher profiles separate from users
 
 -   **Author:** sky
--   **Status:** In progress. Step 0 (the Drizzle 1.0 upgrade) and step 1 (Structure) were
-    implemented on 2026-11-12; steps 2 and 3 are not started.
+-   **Status:** In progress. Step 0 (the Drizzle 1.0 upgrade), step 1 (Structure) and step 2
+    (Helpers) were implemented on 2026-11-12; step 3 is not started.
 -   **Date:** 2026-11-11
 -   **Related:** reviews in [reviews/teacher-profiles/](reviews/teacher-profiles/); the brief this design came from, [teacher-profiles-brief.md](teacher-profiles-brief.md).
     Changes [ADR 003](../adr/003-payments-destination-charges.md): the destination charge goes to
@@ -633,7 +633,8 @@ and draft versions, lets them pick one for each conflict, then approve or discar
 - **Conflicts:** a live row edited after `opened_at_snapshot`, a draft whose live row was deleted,
   or a lesson whose live prerequisite links differ from `opened_prerequisites`. Live rows the owner
   added during the change set are not conflicts and stay. The approver picks the live or draft
-  version of each conflict; the choices are stored on the change set until approval.
+  version of each conflict; the choices are stored on the change set until approval. Step 2's
+  status block lists how the built rules refine this.
 - The ordered apply procedure is in the Detailed Implementation Plan, item 2.8.
 - **Quiz changes:** an attempt in progress is graded against the quiz as it is at submission. This
   is today's behaviour when an owner edits a live quiz, and this design does not change it.
@@ -1943,6 +1944,134 @@ A second try works. This was the case before this step.
 -   **Why**: Technical Plan, section 4; [brief](teacher-profiles-brief.md) "Stripe link safety".
 
 #### Step 2: Helpers
+
+**Status:** implemented on 2026-11-12. The items below describe the change as planned; this block
+records what was built differently and how it was checked.
+
+**Built differently from the items below**
+
+Invitations and members:
+
+- **One row per invitation email (2.1, 2.7).** A resend marks the old row `revoked` and adds a
+  new one, where the plan updated the row in place. The rows of the last 24 hours are then the
+  count of emails sent, which is what the limit of 20 is for, and a resend counts without a
+  counter column.
+- **A second invitation with a different role is refused (2.7)** with `409 invitation_pending`.
+  Only the same role is a resend. Otherwise a manager could replace the owner's pending manager
+  invitation with a writer one.
+- **A profile that is not approved gives a role no more than it has when approved (section 2).**
+  The plan gave "its owner and members" `profile.read` and `profile.edit`. A writer cannot edit
+  an approved profile, so a writer gets `profile.read` only. Members can only join an approved
+  profile, so this matters only as a guard.
+- **A member leaves from the Settings page (2.14)**, in a card that states their role. The menu
+  hides Earnings and Members from a writer.
+- **Emails escape what people typed (2.12).** `simpleEmail` put names and titles into HTML as
+  they were. An invitation goes to an address outside Elevate with the inviter's name and the
+  profile's name in it, so the helper in `emails/templates.ts` now escapes its text, where the
+  plan said that file would not change. A test sends an invitation from an account whose name is
+  a link.
+- **Course review emails go to managers too.** Step 1 left a note for this in `review.service.ts`.
+- **In development the invitation response carries the link**, as the sign-in response carries
+  its code, when `DEV_ENDPOINTS_ENABLED` is on and the build is not production.
+
+Change sets:
+
+- **A choice names the state it was made against (2.8, 2.10).** Each conflict carries `seen`: the
+  live row's `updated_at`, `deleted`, or the lesson's live prerequisite IDs. The resolve body sends
+  it back, and a choice whose `seen` no longer matches is refused with `409 change_set_conflict`
+  and the current list. This is how "a live edit made after resolving is a new conflict" is done,
+  and it also covers an approver who decides on a page that has gone stale.
+- **A live save that changed nothing is not a conflict (2.8).** A conflict needs the live row to
+  be newer than the snapshot and to differ from the draft in the fields approval copies.
+- **A deleted lesson is one conflict (2.8).** The artefacts and quizzes that were deleted with it
+  are decided by the lesson's choice and are not listed apart.
+- **Removing something that was edited since is a conflict (2.8).** If a writer removes a lesson
+  and the lesson, or anything under it, was edited on the live course afterwards, the approver
+  chooses between keeping it and removing it.
+- **Approval checks for a prerequisite loop last (2.8).** The owner's live links and the writer's
+  can form a loop that neither made alone. Approval then answers `422 prerequisite_cycle` and
+  applies nothing.
+- **`discard` keeps the change-set row (2.8)** with status `discarded`, who decided and when, and
+  deletes its draft rows. The plan deleted the row, which left the `discarded` status of section 8
+  unused.
+- **Nothing to decide is `409 no_open_change_set` (2.10)** on approve, resolve and discard. On
+  these routes 404 means the course is not on the profile. `GET change-set` answers
+  `{ changeSet: null }`.
+- **The conflict list is under `error.details.conflicts` (2.10)**, in the API's error envelope.
+- **Contracts carry more than listed (2.13).** `ChangeSetView` also has `conflicts`, each with
+  its stored choice, so the review screen shows them before anyone presses Approve. Items and
+  conflicts have a `title`; a quiz's item or conflict gives its artefact's IDs. `CourseView` has
+  `viewing` and `changeSet`, lessons and artefacts have `sourceId`, and `CourseSummary` has
+  `pendingChanges`.
+- **`GET courses/:id` declares its `draft` query (2.10)**, so the typed client can send it.
+- **The builder keeps its place across the switch to draft IDs (2.14).** Selection and React keys
+  use the item's `sourceId` when it has one, so the open editor and its focus survive the
+  writer's first save. A writer's builder always asks for `?draft=1`.
+
+Learner reads:
+
+- **`createDb` and `createPgliteDb` each return `learnerDb` (2.3, 2.4)**, in place of one
+  `createLearnerDb(client)`. One function for both drivers would pull PGlite into the API bundle.
+- **Checkout and certificates needed no learner client (2.5, 2.6).** The checkout quote loaded
+  the lessons and never used them, so that read is removed. Certificates read no course content.
+  The catalogue, the lesson player, My Learning and the drop-off analytics moved to the views.
+- **The guard scans all of `apps/api/src` (2.17)**, not only `services/`.
+
+Schema and media:
+
+- **A live row carries no draft fields (2.2).** A check constraint on `lessons`, `artefacts` and
+  `quizzes` enforces it, and `change_set_id` and `source_id` are indexed. `opened_by` and
+  `decided_by` are set to null if the user is deleted.
+- **Course media must belong to the course's profile (1.26, Goal 12).** Item 1.26 let the
+  uploader, and any member of the asset's profile, use an asset anywhere. With members, a writer
+  on one profile who owns another could have put the first profile's video on their own course.
+  A file put on a course, or set as the profile's picture, is now looked up by profile
+  (`getProfileAsset`) and anything else is 404.
+  An asset with a profile is readable by the people on that profile, so a writer who has left
+  loses access to what they uploaded. Two existing tests now upload their cover image to the
+  profile, as the builder does.
+- **The `init` migration was regenerated.** `20261112031609_init` replaces `20261111170534_init`.
+  A database migrated with the step 1 folder has to be reset once more.
+
+**How it was checked**
+
+- `npm run lint`, `npm run check:dupes` and `npx turbo run typecheck test build` pass with nothing
+  cached. The API suite is 24 files and 172 tests; the core suite is 39 tests.
+- Each goal has its named test (2.16): Goal 9 `members.test.ts`, Goal 10 `role-routes.test.ts`
+  (the owner, a manager, a writer and staff on a course in each of the four statuses, against the
+  role table), Goal 11 `change-sets.test.ts`, Goal 12 `profile-media.test.ts`, and the guard
+  `schema-guard.test.ts`.
+- **Goal 8, local migration check**, on a throwaway Postgres 17: reset, migrate and seed; a second
+  seed changes nothing; `npm run db:generate` reports no changes; `drizzle/` holds one folder; the
+  database has 26 tables and the 4 views. The built `reset-schema`, `migrate` and `seed --demo`
+  commands were run against the same database.
+- **In a browser**, against that database:
+  - CUJ 2: the owner invites an address; the invitee opens the link signed out, signs in (which
+    creates the account) and accepts; they land in the profile as a writer with no Earnings or
+    Members page; the owner is emailed.
+  - CUJ 3: the writer renames a lesson and adds a reading on a live course, and the editor keeps
+    its selection and focus through the first save; the catalogue still shows the old course; the
+    owner sees the "Changes waiting" badge and the banner; a clashing edit by the owner shows as a
+    clash with both versions; after a choice and approval the catalogue shows both changes and no
+    draft rows are left.
+  - A manager invitation accepted from another address waits, the owner confirms it, and the
+    owner changes the role, on a corporate profile written straight to the database.
+  - Discarding a change set leaves the live course as it was. A writer leaves from Settings and
+    the profile is then not found for them.
+
+**Not checked:** CUJ 6 in two browser tabs (a test covers it, and the profile switcher was seen
+listing both profiles); email delivery (the console mail driver was used); the learner app on a
+device; the Docker image (the built commands ran from `dist`); staging.
+
+**For the author to decide:** an owner's live edit to an item the writer did not touch is
+reported as a clash, as section 8 defines it, because the draft still holds the older copy.
+Keeping the live version is the only choice that makes sense there, and the approver still has
+to make it. A fingerprint of each row's content, stored when the change set opens, would tell
+"the writer did not change this" and skip those. It is one more JSON column on
+`course_change_sets`, and is cheapest to add before the `init` migration is applied anywhere.
+
+**Found and left alone:** Support has no page for a profile's members (staff can read them in
+Teach); a writer sees the profile's commission rate on the Settings page.
 
 ##### 2.1 `packages/db/src/schema/profiles.ts` (Modify)
 
