@@ -7,8 +7,8 @@
  * are interpolated by `translate`.
  *
  * Translated today: navigation, the Settings/Preferences/Profile screens, and the teaching-profile
- * screens of Teach and Support (members, invitations, held changes, company application and
- * set-up, Support's profile pages). Other pages are still English.
+ * screens of Teach and Support (the Teach dashboard and start page, members, invitations, held
+ * changes, company application and set-up, Support's profile pages). Other pages are still English.
  *
  * To add an area: write the two files, then add it to `enAreas` and to `en` below, and to the
  * same two places in `zh.ts`. `test/catalog.test.ts` fails if the two lists disagree or if two

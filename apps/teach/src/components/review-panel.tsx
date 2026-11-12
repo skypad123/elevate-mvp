@@ -94,11 +94,9 @@ export function ReviewPanel({
                     </span>
                   </span>
                   {target === 'settings' ? (
-                    <Link to={path('/settings')}>
-                      <Button variant="ghost" size="sm">
-                        Open settings
-                      </Button>
-                    </Link>
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to={path('/settings')}>Open settings</Link>
+                    </Button>
                   ) : (
                     <Button variant="ghost" size="sm" onClick={() => onGoTo(target)}>
                       Fix

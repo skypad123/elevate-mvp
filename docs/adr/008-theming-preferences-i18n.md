@@ -64,11 +64,11 @@ cannot corrupt what users already have stored.
   together by `messages/en.ts` and `messages/zh.ts`. A Chinese area is checked against its English
   file with `satisfies`, so a missing or unknown key is a compile error in that file.
 - Translated today: navigation, the Settings/Preferences/Profile screens, and the teaching-profile
-  screens: in Teach the profile switcher and staff banner, Members, the invitation page, the company
-  application and set-up, the Stripe card and return pages, Settings, and the review of a writer's
-  held changes; in Support the profiles list, the profile page, the company card, the legal-name
-  check and owner recovery; and the text inside the shared uploader, media preview, dialog and
-  toast. Other pages stay English until they are translated whole, as do error messages from the
+  screens: in Teach the profile switcher and staff banner, the start page, the dashboard, Members,
+  the invitation page, the company application and set-up, the Stripe card and return pages,
+  Settings, and the review of a writer's held changes; in Support the profiles list, the profile
+  page, the company card, the legal-name check and owner recovery; and the text inside the shared
+  shell drawer, uploader, media preview, dialog and toast. Other pages stay English until they are translated whole, as do error messages from the
   API and emails.
 - `test/catalog.test.ts` fails when a catalog has untranslated keys, unknown keys or mismatched
   placeholders, when two areas define the same key, or when an area is missing from a catalog.

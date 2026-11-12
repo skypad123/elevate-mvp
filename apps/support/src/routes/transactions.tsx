@@ -349,18 +349,18 @@ function TransactionView({ t }: { t: TransactionDetail }) {
           Enrolment {statusLabel(t.enrollmentStatus).toLowerCase()}
         </Badge>
         {stripeUrl ? (
-          <a href={stripeUrl} target="_blank" rel="noreferrer">
-            <Button variant="secondary" size="sm" icon={ExternalLink}>
+          <Button asChild variant="secondary" size="sm" icon={ExternalLink}>
+            <a href={stripeUrl} target="_blank" rel="noreferrer">
               Open in Stripe
-            </Button>
-          </a>
+            </a>
+          </Button>
         ) : null}
         {t.stripe.receiptUrl ? (
-          <a href={t.stripe.receiptUrl} target="_blank" rel="noreferrer">
-            <Button variant="ghost" size="sm" icon={Receipt}>
+          <Button asChild variant="ghost" size="sm" icon={Receipt}>
+            <a href={t.stripe.receiptUrl} target="_blank" rel="noreferrer">
               Receipt
-            </Button>
-          </a>
+            </a>
+          </Button>
         ) : null}
         {canRefund ? (
           <Button

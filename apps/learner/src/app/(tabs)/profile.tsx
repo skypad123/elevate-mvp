@@ -92,10 +92,15 @@ export default function Profile() {
             <Text tone="secondary" variant="small">
               {t('prefs.appearance.description')}
             </Text>
-            <View style={{ flexDirection: 'row', gap: theme.space[2], flexWrap: 'wrap' }}>
+            <View
+              accessibilityRole="radiogroup"
+              accessibilityLabel={t('prefs.appearance')}
+              style={{ flexDirection: 'row', gap: theme.space[2], flexWrap: 'wrap' }}
+            >
               {themePreferenceSchema.options.map((option) => (
                 <Chip
                   key={option}
+                  role="radio"
                   label={t(`prefs.theme.${option}`)}
                   selected={preferences.theme === option}
                   onPress={() => setPreference('theme', option)}
@@ -108,10 +113,15 @@ export default function Profile() {
             <Text tone="secondary" variant="small">
               {t('prefs.language.description')}
             </Text>
-            <View style={{ flexDirection: 'row', gap: theme.space[2], flexWrap: 'wrap' }}>
+            <View
+              accessibilityRole="radiogroup"
+              accessibilityLabel={t('prefs.language')}
+              style={{ flexDirection: 'row', gap: theme.space[2], flexWrap: 'wrap' }}
+            >
               {supportedLocales.map((locale) => (
                 <Chip
                   key={locale}
+                  role="radio"
                   label={localeNames[locale]}
                   selected={preferences.locale === locale}
                   onPress={() => setPreference('locale', locale)}

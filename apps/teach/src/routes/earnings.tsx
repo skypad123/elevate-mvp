@@ -182,9 +182,9 @@ export function EarningsPage() {
             Open Stripe dashboard
           </Button>
         ) : (
-          <Link to={path()}>
-            <Button variant="accent">Connect Stripe to get paid</Button>
-          </Link>
+          <Button asChild variant="accent">
+            <Link to={path()}>Connect Stripe to get paid</Link>
+          </Button>
         )}
         <span className="text-small text-ink-tertiary">
           Commission on your courses: {formatBps(e.commissionBps)}
