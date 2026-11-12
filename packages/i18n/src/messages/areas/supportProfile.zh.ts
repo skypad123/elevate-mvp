@@ -46,9 +46,9 @@ export const supportProfileZh = {
   'profileDetail.payout.title': '收款账户',
   'profileDetail.payout.description': '此档案用来收款的 Stripe 账户。',
   'profileDetail.payout.none.personal':
-    '暂无。所有者尚未开始办理 Stripe 开通，因此该档案的课程还无法购买。',
+    '暂无。所有者尚未开始 Stripe 开通流程，因此该档案的课程还无法购买。',
   'profileDetail.payout.none.corporate':
-    '暂无。所有者尚未开始为公司办理 Stripe 开通，因此该档案的课程还无法购买。',
+    '暂无。所有者尚未为公司开始 Stripe 开通流程，因此该档案的课程还无法购买。',
   'profileDetail.payout.kind': '账户类型',
   'profileDetail.payout.kind.company': '公司',
   'profileDetail.payout.kind.individual': '个人',

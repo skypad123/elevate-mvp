@@ -30,5 +30,5 @@ export const paymentsZh = {
   'payments.return.incomplete.description': 'Stripe 还需要一些资料才能开通收款。',
   'payments.return.failed': '无法检查 Stripe 状态',
 
-  'payments.refresh.redirecting': '正在带您返回 Stripe…',
+  'payments.refresh.redirecting': '正在返回 Stripe…',
 } satisfies Record<keyof typeof paymentsEn, string>

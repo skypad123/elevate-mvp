@@ -32,5 +32,5 @@ export const invitationZh = {
   'invitation.notYou': '不是您本人？请{signOut}，再用您想使用的邮箱地址登录。',
   'invitation.signInToAccept': '登录以接受邀请',
   'invitation.newHere': '第一次使用 Elevate？使用邮箱登录即会为您创建账户，无需设置密码。',
-  'invitation.expires': '此邀请的有效期至 {date}。',
+  'invitation.expires': '此邀请有效期至 {date}。',
 } satisfies Record<keyof typeof invitationEn, string>

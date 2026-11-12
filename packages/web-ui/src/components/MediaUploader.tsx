@@ -46,12 +46,14 @@ export type MediaUploaderProps = {
 
 const KIND_ICON = { video: Film, audio: FileAudio, image: ImageIcon, document: FileText } as const
 
-/** `failed` words the error for the reader: it gets the HTTP status when there was an answer. */
+/**
+ * A failed upload rejects with a plain Error. Its message is for logs, not for the reader:
+ * `errorMessage` shows its own sentence for anything that is not an API error.
+ */
 function putWithProgress(
   url: string,
   file: File,
   onProgress: (percent: number) => void,
-  failed: (status?: number) => string,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -61,8 +63,10 @@ function putWithProgress(
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
     }
     xhr.onload = () =>
-      xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(failed(xhr.status)))
-    xhr.onerror = () => reject(new Error(failed()))
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`Upload failed (${xhr.status})`))
+    xhr.onerror = () => reject(new Error('Upload failed'))
     xhr.send(file)
   })
 }
@@ -146,12 +150,8 @@ export function MediaUploader({
       )
       if (instructions.mode === 'put') {
         setPhase({ kind: 'uploading', percent: 0, instructions })
-        await putWithProgress(
-          instructions.uploadUrl,
-          file,
-          (percent) => setPhase({ kind: 'uploading', percent, instructions }),
-          (status) =>
-            status === undefined ? t('ui.upload.failed') : t('ui.upload.failedStatus', { status }),
+        await putWithProgress(instructions.uploadUrl, file, (percent) =>
+          setPhase({ kind: 'uploading', percent, instructions }),
         )
         pollUntilReady(instructions.asset.id)
       } else {

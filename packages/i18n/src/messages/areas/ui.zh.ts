@@ -2,7 +2,7 @@ import type { uiEn } from './ui.en'
 
 export const uiZh = {
   'ui.error.generic': '出了点问题，请重试。',
-  'ui.error.unreachable': '无法连接 Elevate API。它是否正在运行？',
+  'ui.error.unreachable': '无法连接 Elevate API，请确认它是否正在运行。',
 
   'ui.close': '关闭',
   'ui.dismiss': '关闭通知',
@@ -17,7 +17,6 @@ export const uiZh = {
   'ui.upload.processing': '处理中…',
   'ui.upload.processing.hint': '转码通常需要一两分钟。',
   'ui.upload.failed': '上传失败',
-  'ui.upload.failedStatus': '上传失败（{status}）',
   'ui.upload.processingFailed': '处理失败',
   'ui.upload.retry': '点击重试',
   'ui.upload.replace': '替换',

@@ -8,7 +8,7 @@ export const companyApplyZh = {
   'companyApply.eyebrow.reapply': '更新您的申请',
   'companyApply.title': '为您的公司创建教学档案',
   'companyApply.intro':
-    '适用于在新加坡注册的私人有限公司或有限责任合伙。课程以公司名义出售，款项支付到公司自己的 Stripe 账户。我们会先对照商业档案核对公司信息，再审核教学内容，通常在两个工作日内完成。',
+    '适用于在新加坡注册的私人有限公司或有限责任合伙企业。课程以公司名义出售，款项支付到公司自己的 Stripe 账户。我们会先对照商业档案核对公司信息，再审核教学内容，通常在两个工作日内完成。',
   'companyApply.personalInstead': '以个人名义授课，或者您是独资经营者？请{link}。',
   'companyApply.personalInstead.link': '改为以个人身份申请',
   'companyApply.reviewerNote': '审核意见',

@@ -19,12 +19,13 @@ export const supportCompanyZh = {
   'companyCard.registryDocument.none': '无存档。只有预置的演示公司才没有商业档案。',
 
   'nameCheck.title': '法定名称核对',
-  'nameCheck.description': '仅当 Stripe 账户上的法定名称与此处批准的公司一致时，公司才能收款。',
+  'nameCheck.description':
+    '仅当 Stripe 账户上的法定名称与此处批准的公司名称一致时，该公司才能收款。',
   'nameCheck.state.match': '名称一致',
   'nameCheck.state.mismatch': '名称不一致',
   'nameCheck.state.waiting': '待核对',
   'nameCheck.state.notStarted': '未开始',
-  'nameCheck.notStarted': '该公司尚未开始办理 Stripe 开通，因此暂无可供核对的 Stripe 名称。',
+  'nameCheck.notStarted': '该公司尚未开始 Stripe 开通流程，因此暂无可供核对的 Stripe 名称。',
 
   'nameCheck.stripeName': 'Stripe 账户上的名称',
   'nameCheck.stripeName.notReturned': 'Stripe 未返回法定名称',

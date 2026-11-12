@@ -20,11 +20,11 @@ export const teachSettingsZh = {
   'membership.leave.title': '要离开 {name} 吗？',
   'membership.leave.description':
     '您将立即失去对此教学档案及其课程的访问权限。您撰写的内容会保留在档案中。如需重新加入，需要获得新的邀请。',
-  'membership.leave.stay': '留下',
+  'membership.leave.stay': '暂不离开',
   'membership.leave.confirm': '离开',
   'membership.leave.done': '您已离开 {name}',
   'membership.leave.failed': '离开失败',
 
-  'account.signedInAs': '登录账户',
+  'account.signedInAs': '当前登录账户',
   'account.owner': '所有者',
 } satisfies Record<keyof typeof teachSettingsEn, string>

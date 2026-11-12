@@ -24,10 +24,10 @@ export const domainZh = {
   'status.payout.onboarding': '开通中',
   'status.payout.active': '已启用',
 
-  'entityType.private_limited': '私人有限公司 (Pte. Ltd.)',
-  'entityType.llp': '有限责任合伙 (LLP)',
+  'entityType.private_limited': '私人有限公司（Pte. Ltd.）',
+  'entityType.llp': '有限责任合伙企业（LLP）',
   'company.legalName': '法定名称',
-  'company.legalForm': '法律形式',
+  'company.legalForm': '企业类型',
   'company.uen': 'UEN',
   'company.uenValue': 'UEN {uen}',
 

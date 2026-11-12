@@ -19,8 +19,6 @@ export const uiEn = {
   'ui.upload.processing': 'Processing…',
   'ui.upload.processing.hint': 'Transcoding usually takes a minute or two.',
   'ui.upload.failed': 'Upload failed',
-  // {status} is the HTTP status the storage answered with
-  'ui.upload.failedStatus': 'Upload failed ({status})',
   'ui.upload.processingFailed': 'Processing failed',
   'ui.upload.retry': 'Click to try again',
   // MediaUploader: a file that is already there

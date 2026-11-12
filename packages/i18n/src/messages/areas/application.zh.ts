@@ -35,7 +35,7 @@ export const applicationZh = {
   'companySetup.stripe.title': '连接公司的 Stripe 账户',
   'companySetup.stripe.verified': 'Stripe 已验证该公司，可以代其收取款项。',
   'companySetup.stripe.notConnected':
-    'Stripe 负责处理付款和收款。开通时须以公司名义办理，并使用公司自己的银行账户，大约需要十分钟。',
+    'Stripe 负责处理收款和提现。开通时须以公司名义办理，并使用公司自己的银行账户，大约需要十分钟。',
   'companySetup.stripe.unfinished': 'Stripe 的开通流程已经开始，但尚未完成。',
   'companySetup.stripe.verifying': 'Stripe 正在验证公司的资料，可能需要一两天。',
   'companySetup.stripe.continue': '继续开通 Stripe',
