@@ -44,7 +44,9 @@ decisions.
   course), and the writer edits the copies. Approval by the owner or a manager applies all of it
   or none of it, and live rows keep their IDs, so learner progress and quiz attempts stay attached.
   Where the live course was changed in the meantime, the two versions are not merged: the approver
-  picks one for each clash. Course details and price are not part of a change set.
+  picks one for each clash. Only an item the writer changed can clash: a fingerprint of each copy
+  is kept when the change set opens, and an owner's edit or deletion of an item the writer left
+  as it was simply stands. Course details and price are not part of a change set.
 - **Learners read live rows only, by construction.** Four database views leave the draft rows
   out, and learner-facing services read course content through a second database client
   (`learnerDb`) that knows the content only by those views. A test reads the source and fails if
@@ -71,8 +73,9 @@ refuses one without.
   each status, and compares the answers with that table.
 - Opening a change set copies the whole course. That is cheap at tens of lessons, and is the
   thing to revisit if a course grows to a few hundred items.
-- An owner who edits a live course while a change set is open gets a clash to resolve for each
-  item they changed, even one the writer did not touch: the draft still holds the older copy.
+- An owner who edits a live course while a change set is open gets a clash to resolve only for an
+  item the writer changed too. A writer who changes something and then changes it back has left
+  it untouched, so the owner's version stands there as well.
 - Support reaches profiles directly (`/support/profiles`), and a person's page lists their
   profiles instead of holding a teacher section.
 - The repo depends on a release candidate until Drizzle 1.0 is final. A move to a later version

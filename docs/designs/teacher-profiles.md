@@ -613,8 +613,10 @@ and draft versions, lets them pick one for each conflict, then approve or discar
 
 - **`course_change_sets`:**
   - columns: `id`, `course_id`, `opened_by`, `status`, `opened_at`, `opened_at_snapshot`,
-    `opened_prerequisites` (the live prerequisite links at opening, as JSON), `decided_by`,
-    `decided_at`;
+    `opened_prerequisites` (the live prerequisite links at opening, as JSON),
+    `opened_fingerprints` (a fingerprint of each draft row and of each draft lesson's
+    prerequisites as copied, as JSON; added after step 3, see Step 2's status block),
+    `decided_by`, `decided_at`;
   - `status` is `open`, `approved` or `discarded`;
   - a partial unique index on `course_id` where the status is `open` allows one open change set per
     course.
@@ -678,7 +680,9 @@ and draft versions, lets them pick one for each conflict, then approve or discar
   or a lesson whose live prerequisite links differ from `opened_prerequisites`. Live rows the owner
   added during the change set are not conflicts and stay. The approver picks the live or draft
   version of each conflict; the choices are stored on the change set until approval. Step 2's
-  status block lists how the built rules refine this.
+  status block lists how the built rules refine this; the main refinement is that only something
+  the writer changed can clash. A live edit or deletion of an item the writer left as it was is
+  the owner's alone: it is not a conflict, and approval keeps it.
 - The ordered apply procedure is in the Detailed Implementation Plan, item 2.8.
 - **Quiz changes:** an attempt in progress is graded against the quiz as it is at submission. This
   is today's behaviour when an owner edits a live quiz, and this design does not change it.
@@ -2107,12 +2111,26 @@ Schema and media:
 listing both profiles); email delivery (the console mail driver was used); the learner app on a
 device; the Docker image (the built commands ran from `dist`); staging.
 
-**For the author to decide:** an owner's live edit to an item the writer did not touch is
-reported as a clash, as section 8 defines it, because the draft still holds the older copy.
-Keeping the live version is the only choice that makes sense there, and the approver still has
-to make it. A fingerprint of each row's content, stored when the change set opens, would tell
-"the writer did not change this" and skip those. It is one more JSON column on
-`course_change_sets`, and is cheapest to add before the `init` migration is applied anywhere.
+**Decided after step 3 (2026-11-12): only what the writer changed can clash.** As first built, an
+owner's live edit to an item the writer did not touch was reported as a clash, because the draft
+still held the older copy, and the approver had to choose "keep live" by hand. The author chose to
+add a fingerprint, and it was built after step 3:
+
+- `course_change_sets.opened_fingerprints` holds, when the change set opens, a fingerprint of each
+  draft row (the fields approval copies, plus an artefact's lesson) by draft ID, and of each draft
+  lesson's prerequisites. A copied draft whose fingerprint still matches is untouched.
+- An untouched draft is never a conflict: not when the owner edits its live row, not when the
+  owner deletes it (a lesson counts only if it and everything under it are untouched), and not
+  when the owner changes the prerequisites of a lesson whose links the writer left alone. It is
+  not listed as a change, and approval leaves its live row, or links, as the owner has them.
+- One exception keeps the writer's links: when a lesson they point at comes back as a new row
+  (a `deleted` conflict resolved "keep draft"), only the draft can name it.
+- A writer who changes something and then changes it back has left it untouched.
+- Tests in `change-sets.test.ts`: an owner's edits and a deletion of things the writer left
+  alone; a deleted lesson, untouched and then with an edit under it; the owner's prerequisites
+  on an untouched lesson (which can still make a loop); prerequisites changed on both sides. With
+  the fingerprints switched off, the first three fail.
+- The `init` migration was regenerated for the column (`20261112125246_init`).
 
 **Found and left alone:** Support has no page for a profile's members (staff can read them in
 Teach); a writer sees the profile's commission rate on the Settings page.
@@ -2129,7 +2147,8 @@ Teach); a writer sees the profile's commission rate on the Settings page.
 
 -   **Type / Scope**: Drizzle tables and views.
 -   **Proposed Changes**:
-    - new `courseChangeSets` table (including `openedPrerequisites` and `resolutions`, both JSON),
+    - new `courseChangeSets` table (including `openedPrerequisites`, `openedFingerprints` and
+      `resolutions`, all JSON),
       `change_set_status` enum, and the partial unique index on `course_id` where status is
       `open`;
     - `lessons`, `artefacts`, `quizzes`, `lessonPrerequisites` gain `changeSetId` (cascade) and,
@@ -2231,8 +2250,10 @@ Teach); a writer sees the profile's commission rate on the Settings page.
     - **`openFor`**, in one transaction: copy the course's live lessons, artefacts and quizzes into
       draft rows with new IDs and `source_id` set; rewrite the copies' `lesson_id` and
       `artefact_id` to the new draft IDs; copy the prerequisite links with both ends rewritten to
-      draft lesson IDs; store the live links in `opened_prerequisites` and the latest live
-      `updated_at` in `opened_at_snapshot`.
+      draft lesson IDs; store the live links in `opened_prerequisites`, the latest live
+      `updated_at` in `opened_at_snapshot`, and a fingerprint of each draft row (the fields
+      approval copies, and an artefact's lesson) and of each draft lesson's prerequisites in
+      `opened_fingerprints`. A copied draft whose fingerprint still matches is _untouched_.
     - **Terms used below.** A _copied_ draft has `copied_from_live = true`; its `source_id` points
       at the live row, or is null if that live row was deleted since. A _new_ draft has
       `copied_from_live = false` and keeps its own ID when it goes live. The _map_ sends each draft
@@ -2246,7 +2267,10 @@ Teach); a writer sees the profile's commission rate on the Settings page.
          - a lesson whose live prerequisite links differ from its links in
            `opened_prerequisites` (kind `prerequisites`, keyed by the live lesson ID).
 
-         Live rows the owner added after opening have no draft, are not conflicts, and stay as they
+         None of these is a conflict when the writer left the draft untouched (for `deleted`, the
+         draft and everything under it; for `prerequisites`, the lesson's links): the live row
+         stays as the owner left it, deleted or edited. Live rows the owner added after opening
+         have no draft, are not conflicts, and stay as they
          are. If any conflict has no entry in `resolutions`, return `409 change_set_conflict` with
          the list and change nothing;
       3. apply the stored resolutions (see `resolveConflicts`): for each `keep: 'live'` on an
@@ -2553,7 +2577,8 @@ Seed:
   only. `migration-guard.test.ts` checks the legal-entity link and the check constraint.
 - **Goal 8, local migration check**, on a throwaway Postgres 17: reset, migrate and seed; a second
   seed changes nothing; `npm run db:generate` reports no changes; `drizzle/` holds one folder
-  (`20261112044644_init`); the database has 27 tables and the 4 views. The built `reset-schema`
+  (`20261112044644_init`, since regenerated as `20261112125246_init` for the change-set
+  fingerprints in Step 2's status block); the database has 27 tables and the 4 views. The built `reset-schema`
   (which refuses without `ALLOW_SCHEMA_RESET=yes`), `migrate` and `seed --demo` commands were run
   against the same database.
 - **In a browser**, against that database and an API server with the fake payments provider:
