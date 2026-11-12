@@ -1,8 +1,8 @@
-import { index, integer, pgTable, primaryKey, text, unique, uuid } from 'drizzle-orm/pg-core'
+import { index, integer, primaryKey, snakeCase, text, unique, uuid } from 'drizzle-orm/pg-core'
 import { citext, createdAt, id, ts, updatedAt } from './columns'
 import { audienceEnum, identityProviderEnum, userRoleEnum } from './enums'
 
-export const users = pgTable('users', {
+export const users = snakeCase.table('users', {
   id: id(),
   email: citext().notNull().unique(),
   name: text(),
@@ -12,7 +12,7 @@ export const users = pgTable('users', {
 })
 
 /** One row per login method. `email` today; `singpass` (or others) can be linked later. */
-export const identities = pgTable(
+export const identities = snakeCase.table(
   'identities',
   {
     id: id(),
@@ -26,7 +26,7 @@ export const identities = pgTable(
   (t) => [unique().on(t.provider, t.providerSubject), index().on(t.userId)],
 )
 
-export const sessions = pgTable(
+export const sessions = snakeCase.table(
   'sessions',
   {
     id: id(),
@@ -44,7 +44,7 @@ export const sessions = pgTable(
   (t) => [index().on(t.userId), index().on(t.expiresAt)],
 )
 
-export const magicLinks = pgTable(
+export const magicLinks = snakeCase.table(
   'magic_links',
   {
     id: id(),
@@ -62,7 +62,7 @@ export const magicLinks = pgTable(
 )
 
 /** Learner is implicit: every user can learn. Extra roles are rows here. */
-export const userRoles = pgTable(
+export const userRoles = snakeCase.table(
   'user_roles',
   {
     userId: uuid()

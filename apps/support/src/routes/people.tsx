@@ -7,7 +7,6 @@ import {
   PageHeader,
   Skeleton,
   statusLabel,
-  statusTone,
   Table,
   Tabs,
   TabsList,
@@ -23,17 +22,16 @@ import { useDeferredValue, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { type PeopleFilter, usePeople } from '../lib/queries'
 
+// Teachers are found through the Profiles page: teaching belongs to a profile, not to a person.
 const TABS: Array<{ value: string; label: string; filter: PeopleFilter }> = [
-  { value: 'applications', label: 'Applications', filter: { role: 'teacher', status: 'applied' } },
-  { value: 'teachers', label: 'Teachers', filter: { role: 'teacher', status: 'approved' } },
+  { value: 'all', label: 'Everyone', filter: {} },
   { value: 'learners', label: 'Learners', filter: { role: 'learner' } },
   { value: 'staff', label: 'Staff', filter: { role: 'staff' } },
-  { value: 'all', label: 'Everyone', filter: {} },
 ]
 
 export function People() {
   const [params, setParams] = useSearchParams()
-  const tab = params.get('tab') ?? 'applications'
+  const tab = params.get('tab') ?? 'all'
   const [q, setQ] = useState(params.get('q') ?? '')
   const deferredQ = useDeferredValue(q)
   const navigate = useNavigate()
@@ -47,8 +45,8 @@ export function People() {
     <>
       <PageHeader
         eyebrow="People"
-        title="Teachers and learners"
-        description="Approve teacher applications, set commission rates and look up learners."
+        title="People"
+        description="Look up anyone with an account and manage staff access. Teacher applications are under Profiles."
       />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Tabs value={tab} onValueChange={(v) => setParams({ tab: v, ...(q ? { q } : {}) })}>
@@ -87,8 +85,7 @@ export function People() {
             <TR>
               <TH>Person</TH>
               <TH>Roles</TH>
-              <TH>Teacher status</TH>
-              <TH>Commission</TH>
+              <TH>Teaching profiles</TH>
               <TH>Joined</TH>
             </TR>
           </THead>
@@ -97,15 +94,9 @@ export function People() {
               <TR key={p.id} className="cursor-pointer" onClick={() => navigate(`/people/${p.id}`)}>
                 <TD>
                   <div className="flex items-center gap-3">
-                    <Avatar
-                      name={p.teacher?.displayName ?? p.name ?? p.email}
-                      url={p.avatarUrl}
-                      size="sm"
-                    />
+                    <Avatar name={p.name ?? p.email} url={p.avatarUrl} size="sm" />
                     <div>
-                      <p className="font-semibold text-ink">
-                        {p.teacher?.displayName ?? p.name ?? '—'}
-                      </p>
+                      <p className="font-semibold text-ink">{p.name ?? '—'}</p>
                       <p className="text-caption text-ink-tertiary">{p.email}</p>
                     </div>
                   </div>
@@ -116,7 +107,7 @@ export function People() {
                       <Badge>Learner</Badge>
                     ) : (
                       p.roles.map((r) => (
-                        <Badge key={r} tone={r === 'teacher' ? 'accent' : 'info'}>
+                        <Badge key={r} tone="info">
                           {statusLabel(r)}
                         </Badge>
                       ))
@@ -124,16 +115,13 @@ export function People() {
                   </div>
                 </TD>
                 <TD>
-                  {p.teacher ? (
-                    <Badge tone={statusTone[p.teacher.status]}>
-                      {statusLabel(p.teacher.status)}
-                    </Badge>
-                  ) : (
+                  {p.profiles.length === 0 ? (
                     <span className="text-ink-tertiary">—</span>
+                  ) : (
+                    <span className="text-ink-secondary">
+                      {p.profiles.map((profile) => profile.displayName).join(', ')}
+                    </span>
                   )}
-                </TD>
-                <TD className="font-mono">
-                  {p.teacher ? `${p.teacher.commissionBps / 100}%` : '—'}
                 </TD>
                 <TD className="text-ink-secondary">{formatDate(p.createdAt)}</TD>
               </TR>

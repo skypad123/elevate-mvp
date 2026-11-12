@@ -41,7 +41,7 @@ export default function Profile() {
             <Text tone="secondary">{user?.email}</Text>
             <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
               <Badge label="Learner" tone="brand" />
-              {user?.roles.includes('teacher') ? <Badge label="Teacher" tone="accent" /> : null}
+              {user?.profiles.length ? <Badge label="Teacher" tone="accent" /> : null}
               {user?.roles.some((r) => r === 'support_agent' || r === 'super_admin') ? (
                 <Badge label="Staff" tone="info" />
               ) : null}

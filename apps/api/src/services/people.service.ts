@@ -1,24 +1,52 @@
 import type { Page, PersonDetail, PersonSummary, Role } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, desc, eq, exists, ilike, inArray, notExists, or, type SQL, sql } from 'drizzle-orm'
+import {
+  and,
+  EmptyFilter,
+  eq,
+  exists,
+  ilike,
+  inArray,
+  notExists,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
 import type { SessionUser } from '../middleware/auth'
 import { recordAudit } from './audit.service'
-import { teacherProfileView } from './teachers.service'
+import { profileSummary } from './auth.service'
 
 export type PeopleQuery = {
   q?: string
-  role?: 'teacher' | 'learner' | 'staff'
-  status?: 'applied' | 'approved' | 'rejected'
+  role?: 'learner' | 'staff'
   cursor?: string
   limit: number
 }
 
+type ProfileColumns = Pick<typeof s.profiles.$inferSelect, 'id' | 'type' | 'displayName' | 'status'>
+
 type UserWithRelations = typeof s.users.$inferSelect & {
   roles: (typeof s.userRoles.$inferSelect)[]
-  teacherProfile: typeof s.teacherProfiles.$inferSelect | null
+  ownedProfiles: ProfileColumns[]
+  memberships: Array<
+    Pick<typeof s.profileMemberships.$inferSelect, 'role'> & { profile: ProfileColumns }
+  >
 }
+
+const PROFILE_COLUMNS = { id: true, type: true, displayName: true, status: true } as const
+
+/** The relations a person is listed with: staff roles, and every profile they own or are on. */
+const PERSON_RELATIONS = {
+  roles: true,
+  ownedProfiles: { columns: PROFILE_COLUMNS, orderBy: { appliedAt: 'asc' } },
+  memberships: {
+    columns: { role: true },
+    with: { profile: { columns: PROFILE_COLUMNS } },
+    orderBy: { createdAt: 'asc' },
+  },
+} as const
 
 const STAFF_ROLES = ['support_agent', 'super_admin'] as const
 
@@ -47,15 +75,11 @@ export function personSummary(user: UserWithRelations): PersonSummary {
     avatarUrl: user.avatarUrl,
     roles: user.roles.map((r) => r.role),
     createdAt: user.createdAt.toISOString(),
-    teacher: user.teacherProfile
-      ? {
-          status: user.teacherProfile.status,
-          displayName: user.teacherProfile.displayName,
-          commissionBps: user.teacherProfile.commissionBps,
-          stripeChargesEnabled: user.teacherProfile.stripeChargesEnabled,
-          appliedAt: user.teacherProfile.appliedAt.toISOString(),
-        }
-      : null,
+    // Owned profiles first, then the ones the person is a manager or writer of.
+    profiles: [
+      ...user.ownedProfiles.map((p) => profileSummary(p, 'owner')),
+      ...user.memberships.map((m) => profileSummary(m.profile, m.role)),
+    ],
   }
 }
 
@@ -64,79 +88,66 @@ export class PeopleService {
 
   async list(query: PeopleQuery): Promise<Page<PersonSummary>> {
     const { db } = this.deps
-    const conditions: SQL[] = []
+    const cursor = query.cursor ? decodeCursor(query.cursor) : null
 
-    const teacherExists = (extra?: SQL) =>
-      exists(
+    /**
+     * The filters as SQL. `users` is the alias the relational query gives the table; the
+     * subqueries have to refer to it, because `s.users` is not in scope inside that query.
+     */
+    const conditionsFor = (users: typeof s.users): SQL[] => {
+      const conditions: SQL[] = []
+
+      const ownsProfile = (extra?: SQL) =>
         db
           .select({ one: sql`1` })
-          .from(s.teacherProfiles)
+          .from(s.profiles)
           .where(
             extra
-              ? and(eq(s.teacherProfiles.userId, s.users.id), extra)
-              : eq(s.teacherProfiles.userId, s.users.id),
-          ),
-      )
-    const staffExists = exists(
-      db
-        .select({ one: sql`1` })
-        .from(s.userRoles)
-        .where(
-          and(eq(s.userRoles.userId, s.users.id), inArray(s.userRoles.role, [...STAFF_ROLES])),
-        ),
-    )
-
-    if (query.role === 'teacher')
-      conditions.push(
-        teacherExists(query.status ? eq(s.teacherProfiles.status, query.status) : undefined),
-      )
-    if (query.role === 'staff') conditions.push(staffExists)
-    if (query.role === 'learner') {
-      conditions.push(
-        notExists(
-          db
-            .select({ one: sql`1` })
-            .from(s.teacherProfiles)
-            .where(eq(s.teacherProfiles.userId, s.users.id)),
-        ),
-      )
-      conditions.push(
-        notExists(
-          db
-            .select({ one: sql`1` })
-            .from(s.userRoles)
-            .where(
-              and(eq(s.userRoles.userId, s.users.id), inArray(s.userRoles.role, [...STAFF_ROLES])),
-            ),
-        ),
-      )
-    }
-    if (query.q) {
-      const like = `%${query.q.replace(/[%_]/g, '\\$&')}%`
-      const nameMatch = exists(
+              ? and(eq(s.profiles.ownerUserId, users.id), extra)
+              : eq(s.profiles.ownerUserId, users.id),
+          )
+      const staffExists = exists(
         db
           .select({ one: sql`1` })
-          .from(s.teacherProfiles)
+          .from(s.userRoles)
           .where(
-            and(
-              eq(s.teacherProfiles.userId, s.users.id),
-              ilike(s.teacherProfiles.displayName, like),
-            ),
+            and(eq(s.userRoles.userId, users.id), inArray(s.userRoles.role, [...STAFF_ROLES])),
           ),
       )
-      const q = or(ilike(sql`${s.users.email}::text`, like), ilike(s.users.name, like), nameMatch)
-      if (q) conditions.push(q)
+
+      if (query.role === 'staff') conditions.push(staffExists)
+      // A learner owns no profile and is not staff.
+      if (query.role === 'learner') {
+        conditions.push(notExists(ownsProfile()))
+        conditions.push(
+          notExists(
+            db
+              .select({ one: sql`1` })
+              .from(s.userRoles)
+              .where(
+                and(eq(s.userRoles.userId, users.id), inArray(s.userRoles.role, [...STAFF_ROLES])),
+              ),
+          ),
+        )
+      }
+      if (query.q) {
+        const like = `%${query.q.replace(/[%_]/g, '\\$&')}%`
+        const nameMatch = exists(ownsProfile(ilike(s.profiles.displayName, like)))
+        const q = or(ilike(sql`${users.email}::text`, like), ilike(users.name, like), nameMatch)
+        if (q) conditions.push(q)
+      }
+      if (cursor)
+        conditions.push(
+          sql`(${users.createdAt}, ${users.id}) < (${cursor.createdAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`,
+        )
+      return conditions
     }
-    const cursor = query.cursor ? decodeCursor(query.cursor) : null
-    if (cursor)
-      conditions.push(
-        sql`(${s.users.createdAt}, ${s.users.id}) < (${cursor.createdAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`,
-      )
 
     const rows = await db.query.users.findMany({
-      where: conditions.length ? and(...conditions) : undefined,
-      with: { roles: true, teacherProfile: true },
-      orderBy: [desc(s.users.createdAt), desc(s.users.id)],
+      // No conditions means no filter; Drizzle wants that said with EmptyFilter, not undefined.
+      where: { RAW: (users) => and(...conditionsFor(users)) ?? EmptyFilter },
+      with: PERSON_RELATIONS,
+      orderBy: { createdAt: 'desc', id: 'desc' },
       limit: query.limit + 1,
     })
     const items = rows.slice(0, query.limit).map(personSummary)
@@ -147,33 +158,17 @@ export class PeopleService {
   async detail(userId: string): Promise<PersonDetail> {
     const { db } = this.deps
     const user = await db.query.users.findFirst({
-      where: eq(s.users.id, userId),
-      with: { roles: true, teacherProfile: true },
+      where: { id: userId },
+      with: PERSON_RELATIONS,
     })
     if (!user) throw errors.notFound('Person')
-    const [[enrollments], [courses]] = await Promise.all([
-      db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(s.enrollments)
-        .where(and(eq(s.enrollments.userId, userId), inArray(s.enrollments.status, ['active']))),
-      db
-        .select({
-          count: sql<number>`count(*)::int`,
-          live: sql<number>`count(*) filter (where ${s.courses.status} = 'live')::int`,
-        })
-        .from(s.courses)
-        .where(eq(s.courses.teacherId, userId)),
-    ])
+    const [enrollments] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(s.enrollments)
+      .where(and(eq(s.enrollments.userId, userId), inArray(s.enrollments.status, ['active'])))
     return {
       ...personSummary(user),
-      teacherProfile: user.teacherProfile
-        ? teacherProfileView(user.teacherProfile, user.email)
-        : null,
-      stats: {
-        enrollments: enrollments?.count ?? 0,
-        courses: courses?.count ?? 0,
-        liveCourses: courses?.live ?? 0,
-      },
+      stats: { enrollments: enrollments?.count ?? 0 },
     }
   }
 
@@ -184,14 +179,9 @@ export class PeopleService {
     grant: boolean,
   ): Promise<PersonDetail> {
     const { db } = this.deps
-    if (role === 'teacher')
-      throw errors.badRequest(
-        'use_approval',
-        'Teacher access is granted by approving an application',
-      )
     if (userId === actor.id && role === 'super_admin' && !grant)
       throw errors.badRequest('self_demotion', 'You cannot remove your own super admin role')
-    const user = await db.query.users.findFirst({ where: eq(s.users.id, userId) })
+    const user = await db.query.users.findFirst({ where: { id: userId } })
     if (!user) throw errors.notFound('Person')
     if (grant)
       await db

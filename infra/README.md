@@ -186,11 +186,76 @@ in `terraform.tfvars` and apply.
   next deploy.
 - **Roll back**: `git revert` the commit on the environment's branch and push. The deploy builds
   and rolls out the reverted code like any other commit. Database migrations are not reversed, so
-  keep them additive.
+  keep them additive. The one-time reset below is the exception: it cannot be rolled back.
 - **Logs**: `aws logs tail /ecs/elevate-<environment>/api --follow`.
 - **Native apps**: `apps/learner/eas.json` has a `preview` profile pointing at staging and a
   `production` profile. Replace the `example.com` URLs in it with your domain. Builds run on EAS,
   not AWS.
+
+## Seeding
+
+The API image has a seed command, run as a one-off task (the `run-task` call is the one in
+"Resetting an environment" below, with a different command):
+
+- `["node", "dist/seed.js", "--demo"]` for staging: the super admin, a support agent, demo
+  teachers with their courses, a writer on the first demo profile, a demo company with a manager
+  (no courses), two promo codes and a learner.
+  The demo teachers have no payout account, so their paid courses cannot be bought until someone
+  connects Stripe.
+- `["node", "dist/seed.js", "--admin-only"]` for production: the super admin and nothing else.
+
+Both need `SEED_SUPER_ADMIN_EMAIL` in the task's environment and write course thumbnails through
+the API's own storage, so they land in the environment's S3 bucket. Running a seed twice is safe.
+
+## Resetting an environment
+
+One time only, for the teacher profiles change. That change replaced the earlier migrations with
+a single new one, so a database that already has the old tables cannot be migrated: it has to be
+emptied. **Everything in the database is lost, and `git revert` cannot bring it back.** Do staging
+first; do production only after staging has been checked.
+
+The values used below come from `terraform output github_environment_variables` in
+`envs/<environment>`.
+
+1. **Push the commit to the environment's branch.** Deploy builds the image and registers a task
+   definition, then fails at "Run database migrations". That is expected: the database lists two
+   old migrations and the image holds one new one, so the migration command stops with
+   `we found 2 migrations (ids: 1, 2) in the database that do not match any local migration`. It
+   changes nothing, and the running API stays on the old version. On production, the run first
+   waits for the required reviewer.
+2. **Empty the database** with the task definition that run registered:
+
+   ```bash
+   # The newest revision of the family is the one the failed run registered.
+   TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "$ECS_TASK_FAMILY" \
+     --query taskDefinition.taskDefinitionArn --output text)
+
+   aws ecs run-task \
+     --cluster "$ECS_CLUSTER" \
+     --task-definition "$TASK_DEFINITION" \
+     --launch-type FARGATE \
+     --network-configuration "awsvpcConfiguration={subnets=[$ECS_SUBNETS],securityGroups=[$ECS_SECURITY_GROUP],assignPublicIp=ENABLED}" \
+     --overrides "$(jq -cn --arg name "$ECS_CONTAINER" '{containerOverrides: [{name: $name,
+       command: ["node", "dist/reset-schema.js"],
+       environment: [{name: "ALLOW_SCHEMA_RESET", value: "yes"}]}]}')"
+   ```
+
+   The command refuses to run without `ALLOW_SCHEMA_RESET=yes`. The variable is set only in this
+   one call and never in Terraform, so a normal deploy cannot empty the database. The task's log
+   ends with `schema reset on <host>/<database>`.
+3. **Run Deploy again** for the branch: `gh workflow run deploy.yml --ref <branch>`. It reuses the
+   image, applies the new migration and rolls the service. Between step 2 and this step the old
+   API answers with errors; that is accepted because there are no users yet.
+4. **Seed** (see "Seeding" above): the same `run-task` call with
+   `command: ["node", "dist/seed.js", "--demo"]` on staging or `"--admin-only"` on production,
+   and without `ALLOW_SCHEMA_RESET`.
+
+An environment whose database was never migrated has nothing to reset: step 1 succeeds, and only
+step 4 remains.
+
+Stripe test accounts created before the reset have no row in the new database. Their
+`account.updated` events are stored as `unknown_account` errors in `webhook_events`; ignore them,
+or close those accounts in the Stripe test dashboard.
 
 ## Known gaps
 
@@ -198,8 +263,6 @@ in `terraform.tfvars` and apply.
   JSON logs). Two things key off that flag and are therefore wrong on staging: Mux assets are not
   created in Mux's test mode, and Support's "open in Stripe" link always points at the Stripe test
   dashboard (also wrong on production with live keys). Both need a small code change.
-- **Seeding**: `npm run db:seed` writes its sample media to local disk, so it cannot seed an
-  environment that stores files in S3 yet.
 - **Private file links**: downloads are presigned with the API task's temporary credentials, so a
   link can stop working before its stated lifetime if those credentials rotate first. Clients
   should request a fresh link on failure.
