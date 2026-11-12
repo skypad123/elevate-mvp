@@ -34,6 +34,9 @@ const RECENT_SIGN_IN_MS = 24 * 60 * 60 * 1000
 /** Resolves the bearer token on every request. A present-but-invalid token is a 401. */
 export const authenticate = (deps: Deps) => {
   const auth = new AuthService(deps)
+  // Signing in must not depend on an old session: the portals send the token they still hold on
+  // every request, so on these two a dead token means "no user" instead of a 401.
+  const signInRoutes = new Set(['POST /api/auth/magic-link', 'POST /api/auth/verify'])
   return createMiddleware<AppEnv>(async (c, next) => {
     const header = c.req.header('authorization')
     if (!header) {
@@ -41,9 +44,9 @@ export const authenticate = (deps: Deps) => {
       return next()
     }
     const [scheme, token] = header.split(' ')
-    if (scheme?.toLowerCase() !== 'bearer' || !token) throw errors.invalidSession()
-    const user = await auth.getSessionUser(token)
-    if (!user) throw errors.invalidSession()
+    const user =
+      scheme?.toLowerCase() === 'bearer' && token ? await auth.getSessionUser(token) : null
+    if (!user && !signInRoutes.has(`${c.req.method} ${c.req.path}`)) throw errors.invalidSession()
     c.set('user', user)
     await next()
   })
