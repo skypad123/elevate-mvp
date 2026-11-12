@@ -1,4 +1,4 @@
-import type { InvitationView, MembershipRole, MemberView } from '@elevate/core'
+import type { InvitationView, MembershipRole, MemberView, ProfileRole } from '@elevate/core'
 import {
   Badge,
   Button,
@@ -6,7 +6,6 @@ import {
   CardHeader,
   Dialog,
   EmptyState,
-  formatDate,
   Input,
   NativeSelect,
   PageHeader,
@@ -20,9 +19,10 @@ import {
   useToast,
 } from '@elevate/web-ui'
 import { errorMessage, fieldErrors } from '@elevate/web-ui/portal'
+import { fillSlots, useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { MailPlus, Users } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
-import { ROLE_LABEL, ROLE_SUMMARY, useMemberActions, useMembers } from '../lib/members'
+import { useMemberActions, useMembers } from '../lib/members'
 import { useCurrentProfile } from '../lib/profile'
 
 /**
@@ -36,6 +36,8 @@ export function MembersPage() {
   const members = useMembers(canRead)
   const actions = useMemberActions()
   const { toast } = useToast()
+  const t = useT()
+  const formatDate = useFormatDate()
   const [removing, setRemoving] = useState<MemberView | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -51,7 +53,7 @@ export function MembersPage() {
       await action()
       toast({ tone: 'success', title: done })
     } catch (error) {
-      toast({ tone: 'danger', title: 'That did not work', description: errorMessage(error) })
+      toast({ tone: 'danger', title: t('common.actionFailed'), description: errorMessage(error) })
     } finally {
       setBusy(null)
     }
@@ -60,11 +62,11 @@ export function MembersPage() {
   if (!canRead)
     return (
       <>
-        <PageHeader eyebrow="Members" title="Members" />
+        <PageHeader eyebrow={t('members.eyebrow')} title={t('members.title')} />
         <EmptyState
           icon={Users}
-          title="Members are managed by the owner"
-          body="Your role on this profile does not include its member list."
+          title={t('members.noAccess.title')}
+          body={t('members.noAccess.body')}
         />
       </>
     )
@@ -72,31 +74,33 @@ export function MembersPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Members"
-        title="Members"
-        description="People who work on this profile’s courses with you. Each signs in with their own account."
+        eyebrow={t('members.eyebrow')}
+        title={t('members.title')}
+        description={t('members.description')}
       />
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
           <section className="space-y-3">
-            <h2 className="font-display text-h3 font-semibold text-ink">On this profile</h2>
+            <h2 className="font-display text-h3 font-semibold text-ink">
+              {t('members.list.title')}
+            </h2>
             {members.isPending ? (
               <Skeleton className="h-40 w-full" />
             ) : members.isError ? (
               <EmptyState
                 tone="danger"
-                title="Could not load members"
+                title={t('members.list.loadFailed')}
                 body={errorMessage(members.error)}
               />
             ) : (
               <Table>
                 <THead>
                   <TR>
-                    <TH>Person</TH>
-                    <TH>Role</TH>
-                    <TH>Added</TH>
+                    <TH>{t('members.list.person')}</TH>
+                    <TH>{t('common.role')}</TH>
+                    <TH>{t('members.list.added')}</TH>
                     <TH className="text-right">
-                      <span className="sr-only">Actions</span>
+                      <span className="sr-only">{t('common.actions')}</span>
                     </TH>
                   </TR>
                 </THead>
@@ -109,7 +113,7 @@ export function MembersPage() {
                       />
                     </TD>
                     <TD>
-                      <Badge tone="brand">Owner</Badge>
+                      <Badge tone="brand">{t('profileRole.owner')}</Badge>
                     </TD>
                     <TD className="text-ink-tertiary">—</TD>
                     <TD />
@@ -122,7 +126,7 @@ export function MembersPage() {
                       <TD>
                         {canChangeRoles ? (
                           <NativeSelect
-                            aria-label={`Role of ${m.name ?? m.email}`}
+                            aria-label={t('members.list.roleOf', { name: m.name ?? m.email })}
                             value={m.role}
                             disabled={busy === m.userId}
                             onChange={(e) => {
@@ -130,29 +134,29 @@ export function MembersPage() {
                               void run(
                                 m.userId,
                                 () => actions.changeRole(m.userId, role),
-                                `${m.name ?? m.email} is now ${role === 'manager' ? 'a manager' : 'a writer'}`,
+                                t(`members.toast.role.${role}`, { name: m.name ?? m.email }),
                               )
                             }}
                           >
-                            <option value="writer">Writer</option>
-                            <option value="manager">Manager</option>
+                            <option value="writer">{t('profileRole.writer')}</option>
+                            <option value="manager">{t('profileRole.manager')}</option>
                           </NativeSelect>
                         ) : (
-                          <Badge>{ROLE_LABEL[m.role]}</Badge>
+                          <Badge>{t(`profileRole.${m.role}`)}</Badge>
                         )}
                       </TD>
                       <TD className="text-ink-secondary">
                         {formatDate(m.addedAt)}
                         {m.addedBy ? (
                           <span className="block text-caption text-ink-tertiary">
-                            by {m.addedBy}
+                            {t('members.list.addedBy', { name: m.addedBy })}
                           </span>
                         ) : null}
                       </TD>
                       <TD className="text-right">
                         {canManage(m.role) ? (
                           <Button variant="ghost" size="sm" onClick={() => setRemoving(m)}>
-                            Remove
+                            {t('common.remove')}
                           </Button>
                         ) : null}
                       </TD>
@@ -162,23 +166,23 @@ export function MembersPage() {
               </Table>
             )}
             {members.data && members.data.members.length === 0 ? (
-              <p className="text-small text-ink-tertiary">
-                Nobody else yet. Invite a writer to help build your courses.
-              </p>
+              <p className="text-small text-ink-tertiary">{t('members.list.empty')}</p>
             ) : null}
           </section>
 
           {members.data && members.data.invitations.length > 0 ? (
             <section className="space-y-3">
-              <h2 className="font-display text-h3 font-semibold text-ink">Invitations</h2>
+              <h2 className="font-display text-h3 font-semibold text-ink">
+                {t('members.invitations.title')}
+              </h2>
               <Table>
                 <THead>
                   <TR>
-                    <TH>Sent to</TH>
-                    <TH>Role</TH>
-                    <TH>Status</TH>
+                    <TH>{t('members.invitations.sentTo')}</TH>
+                    <TH>{t('common.role')}</TH>
+                    <TH>{t('common.status')}</TH>
                     <TH className="text-right">
-                      <span className="sr-only">Actions</span>
+                      <span className="sr-only">{t('common.actions')}</span>
                     </TH>
                   </TR>
                 </THead>
@@ -194,21 +198,24 @@ export function MembersPage() {
                         void run(
                           invitation.id,
                           () => actions.resend(invitation.id),
-                          `Sent again to ${invitation.email}`,
+                          t('members.toast.resent', { email: invitation.email }),
                         )
                       }
                       onRevoke={() =>
                         void run(
                           invitation.id,
                           () => actions.revoke(invitation.id),
-                          'Invitation revoked',
+                          t('members.toast.revoked'),
                         )
                       }
                       onConfirm={() =>
                         void run(
                           invitation.id,
                           () => actions.confirm(invitation.id),
-                          `${invitation.acceptedByEmail ?? 'They'} is now ${invitation.role === 'manager' ? 'a manager' : 'a writer'}`,
+                          // The address that used the link, or the one the invitation went to.
+                          t(`members.toast.role.${invitation.role}`, {
+                            name: invitation.acceptedByEmail ?? invitation.email,
+                          }),
                         )
                       }
                     />
@@ -229,21 +236,16 @@ export function MembersPage() {
           ) : (
             <Card as="section">
               <CardHeader
-                title="Read only"
-                description="You can see who is on this profile. Inviting and removing people is for the owner and managers."
+                title={t('members.readOnly.title')}
+                description={t('members.readOnly.description')}
               />
             </Card>
           )}
           <Card as="section" className="space-y-3">
-            <CardHeader title="What each role can do" />
-            <RoleNote
-              label="Owner"
-              text="Everything, including payout settings and who the managers are."
-            />
-            {type === 'corporate' ? (
-              <RoleNote label={ROLE_LABEL.manager} text={ROLE_SUMMARY.manager} />
-            ) : null}
-            <RoleNote label={ROLE_LABEL.writer} text={ROLE_SUMMARY.writer} />
+            <CardHeader title={t('members.roles.title')} />
+            <RoleNote profileRole="owner" />
+            {type === 'corporate' ? <RoleNote profileRole="manager" /> : null}
+            <RoleNote profileRole="writer" />
           </Card>
         </div>
       </div>
@@ -251,12 +253,12 @@ export function MembersPage() {
       <Dialog
         open={!!removing}
         onOpenChange={(open) => !open && setRemoving(null)}
-        title={`Remove ${removing?.name ?? removing?.email ?? ''}?`}
-        description="They lose access to this profile at once. Courses and files they worked on stay with the profile, and changes of theirs that are waiting for approval stay too."
+        title={t('members.remove.title', { name: removing?.name ?? removing?.email ?? '' })}
+        description={t('members.remove.description')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setRemoving(null)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
@@ -267,11 +269,11 @@ export function MembersPage() {
                 void run(
                   member.userId,
                   () => actions.remove(member.userId),
-                  `${member.name ?? member.email} was removed`,
+                  t('members.toast.removed', { name: member.name ?? member.email }),
                 ).then(() => setRemoving(null))
               }}
             >
-              Remove
+              {t('common.remove')}
             </Button>
           </>
         }
@@ -289,10 +291,15 @@ function Person({ name, email }: { name: string | null; email: string }) {
   )
 }
 
-function RoleNote({ label, text }: { label: string; text: string }) {
+/** A role and what it can do, with the role's name in bold. */
+function RoleNote({ profileRole }: { profileRole: ProfileRole }) {
+  const t = useT()
   return (
     <p className="text-small text-ink-secondary">
-      <strong className="font-semibold text-ink">{label}.</strong> {text}
+      {fillSlots(t('profileRole.note'), {
+        role: <strong className="font-semibold text-ink">{t(`profileRole.${profileRole}`)}</strong>,
+        summary: t(`profileRole.${profileRole}.summary`),
+      })}
     </p>
   )
 }
@@ -314,6 +321,8 @@ function InvitationRow({
   onRevoke: () => void
   onConfirm: () => void
 }) {
+  const t = useT()
+  const formatDate = useFormatDate()
   const awaiting = invitation.status === 'awaiting_confirmation'
   return (
     <TR>
@@ -321,27 +330,28 @@ function InvitationRow({
         <span className="block font-semibold text-ink">{invitation.email}</span>
         {invitation.invitedBy ? (
           <span className="block text-caption text-ink-tertiary">
-            invited by {invitation.invitedBy}
+            {t('members.invitations.invitedBy', { name: invitation.invitedBy })}
           </span>
         ) : null}
       </TD>
       <TD>
-        <Badge>{ROLE_LABEL[invitation.role]}</Badge>
+        <Badge>{t(`profileRole.${invitation.role}`)}</Badge>
       </TD>
       <TD className="text-ink-secondary">
         {awaiting ? (
           <>
-            <Badge tone="warning">Needs confirmation</Badge>
+            <Badge tone="warning">{t('members.invitations.needsConfirmation')}</Badge>
             <span className="mt-1 block text-caption text-ink-secondary">
-              Accepted from another address: {invitation.acceptedByEmail ?? 'unknown'}. They are not
-              a member until the owner confirms.
+              {invitation.acceptedByEmail
+                ? t('members.invitations.acceptedElsewhere', { email: invitation.acceptedByEmail })
+                : t('members.invitations.acceptedElsewhere.unknown')}
             </span>
           </>
         ) : (
           <>
-            <Badge tone="neutral">Waiting</Badge>
+            <Badge tone="neutral">{t('members.invitations.waiting')}</Badge>
             <span className="mt-1 block text-caption text-ink-tertiary">
-              Link expires {formatDate(invitation.expiresAt)}
+              {t('members.invitations.expires', { date: formatDate(invitation.expiresAt) })}
             </span>
           </>
         )}
@@ -350,17 +360,17 @@ function InvitationRow({
         <span className="inline-flex flex-wrap justify-end gap-1">
           {awaiting && canConfirm ? (
             <Button size="sm" loading={busy} onClick={onConfirm}>
-              Confirm
+              {t('members.invitations.confirm')}
             </Button>
           ) : null}
           {!awaiting && canManage ? (
             <Button variant="ghost" size="sm" disabled={busy} onClick={onResend}>
-              Send again
+              {t('members.invitations.resend')}
             </Button>
           ) : null}
           {canManage ? (
             <Button variant="ghost" size="sm" disabled={busy} onClick={onRevoke}>
-              Revoke
+              {t('members.invitations.revoke')}
             </Button>
           ) : null}
         </span>
@@ -377,6 +387,7 @@ function InviteCard({
   onInvite: (email: string, role: MembershipRole) => Promise<unknown>
 }) {
   const { toast } = useToast()
+  const t = useT()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<MembershipRole>('writer')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -390,13 +401,17 @@ function InviteCard({
       await onInvite(email.trim(), role)
       toast({
         tone: 'success',
-        title: `Invitation sent to ${email.trim()}`,
-        description: 'The link in the email works for 7 days.',
+        title: t('members.toast.invited', { email: email.trim() }),
+        description: t('members.toast.invited.description'),
       })
       setEmail('')
     } catch (error) {
       setErrors(fieldErrors(error))
-      toast({ tone: 'danger', title: 'Could not send', description: errorMessage(error) })
+      toast({
+        tone: 'danger',
+        title: t('members.toast.inviteFailed'),
+        description: errorMessage(error),
+      })
     } finally {
       setBusy(false)
     }
@@ -404,13 +419,10 @@ function InviteCard({
 
   return (
     <Card as="section">
-      <CardHeader
-        title="Invite someone"
-        description="They get an email with a link. They sign in with their own address and accept."
-      />
+      <CardHeader title={t('members.invite.title')} description={t('members.invite.description')} />
       <form onSubmit={submit} className="space-y-4">
         <Input
-          label="Email"
+          label={t('common.email')}
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -420,25 +432,31 @@ function InviteCard({
         />
         {roles.length > 1 ? (
           <NativeSelect
-            label="Role"
+            label={t('common.role')}
             value={role}
             onChange={(e) => setRole(e.target.value as MembershipRole)}
-            hint={ROLE_SUMMARY[role]}
+            hint={t(`profileRole.${role}.summary`)}
           >
             {roles.map((r) => (
               <option key={r} value={r}>
-                {ROLE_LABEL[r]}
+                {t(`profileRole.${r}`)}
               </option>
             ))}
           </NativeSelect>
         ) : (
           <p className="text-small text-ink-secondary">
-            They join as a <strong className="font-semibold text-ink">writer</strong>.{' '}
-            {ROLE_SUMMARY.writer}
+            {fillSlots(t('members.invite.joinsAs'), {
+              role: (
+                <strong className="font-semibold text-ink">
+                  {t('members.invite.joinsAs.writer')}
+                </strong>
+              ),
+              summary: t('profileRole.writer.summary'),
+            })}
           </p>
         )}
         <Button type="submit" icon={MailPlus} loading={busy} className="w-full">
-          Send invitation
+          {t('members.invite.submit')}
         </Button>
       </form>
     </Card>

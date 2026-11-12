@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { Navigate, useLocation } from 'react-router'
 import { Spinner } from '../components/Spinner'
+import { useT } from '../preferences/PreferencesProvider'
 import { ApiError, type PortalApi, type TokenStore, unwrap } from './api'
 
 export type PortalSession = {
@@ -115,11 +116,12 @@ export function usePortalAuth(): PortalSession {
   return ctx
 }
 
-export function FullPageSpinner({ label = 'Loading…' }: { label?: string }) {
+export function FullPageSpinner({ label }: { label?: string }) {
+  const t = useT()
   return (
     <div className="flex min-h-full flex-col items-center justify-center gap-3 text-ink-secondary">
       <Spinner className="size-6 text-brand-fg" />
-      <p className="text-small">{label}</p>
+      <p className="text-small">{label ?? t('common.loading')}</p>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { Button, Logo } from '@elevate/web-ui'
 import { FullPageSpinner, usePortalAuth } from '@elevate/web-ui/portal'
-import { PreferencesButton } from '@elevate/web-ui/preferences'
+import { PreferencesButton, useT } from '@elevate/web-ui/preferences'
 import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation, useParams } from 'react-router'
 import { lastProfileId, useCurrentProfile } from '../lib/profile'
@@ -60,6 +60,7 @@ export function ProfileGate() {
 export function OnboardingLayout({ children }: { children?: ReactNode }) {
   const { user, signOut } = usePortalAuth()
   const { profileId } = useParams()
+  const t = useT()
   return (
     <div className="min-h-full bg-canvas">
       <header className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-5">
@@ -71,7 +72,7 @@ export function OnboardingLayout({ children }: { children?: ReactNode }) {
           {/* Settings is out of reach until a profile is approved; language and theme are not. */}
           <PreferencesButton />
           <Button variant="ghost" size="sm" onClick={signOut}>
-            Sign out
+            {t('nav.signOut')}
           </Button>
         </div>
       </header>

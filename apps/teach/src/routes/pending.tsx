@@ -1,5 +1,6 @@
 import { Badge, Button, Card, cn, Eyebrow } from '@elevate/web-ui'
 import { usePortalAuth } from '@elevate/web-ui/portal'
+import { fillSlots, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   CheckCircle2,
@@ -30,6 +31,7 @@ function ApplicationStatus() {
   const { refreshUser } = usePortalAuth()
   const { profile, profileId, role, type, path, actingAsStaff } = useCurrentProfile()
   const queryClient = useQueryClient()
+  const t = useT()
   if (!profile) return null
   const rejected = profile.status === 'rejected'
   const company = profile.legalEntity
@@ -52,56 +54,60 @@ function ApplicationStatus() {
             <Clock className="size-7 text-warning" />
           )}
           <div>
-            <Eyebrow>{company ? 'Company application' : 'Application'}</Eyebrow>
+            <Eyebrow>
+              {t(company ? 'application.eyebrow.company' : 'application.eyebrow.personal')}
+            </Eyebrow>
             <h1 className="font-display text-h1 font-semibold text-ink">
-              {rejected ? 'Not approved yet' : 'Under review'}
+              {t(rejected ? 'application.title.rejected' : 'application.title.applied')}
             </h1>
           </div>
           <Badge tone={rejected ? 'danger' : 'warning'} className="ml-auto">
-            {rejected ? 'Rejected' : 'Applied'}
+            {t(`status.profile.${profile.status}`)}
           </Badge>
         </div>
         {rejected ? (
           <>
-            <p className="text-body text-ink-secondary">
-              The team could not approve the application as submitted. Their note:
-            </p>
+            <p className="text-body text-ink-secondary">{t('application.rejected.body')}</p>
             <blockquote className="rounded-card border-l-4 border-warning bg-warning-tint p-4 text-body text-ink">
               {profile.reviewNote}
             </blockquote>
             {canEdit ? (
               <Link to={editPath}>
-                <Button variant="accent">Edit and resubmit</Button>
+                <Button variant="accent">{t('application.editAndResubmit')}</Button>
               </Link>
             ) : null}
           </>
         ) : (
           <>
             <p className="text-body text-ink-secondary">
-              Thanks, {profile.displayName}. A member of the Elevate team is reading the application
-              {company
-                ? `, and comparing ${company.legalName} (UEN ${company.uen}) with the business profile you uploaded`
-                : ''}
-              . An email goes to <strong className="text-ink">{profile.owner.email}</strong> when it
-              has been reviewed, usually within two working days.
+              {fillSlots(t('application.sentences'), {
+                first: company
+                  ? t('application.reading.company', {
+                      name: profile.displayName,
+                      legalName: company.legalName,
+                      uen: company.uen,
+                    })
+                  : t('application.reading.personal', { name: profile.displayName }),
+                second: fillSlots(t('application.emailNotice'), {
+                  email: <strong className="text-ink">{profile.owner.email}</strong>,
+                }),
+              })}
             </p>
             <div className="flex flex-wrap gap-2">
               {canEdit ? (
                 <Link to={editPath}>
-                  <Button variant="secondary">Edit application</Button>
+                  <Button variant="secondary">{t('application.edit')}</Button>
                 </Link>
               ) : null}
               <Button variant="ghost" icon={MailCheck} onClick={checkStatus}>
-                Check status
+                {t('application.checkStatus')}
               </Button>
             </div>
           </>
         )}
       </Card>
       <Card muted className="text-small text-ink-secondary">
-        {company
-          ? 'After approval there are two more steps before courses can be sold: the company connects its own Stripe account, and Elevate checks that the legal name on that account matches the company.'
-          : 'While you wait: think about the first course you want to build. Most pilot teachers start with 3–5 lessons, a short video per lesson, a page of notes and a quick quiz.'}
+        {t(company ? 'application.next.company' : 'application.next.personal')}
       </Card>
     </div>
   )
@@ -117,6 +123,7 @@ function CompanySetup() {
   const queryClient = useQueryClient()
   const stripe = useStripeStatus()
   const links = useStripeLinks()
+  const t = useT()
   const status = stripe.data
   const active = status?.status === 'active'
 
@@ -132,39 +139,33 @@ function CompanySetup() {
   const nameChecked = !!status?.nameVerified
 
   let stripeText: string
-  if (chargesOn) stripeText = 'Stripe has verified the company and can take payments for it.'
-  else if (!status?.connected)
-    stripeText =
-      'Stripe handles payments and payouts. Onboarding is done for the company, with its own bank account, and takes about ten minutes.'
-  else if (!status.detailsSubmitted)
-    stripeText = 'Stripe onboarding was started and is not finished yet.'
-  else stripeText = 'Stripe is verifying the company’s details. This can take a day or two.'
+  if (chargesOn) stripeText = t('companySetup.stripe.verified')
+  else if (!status?.connected) stripeText = t('companySetup.stripe.notConnected')
+  else if (!status.detailsSubmitted) stripeText = t('companySetup.stripe.unfinished')
+  else stripeText = t('companySetup.stripe.verifying')
 
-  // A legal name often ends in a full stop ("Pte. Ltd."), so it never ends a sentence here.
   let nameText: string
-  if (nameChecked)
-    nameText = `The legal name on the Stripe account is ${company.legalName}, the company we approved.`
+  if (nameChecked) nameText = t('companySetup.name.matched', { legalName: company.legalName })
   else if (chargesOn)
-    nameText = `We are checking that the legal name on the Stripe account is ${company.legalName}, the company we approved. This usually takes one working day, and an email goes to ${profile.owner.email} when it is done. If the names differ, we will say what to change.`
-  else
-    nameText = `When Stripe has finished, we check that the legal name on the Stripe account is ${company.legalName}, the company we approved.`
+    nameText = t('companySetup.name.checking', {
+      legalName: company.legalName,
+      email: profile.owner.email,
+    })
+  else nameText = t('companySetup.name.later', { legalName: company.legalName })
 
   return (
     <div className="space-y-6 animate-rise">
       <Card as="section" className="space-y-6">
         <div>
-          <Eyebrow>Setting up {profile.displayName}</Eyebrow>
-          <h1 className="font-display text-h1 font-semibold text-ink">Two steps before you sell</h1>
-          <p className="mt-2 text-body text-ink-secondary">
-            The application is approved. The company can be paid, and its courses bought, once both
-            steps below are done.
-          </p>
+          <Eyebrow>{t('companySetup.eyebrow', { name: profile.displayName })}</Eyebrow>
+          <h1 className="font-display text-h1 font-semibold text-ink">{t('companySetup.title')}</h1>
+          <p className="mt-2 text-body text-ink-secondary">{t('companySetup.intro')}</p>
         </div>
         <ol className="space-y-5">
-          <Step done title="Application approved">
-            We checked {company.legalName} (UEN {company.uen}) against its business profile.
+          <Step done title={t('companySetup.approved.title')}>
+            {t('companySetup.approved.body', { legalName: company.legalName, uen: company.uen })}
           </Step>
-          <Step done={chargesOn} current={!chargesOn} title="Connect the company’s Stripe account">
+          <Step done={chargesOn} current={!chargesOn} title={t('companySetup.stripe.title')}>
             <p>{stripeText}</p>
             {chargesOn ? null : canConnect ? (
               <Button
@@ -174,18 +175,18 @@ function CompanySetup() {
                 loading={links.busy || stripe.isPending}
                 onClick={links.connect}
               >
-                {status?.connected ? 'Continue Stripe onboarding' : 'Connect Stripe'}
+                {t(status?.connected ? 'companySetup.stripe.continue' : 'stripe.connect')}
               </Button>
             ) : (
               <p className="mt-2 text-ink-tertiary">
-                Only the profile’s owner, {profile.owner.email}, can connect Stripe.
+                {t('companySetup.stripe.ownerOnly', { email: profile.owner.email })}
               </p>
             )}
           </Step>
           <Step
             done={nameChecked}
             current={chargesOn && !nameChecked}
-            title="Elevate checks the legal name"
+            title={t('companySetup.name.title')}
           >
             <p>{nameText}</p>
             {/* If the names differ, the owner corrects the company's details in Stripe. */}
@@ -198,7 +199,7 @@ function CompanySetup() {
                 loading={links.busy}
                 onClick={links.openDashboard}
               >
-                Open Stripe dashboard
+                {t('stripe.openDashboard')}
               </Button>
             ) : null}
           </Step>
@@ -209,7 +210,7 @@ function CompanySetup() {
           loading={stripe.isFetching}
           onClick={() => void stripe.refetch()}
         >
-          Check status
+          {t('application.checkStatus')}
         </Button>
       </Card>
     </div>
@@ -227,14 +228,24 @@ function Step({
   current?: boolean
   children: ReactNode
 }) {
+  const t = useT()
   return (
     <li className="flex gap-3">
       {done ? (
-        <CheckCircle2 aria-label="Done" className="mt-0.5 size-6 shrink-0 text-success" />
+        <CheckCircle2
+          aria-label={t('companySetup.step.done')}
+          className="mt-0.5 size-6 shrink-0 text-success"
+        />
       ) : current ? (
-        <Clock aria-label="Waiting" className="mt-0.5 size-6 shrink-0 text-warning" />
+        <Clock
+          aria-label={t('companySetup.step.waiting')}
+          className="mt-0.5 size-6 shrink-0 text-warning"
+        />
       ) : (
-        <Circle aria-label="Not started" className="mt-0.5 size-6 shrink-0 text-ink-tertiary" />
+        <Circle
+          aria-label={t('companySetup.step.notStarted')}
+          className="mt-0.5 size-6 shrink-0 text-ink-tertiary"
+        />
       )}
       <div className="min-w-0">
         <h2 className={cn('font-semibold', done || current ? 'text-ink' : 'text-ink-secondary')}>

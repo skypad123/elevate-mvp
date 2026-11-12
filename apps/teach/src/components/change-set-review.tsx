@@ -15,33 +15,22 @@ import {
   cn,
   Dialog,
   EmptyState,
-  formatDate,
   RichTextView,
   type StatusTone,
   useToast,
 } from '@elevate/web-ui'
 import { ApiError, errorMessage } from '@elevate/web-ui/portal'
+import { useFormatDate, useFormatList, useT } from '@elevate/web-ui/preferences'
 import { Check, CheckCircle2, Trash2 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { useChangeSetActions } from '../lib/change-sets'
 import { useCurrentProfile } from '../lib/profile'
 
-const CHANGE: Record<ChangeSetItem['change'], { label: string; tone: StatusTone }> = {
-  added: { label: 'Added', tone: 'success' },
-  edited: { label: 'Edited', tone: 'info' },
-  removed: { label: 'Removed', tone: 'danger' },
-}
-const KIND: Record<ChangeSetItem['kind'], string> = {
-  lesson: 'Lesson',
-  artefact: 'Content',
-  quiz: 'Quiz questions',
-  prerequisites: 'Prerequisites',
-}
-const ARTEFACT_TYPE: Record<ArtefactView['type'], string> = {
-  video: 'Video',
-  audio: 'Audio',
-  text: 'Reading',
-  quiz: 'Quiz',
+/** The colour of each kind of change. Its label is the message `changes.change.<change>`. */
+const CHANGE_TONE: Record<ChangeSetItem['change'], StatusTone> = {
+  added: 'success',
+  edited: 'info',
+  removed: 'danger',
 }
 
 /** Everything in one version of the course, by ID. */
@@ -78,10 +67,13 @@ export function ChangeSetReview({
   const { can } = useCurrentProfile()
   const actions = useChangeSetActions(courseId)
   const { toast } = useToast()
+  const t = useT()
+  const formatDate = useFormatDate()
   const [busy, setBusy] = useState<'approve' | 'discard' | string | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const canDecide = can('changeSet.review')
-  const writer = changeSet.openedBy?.name ?? changeSet.openedBy?.email ?? 'The writer'
+  const writer =
+    changeSet.openedBy?.name ?? changeSet.openedBy?.email ?? t('changes.writer.unknown')
   const before = index(live)
   const after = index(draft)
   const unresolved = changeSet.conflicts.filter((c) => c.resolution === null).length
@@ -97,7 +89,11 @@ export function ChangeSetReview({
     } catch (error) {
       // The live course changed again since this list was loaded: show it as it is now.
       await actions.refresh()
-      toast({ tone: 'danger', title: 'Choose again', description: errorMessage(error) })
+      toast({
+        tone: 'danger',
+        title: t('changes.toast.chooseAgain'),
+        description: errorMessage(error),
+      })
     } finally {
       setBusy(null)
     }
@@ -109,13 +105,17 @@ export function ChangeSetReview({
       await actions.approve()
       toast({
         tone: 'success',
-        title: 'Changes are live',
-        description: 'Learners see the updated course now.',
+        title: t('changes.toast.approved'),
+        description: t('changes.toast.approved.description'),
       })
       onDecided()
     } catch (error) {
       if (error instanceof ApiError && error.code === 'change_set_conflict') await actions.refresh()
-      toast({ tone: 'danger', title: 'Not approved', description: errorMessage(error) })
+      toast({
+        tone: 'danger',
+        title: t('changes.toast.approveFailed'),
+        description: errorMessage(error),
+      })
     } finally {
       setBusy(null)
     }
@@ -127,12 +127,16 @@ export function ChangeSetReview({
       await actions.discard()
       toast({
         tone: 'success',
-        title: 'Changes discarded',
-        description: 'The course is unchanged.',
+        title: t('changes.toast.discarded'),
+        description: t('changes.toast.discarded.description'),
       })
       onDecided()
     } catch (error) {
-      toast({ tone: 'danger', title: 'Could not discard', description: errorMessage(error) })
+      toast({
+        tone: 'danger',
+        title: t('changes.toast.discardFailed'),
+        description: errorMessage(error),
+      })
     } finally {
       setBusy(null)
       setConfirmDiscard(false)
@@ -145,8 +149,13 @@ export function ChangeSetReview({
         {changeSet.conflicts.length > 0 ? (
           <Card as="section" className="space-y-4 border-warning">
             <CardHeader
-              title={`${changeSet.conflicts.length} clash${changeSet.conflicts.length === 1 ? '' : 'es'} with the live course`}
-              description={`The live course was changed after ${writer} started. For each one, choose which version to keep. Nothing is merged.`}
+              title={t(
+                changeSet.conflicts.length === 1
+                  ? 'changes.clashes.title.one'
+                  : 'changes.clashes.title.other',
+                { count: changeSet.conflicts.length },
+              )}
+              description={t('changes.clashes.description', { writer })}
             />
             {changeSet.conflicts.map((conflict) => (
               <ConflictChoice
@@ -165,12 +174,14 @@ export function ChangeSetReview({
 
         <section className="space-y-3">
           <h2 className="font-display text-h3 font-semibold text-ink">
-            {changeSet.items.length} change{changeSet.items.length === 1 ? '' : 's'}
+            {t(changeSet.items.length === 1 ? 'changes.count.one' : 'changes.count.other', {
+              count: changeSet.items.length,
+            })}
           </h2>
           {changeSet.items.length === 0 ? (
             <EmptyState
-              title="Nothing has changed yet"
-              body={`${writer} started editing this course but has not changed anything. You can discard this, or wait.`}
+              title={t('changes.empty.title')}
+              body={t('changes.empty.body', { writer })}
             />
           ) : (
             changeSet.items.map((item) => (
@@ -180,9 +191,11 @@ export function ChangeSetReview({
                 className="space-y-3"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={CHANGE[item.change].tone}>{CHANGE[item.change].label}</Badge>
+                  <Badge tone={CHANGE_TONE[item.change]}>
+                    {t(`changes.change.${item.change}`)}
+                  </Badge>
                   <span className="font-mono text-eyebrow uppercase tracking-[0.08em] text-ink-tertiary">
-                    {KIND[item.kind]}
+                    {t(`changes.kind.${item.kind}`)}
                   </span>
                   <h3 className="font-semibold text-ink">{item.title}</h3>
                 </div>
@@ -196,8 +209,11 @@ export function ChangeSetReview({
       <div className="space-y-6">
         <Card as="section" className="space-y-4">
           <CardHeader
-            title="Decide"
-            description={`Started by ${writer} on ${formatDate(changeSet.openedAt)}. Learners see the course as it was until you approve.`}
+            title={t('changes.decide.title')}
+            description={t('changes.decide.description', {
+              writer,
+              date: formatDate(changeSet.openedAt),
+            })}
           />
           {canDecide ? (
             <>
@@ -209,19 +225,19 @@ export function ChangeSetReview({
                 disabled={unresolved > 0 || (busy !== null && busy !== 'approve')}
                 onClick={() => void approve()}
               >
-                Approve and publish
+                {t('changes.decide.approve')}
               </Button>
               {unresolved > 0 ? (
                 <p className="text-small text-warning">
-                  Choose a version for{' '}
-                  {unresolved === 1 ? 'the clash' : `each of the ${unresolved} clashes`} before
-                  approving.
+                  {t(
+                    unresolved === 1
+                      ? 'changes.decide.unresolved.one'
+                      : 'changes.decide.unresolved.other',
+                    { count: unresolved },
+                  )}
                 </p>
               ) : (
-                <p className="text-small text-ink-tertiary">
-                  All of these changes go live together. Learners keep their progress on everything
-                  that stays.
-                </p>
+                <p className="text-small text-ink-tertiary">{t('changes.decide.together')}</p>
               )}
               <Button
                 variant="ghost"
@@ -230,13 +246,11 @@ export function ChangeSetReview({
                 disabled={busy !== null}
                 onClick={() => setConfirmDiscard(true)}
               >
-                Discard these changes
+                {t('changes.decide.discard')}
               </Button>
             </>
           ) : (
-            <p className="text-small text-ink-secondary">
-              The owner or a manager approves or discards these changes.
-            </p>
+            <p className="text-small text-ink-secondary">{t('changes.decide.notAllowed')}</p>
           )}
         </Card>
       </div>
@@ -244,15 +258,15 @@ export function ChangeSetReview({
       <Dialog
         open={confirmDiscard}
         onOpenChange={setConfirmDiscard}
-        title="Discard these changes?"
-        description={`Everything ${writer} changed here is thrown away, and they are told by email. The live course is not touched. This cannot be undone.`}
+        title={t('changes.discard.title')}
+        description={t('changes.discard.description', { writer })}
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmDiscard(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" loading={busy === 'discard'} onClick={() => void discard()}>
-              Discard
+              {t('changes.discard.confirm')}
             </Button>
           </>
         }
@@ -264,36 +278,46 @@ export function ChangeSetReview({
 // ── one change ───────────────────────────────────────────────────────────────
 
 function ItemDetail({ item, before, after }: { item: ChangeSetItem; before: Index; after: Index }) {
+  const t = useT()
+  const formatList = useFormatList()
   if (item.kind === 'lesson') {
     const was = item.liveId ? before.lessons.get(item.liveId) : undefined
     const now = item.draftId ? after.lessons.get(item.draftId) : undefined
     if (item.change === 'added')
       return (
         <p className="text-small text-ink-secondary">
-          A new lesson{now?.summary ? `: ${now.summary}` : ''}. Its content is listed below.
+          {now?.summary
+            ? t('changes.lesson.added.withSummary', { summary: now.summary })
+            : t('changes.lesson.added')}
         </p>
       )
-    if (item.change === 'removed')
+    if (item.change === 'removed') {
+      const count = was?.artefacts.length ?? 0
       return (
         <p className="text-small text-ink-secondary">
-          The lesson and the {was?.artefacts.length ?? 0} item
-          {was?.artefacts.length === 1 ? '' : 's'} in it are removed. Learners lose their progress
-          on them.
+          {t(count === 1 ? 'changes.lesson.removed.one' : 'changes.lesson.removed.other', {
+            count,
+          })}
         </p>
       )
+    }
     return (
       <>
         {was && now && was.title !== now.title ? (
-          <Compare label="Title" before={was.title} after={now.title} />
+          <Compare label={t('changes.field.title')} before={was.title} after={now.title} />
         ) : null}
         {was && now && (was.summary ?? '') !== (now.summary ?? '') ? (
-          <Compare label="Summary" before={was.summary ?? '—'} after={now.summary ?? '—'} />
+          <Compare
+            label={t('changes.field.summary')}
+            before={was.summary ?? '—'}
+            after={now.summary ?? '—'}
+          />
         ) : null}
         {was && now && was.position !== now.position ? (
           <Compare
-            label="Place in the course"
-            before={`Lesson ${was.position + 1}`}
-            after={`Lesson ${now.position + 1}`}
+            label={t('changes.field.lessonPosition')}
+            before={t('changes.position.lesson', { n: was.position + 1 })}
+            after={t('changes.position.lesson', { n: now.position + 1 })}
           />
         ) : null}
       </>
@@ -305,11 +329,15 @@ function ItemDetail({ item, before, after }: { item: ChangeSetItem; before: Inde
     const now = item.draftId ? after.lessons.get(item.draftId) : undefined
     const names = (ids: string[] | undefined, from: Index) =>
       ids?.length
-        ? ids.map((id) => from.lessons.get(id)?.title ?? 'another lesson').join(', ')
-        : 'Nothing: open from the start'
+        ? formatList(
+            ids.map(
+              (id) => from.lessons.get(id)?.title ?? t('changes.prerequisites.unknownLesson'),
+            ),
+          )
+        : t('changes.prerequisites.none')
     return (
       <Compare
-        label="Unlocks after completing"
+        label={t('changes.field.prerequisites')}
         before={names(was?.prerequisiteIds, before)}
         after={names(now?.prerequisiteIds, after)}
       />
@@ -321,7 +349,7 @@ function ItemDetail({ item, before, after }: { item: ChangeSetItem; before: Inde
   if (item.kind === 'quiz')
     return (
       <Compare
-        label="Questions"
+        label={t('changes.field.questions')}
         before={<QuizSummary quiz={was?.quiz ?? null} />}
         after={<QuizSummary quiz={now?.quiz ?? null} />}
       />
@@ -329,41 +357,38 @@ function ItemDetail({ item, before, after }: { item: ChangeSetItem; before: Inde
   if (item.change === 'removed')
     return (
       <p className="text-small text-ink-secondary">
-        This {was ? ARTEFACT_TYPE[was.type].toLowerCase() : 'item'} is removed. Learners lose their
-        progress on it.
+        {was ? t(`changes.item.removed.${was.type}`) : t('changes.item.removed.unknown')}
       </p>
     )
   if (item.change === 'added')
     return now ? (
       <div className="space-y-2">
-        <p className="text-small text-ink-secondary">
-          A new {ARTEFACT_TYPE[now.type].toLowerCase()}.
-        </p>
+        <p className="text-small text-ink-secondary">{t(`changes.item.added.${now.type}`)}</p>
         <ArtefactBody artefact={now} />
       </div>
     ) : null
   return (
     <>
       {was && now && was.title !== now.title ? (
-        <Compare label="Title" before={was.title} after={now.title} />
+        <Compare label={t('changes.field.title')} before={was.title} after={now.title} />
       ) : null}
       {was && now && was.position !== now.position ? (
         <Compare
-          label="Place in the lesson"
-          before={`Item ${was.position + 1}`}
-          after={`Item ${now.position + 1}`}
+          label={t('changes.field.itemPosition')}
+          before={t('changes.position.item', { n: was.position + 1 })}
+          after={t('changes.position.item', { n: now.position + 1 })}
         />
       ) : null}
       {was && now && (was.media?.id ?? null) !== (now.media?.id ?? null) ? (
         <Compare
-          label="File"
-          before={was.media?.filename ?? 'No file'}
-          after={now.media?.filename ?? 'No file'}
+          label={t('changes.field.file')}
+          before={was.media?.filename ?? t('changes.file.none')}
+          after={now.media?.filename ?? t('changes.file.none')}
         />
       ) : null}
       {was && now && JSON.stringify(was.contentJson) !== JSON.stringify(now.contentJson) ? (
         <Compare
-          label="Text"
+          label={t('changes.field.text')}
           before={<RichTextView doc={was.contentJson} />}
           after={<RichTextView doc={now.contentJson} />}
         />
@@ -372,24 +397,28 @@ function ItemDetail({ item, before, after }: { item: ChangeSetItem; before: Inde
   )
 }
 
-/** The live version on the left, the proposed version on the right. */
+/**
+ * The live version on the left, the proposed version on the right. The right side is headed
+ * "After approval" unless `afterHeading` says otherwise.
+ */
 function Compare({
   label,
   before,
   after,
-  afterHeading = 'After approval',
+  afterHeading,
 }: {
   label: string
   before: ReactNode
   after: ReactNode
   afterHeading?: string
 }) {
+  const t = useT()
   return (
     <div>
       <p className="mb-1.5 text-caption font-semibold text-ink-tertiary">{label}</p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Side heading="Live now">{before}</Side>
-        <Side heading={afterHeading} proposed>
+        <Side heading={t('changes.compare.live')}>{before}</Side>
+        <Side heading={afterHeading ?? t('changes.compare.afterApproval')} proposed>
           {after}
         </Side>
       </div>
@@ -422,32 +451,41 @@ function Side({
 }
 
 function ArtefactBody({ artefact }: { artefact: ArtefactView }) {
+  const t = useT()
   if (artefact.type === 'text')
     return artefact.contentJson ? (
       <div className="rounded-control border border-border bg-surface-muted px-3 py-2 text-small">
         <RichTextView doc={artefact.contentJson} />
       </div>
     ) : (
-      <p className="text-small text-ink-tertiary">No text yet.</p>
+      <p className="text-small text-ink-tertiary">{t('changes.body.noText')}</p>
     )
   if (artefact.type === 'quiz') return <QuizSummary quiz={artefact.quiz} />
   return (
     <p className="text-small text-ink-secondary">
-      {artefact.media ? `File: ${artefact.media.filename}` : 'No file uploaded yet.'}
+      {artefact.media
+        ? t('changes.body.file', { filename: artefact.media.filename })
+        : t('changes.body.noFile')}
     </p>
   )
 }
 
 function QuizSummary({ quiz }: { quiz: QuizDefinition | null }) {
+  const t = useT()
   if (!quiz || quiz.questions.length === 0)
-    return <p className="text-small text-ink-tertiary">No questions.</p>
+    return <p className="text-small text-ink-tertiary">{t('changes.quiz.noQuestions')}</p>
+  const settings = [
+    t('changes.quiz.passMark', { percent: quiz.passMarkPercent }),
+    t(quiz.maxAttempts === 1 ? 'changes.quiz.attempts.one' : 'changes.quiz.attempts.other', {
+      count: quiz.maxAttempts,
+    }),
+    ...(quiz.timeLimitMinutes
+      ? [t('changes.quiz.timeLimit', { minutes: quiz.timeLimitMinutes })]
+      : []),
+  ]
   return (
     <div className="space-y-2">
-      <p className="text-caption text-ink-tertiary">
-        Pass mark {quiz.passMarkPercent}% · {quiz.maxAttempts} attempt
-        {quiz.maxAttempts === 1 ? '' : 's'}
-        {quiz.timeLimitMinutes ? ` · ${quiz.timeLimitMinutes} min` : ''}
-      </p>
+      <p className="text-caption text-ink-tertiary">{settings.join(' · ')}</p>
       <ol className="list-decimal space-y-2 pl-5">
         {quiz.questions.map((question) => (
           <li key={question.id}>
@@ -457,7 +495,7 @@ function QuizSummary({ quiz }: { quiz: QuizDefinition | null }) {
                 <li key={option.id} className="flex items-start gap-1.5">
                   {option.correct ? (
                     <Check
-                      aria-label="Correct answer"
+                      aria-label={t('changes.quiz.correct')}
                       className="mt-0.5 size-3.5 shrink-0 text-success"
                     />
                   ) : (
@@ -495,30 +533,38 @@ function ConflictChoice({
   disabled: boolean
   onChoose: (keep: 'live' | 'draft') => void
 }) {
-  const what = conflict.item === 'lesson' ? 'lesson' : conflict.item === 'quiz' ? 'quiz' : 'item'
+  const t = useT()
+  // Each kind of clash has one message per kind of thing. A clash that names none reads as an item.
+  const what = conflict.item ?? 'artefact'
+  const { title } = conflict
   let story: string
   let keepLive: string
   let keepDraft: string
   let note: string | null = null
   if (conflict.kind === 'prerequisites') {
-    story = `The prerequisites of “${conflict.title}” were changed on the live course, and ${writer} changed them too.`
-    keepLive = 'Keep the live prerequisites'
-    keepDraft = `Use ${writer}’s prerequisites`
+    story = t('changes.clash.prerequisites.story', { title, writer })
+    keepLive = t('changes.clash.prerequisites.keepLive')
+    keepDraft = t('changes.clash.prerequisites.keepDraft', { writer })
   } else if (conflict.kind === 'deleted') {
-    story = `The ${what} “${conflict.title}” was deleted from the live course after ${writer} started.`
-    keepLive = 'Leave it deleted'
-    keepDraft = `Bring it back, with ${writer}’s changes`
+    story = t(`changes.clash.deleted.story.${what}`, { title, writer })
+    keepLive = t('changes.clash.deleted.keepLive')
+    keepDraft = t('changes.clash.deleted.keepDraft', { writer })
     if (conflict.droppedChildren > 0) {
-      note = `Leaving it deleted also drops ${conflict.droppedChildren} new item${conflict.droppedChildren === 1 ? '' : 's'} ${writer} added to it.`
+      note = t(
+        conflict.droppedChildren === 1
+          ? 'changes.clash.deleted.dropped.one'
+          : 'changes.clash.deleted.dropped.other',
+        { count: conflict.droppedChildren, writer },
+      )
     }
   } else if (isRemoval) {
-    story = `${writer} removed the ${what} “${conflict.title}”, and it was edited on the live course after that.`
-    keepLive = 'Keep it, as it is live'
-    keepDraft = 'Remove it'
+    story = t(`changes.clash.removed.story.${what}`, { title, writer })
+    keepLive = t('changes.clash.removed.keepLive')
+    keepDraft = t('changes.clash.removed.keepDraft')
   } else {
-    story = `The ${what} “${conflict.title}” was edited on the live course after ${writer} started.`
-    keepLive = 'Keep the live version'
-    keepDraft = `Use ${writer}’s version`
+    story = t(`changes.clash.edited.story.${what}`, { title, writer })
+    keepLive = t('changes.clash.edited.keepLive')
+    keepDraft = t('changes.clash.edited.keepDraft', { writer })
   }
 
   const name = `conflict-${conflict.kind}-${conflict.id}`
@@ -553,7 +599,7 @@ function ConflictChoice({
         ))}
       </div>
       {conflict.resolution === null ? (
-        <p className="text-caption text-warning">No choice made yet.</p>
+        <p className="text-caption text-warning">{t('changes.clash.noChoice')}</p>
       ) : null}
     </fieldset>
   )
@@ -571,7 +617,8 @@ function ConflictVersions({
   before: Index
   after: Index
 }) {
-  const theirs = `${writer}’s version`
+  const t = useT()
+  const theirs = t('changes.versions.theirs', { writer })
   if (conflict.item === 'lesson') {
     const was = conflict.liveId ? before.lessons.get(conflict.liveId) : undefined
     const now = conflict.draftId ? after.lessons.get(conflict.draftId) : undefined
@@ -580,12 +627,14 @@ function ConflictVersions({
       <>
         <strong className="font-semibold">{l.title}</strong>
         {l.summary ? <span className="block text-ink-secondary">{l.summary}</span> : null}
-        <span className="block text-caption text-ink-tertiary">Lesson {l.position + 1}</span>
+        <span className="block text-caption text-ink-tertiary">
+          {t('changes.position.lesson', { n: l.position + 1 })}
+        </span>
       </>
     )
     return (
       <Compare
-        label="The two versions"
+        label={t('changes.versions.label')}
         before={text(was)}
         after={text(now)}
         afterHeading={theirs}
@@ -598,7 +647,7 @@ function ConflictVersions({
   if (conflict.item === 'quiz')
     return (
       <Compare
-        label="The two versions"
+        label={t('changes.versions.label')}
         before={<QuizSummary quiz={was.quiz} />}
         after={<QuizSummary quiz={now.quiz} />}
         afterHeading={theirs}
@@ -611,6 +660,11 @@ function ConflictVersions({
     </div>
   )
   return (
-    <Compare label="The two versions" before={body(was)} after={body(now)} afterHeading={theirs} />
+    <Compare
+      label={t('changes.versions.label')}
+      before={body(was)}
+      after={body(now)}
+      afterHeading={theirs}
+    />
   )
 }

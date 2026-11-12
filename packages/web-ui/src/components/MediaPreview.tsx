@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, FileText } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { errorMessage, type PortalApi, unwrap } from '../portal/api'
+import { useT } from '../preferences/PreferencesProvider'
 import { Skeleton } from './Skeleton'
 
 /** Plays or shows any media asset the viewer may access (owner or staff). */
@@ -16,6 +17,7 @@ export function MediaPreview({
   assetId: string
   className?: string
 }) {
+  const t = useT()
   const query = useQuery({
     queryKey: ['media', 'playback', assetId],
     queryFn: async () =>
@@ -92,7 +94,8 @@ export function MediaPreview({
         className,
       )}
     >
-      <FileText className="size-4" /> Open document <ExternalLink className="size-3.5" />
+      <FileText className="size-4" /> {t('ui.media.openDocument')}
+      <ExternalLink className="size-3.5" />
     </a>
   )
 }

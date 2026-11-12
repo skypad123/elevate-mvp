@@ -12,6 +12,7 @@ import {
   statusTone,
 } from '@elevate/web-ui'
 import { usePortalAuth } from '@elevate/web-ui/portal'
+import { useT } from '@elevate/web-ui/preferences'
 import { ArrowRight, BookOpen, CreditCard, ExternalLink, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router'
 import { useCourses } from '../lib/courses'
@@ -23,6 +24,7 @@ export function StripeCard() {
   const { profile, can } = useCurrentProfile()
   const stripe = useStripeStatus()
   const links = useStripeLinks()
+  const t = useT()
   const status = stripe.data
   const canManage = can('stripe.links')
 
@@ -34,33 +36,30 @@ export function StripeCard() {
   return (
     <Card as="section">
       <CardHeader
-        title="Payments"
+        title={t('payments.title')}
         description={
           enabled
-            ? 'Learners can pay you. Payouts land in your bank on Stripe’s schedule.'
+            ? t('payments.description.enabled')
             : awaitingNameCheck
-              ? 'The Stripe account is connected. Courses can be bought once Elevate has matched its legal name to the company.'
-              : 'Connect a Stripe account so learners can pay you. Takes about five minutes.'
+              ? t('payments.description.nameCheck')
+              : t('payments.description.connect')
         }
         action={
           <Badge tone={enabled ? 'success' : status?.connected ? 'warning' : 'neutral'}>
             {enabled
-              ? 'Payments enabled'
+              ? t('payments.badge.enabled')
               : awaitingNameCheck
-                ? 'Name check pending'
+                ? t('payments.badge.nameCheck')
                 : status?.connected
-                  ? 'Onboarding incomplete'
-                  : 'Not connected'}
+                  ? t('payments.badge.onboarding')
+                  : t('payments.badge.notConnected')}
           </Badge>
         }
       />
       <div className="flex flex-wrap items-center gap-3">
         {awaitingNameCheck ? (
           <>
-            <span className="text-small text-ink-secondary">
-              Elevate compares the legal name on the Stripe account with the company. If they
-              differ, the owner gets an email that says what to change in Stripe.
-            </span>
+            <span className="text-small text-ink-secondary">{t('payments.nameCheck.note')}</span>
             {canManage ? (
               <Button
                 variant="secondary"
@@ -68,14 +67,12 @@ export function StripeCard() {
                 loading={links.busy}
                 onClick={links.openDashboard}
               >
-                Open Stripe dashboard
+                {t('stripe.openDashboard')}
               </Button>
             ) : null}
           </>
         ) : !canManage ? (
-          <span className="text-small text-ink-secondary">
-            Only the profile’s owner can connect Stripe or open its dashboard.
-          </span>
+          <span className="text-small text-ink-secondary">{t('payments.ownerOnly')}</span>
         ) : enabled ? (
           <Button
             variant="secondary"
@@ -83,7 +80,7 @@ export function StripeCard() {
             loading={links.busy}
             onClick={links.openDashboard}
           >
-            Open Stripe dashboard
+            {t('stripe.openDashboard')}
           </Button>
         ) : (
           <Button
@@ -92,16 +89,18 @@ export function StripeCard() {
             loading={links.busy || stripe.isPending}
             onClick={links.connect}
           >
-            {status?.connected ? 'Finish Stripe onboarding' : 'Connect Stripe'}
+            {status?.connected ? t('payments.finishOnboarding') : t('stripe.connect')}
           </Button>
         )}
         {enabled ? (
           <span className="text-small text-ink-tertiary">
-            Commission on your courses: {profile ? formatBps(profile.commissionBps) : '—'}
+            {t('payments.commission', {
+              rate: profile ? formatBps(profile.commissionBps) : '—',
+            })}
           </span>
         ) : null}
         {status && !enabled && !awaitingNameCheck && status.detailsSubmitted ? (
-          <span className="text-small text-ink-secondary">Stripe is verifying your details.</span>
+          <span className="text-small text-ink-secondary">{t('payments.verifying')}</span>
         ) : null}
       </div>
     </Card>

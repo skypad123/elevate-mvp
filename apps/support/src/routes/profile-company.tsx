@@ -1,9 +1,8 @@
-import {
-  ENTITY_TYPE_LABEL,
-  type NameCheckDecision,
-  type NameCheckView,
-  type SupportLegalEntity,
-  type SupportPayoutAccount,
+import type {
+  NameCheckDecision,
+  NameCheckView,
+  SupportLegalEntity,
+  SupportPayoutAccount,
 } from '@elevate/core'
 import {
   Badge,
@@ -12,7 +11,6 @@ import {
   CardHeader,
   DescriptionList,
   Dialog,
-  formatDate,
   Input,
   MediaPreview,
   Skeleton,
@@ -21,66 +19,62 @@ import {
   useToast,
 } from '@elevate/web-ui'
 import { errorMessage, unwrap } from '@elevate/web-ui/portal'
+import { useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, ExternalLink, X } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { api } from '../lib/api'
 import { profileKeys, useNameCheck } from '../lib/queries'
 
-const CHECK: Record<
-  SupportLegalEntity['checkStatus'],
-  { label: string; tone: StatusTone; description: string }
-> = {
-  pending: {
-    label: 'Not checked yet',
-    tone: 'warning',
-    description:
-      'Compare these details with the business profile before you approve. Approving records the company as verified.',
-  },
-  verified: {
-    label: 'Verified',
-    tone: 'success',
-    description: 'Checked against the business profile when the application was approved.',
-  },
-  rejected: {
-    label: 'Rejected',
-    tone: 'danger',
-    description: 'The application was rejected. Its owner can correct it and send it again.',
-  },
+/** The badge colour of each check status. Its words are `companyCard.check.<status>.*`. */
+const CHECK_TONE: Record<SupportLegalEntity['checkStatus'], StatusTone> = {
+  pending: 'warning',
+  verified: 'success',
+  rejected: 'danger',
 }
 
 /** The registered company behind a corporate profile, and the document it is checked against. */
 export function CompanyCard({ entity }: { entity: SupportLegalEntity }) {
-  const check = CHECK[entity.checkStatus]
+  const t = useT()
+  const formatDate = useFormatDate()
   return (
     <Card as="section">
       <CardHeader
-        title="Company"
-        description={check.description}
-        action={<Badge tone={check.tone}>{check.label}</Badge>}
+        title={t('companyCard.title')}
+        description={t(`companyCard.check.${entity.checkStatus}.description`)}
+        action={
+          <Badge tone={CHECK_TONE[entity.checkStatus]}>
+            {t(`companyCard.check.${entity.checkStatus}.label`)}
+          </Badge>
+        }
       />
       <DescriptionList
         items={[
-          { label: 'Legal name', value: entity.legalName },
-          { label: 'UEN', value: <span className="font-mono">{entity.uen}</span> },
-          { label: 'Legal form', value: ENTITY_TYPE_LABEL[entity.entityType] },
+          { label: t('company.legalName'), value: entity.legalName },
+          { label: t('company.uen'), value: <span className="font-mono">{entity.uen}</span> },
+          { label: t('company.legalForm'), value: t(`entityType.${entity.entityType}`) },
           ...(entity.checkedAt
             ? [
                 {
-                  label: 'Checked',
-                  value: `${formatDate(entity.checkedAt)}${entity.checkedBy ? ` by ${entity.checkedBy}` : ''}`,
+                  label: t('companyCard.checked'),
+                  value: entity.checkedBy
+                    ? t('companyCard.checked.by', {
+                        date: formatDate(entity.checkedAt),
+                        name: entity.checkedBy,
+                      })
+                    : formatDate(entity.checkedAt),
                 },
               ]
             : []),
           ...(entity.rejectionReason
-            ? [{ label: 'Rejection reason', value: entity.rejectionReason }]
+            ? [{ label: t('companyCard.rejectionReason'), value: entity.rejectionReason }]
             : []),
           {
-            label: 'Business profile',
+            label: t('companyCard.registryDocument'),
             value: entity.registryDocument ? (
               <MediaPreview api={api} assetId={entity.registryDocument.id} />
             ) : (
-              'None on file. Only the seeded demo companies have none.'
+              t('companyCard.registryDocument.none')
             ),
           },
         ]}
@@ -100,29 +94,28 @@ export function NameCheckCard({
   profileId: string
   account: SupportPayoutAccount | undefined
 }) {
+  const t = useT()
   const started = !!account?.stripeAccountId
   const query = useNameCheck(profileId, started)
   const verified = !!account?.nameVerifiedAt
   const mismatched = !verified && query.data?.lastDecision?.match === false
   const state: { label: string; tone: StatusTone } = verified
-    ? { label: 'Names match', tone: 'success' }
+    ? { label: t('nameCheck.state.match'), tone: 'success' }
     : mismatched
-      ? { label: 'Names do not match', tone: 'danger' }
+      ? { label: t('nameCheck.state.mismatch'), tone: 'danger' }
       : started
-        ? { label: 'Waiting for a check', tone: 'warning' }
-        : { label: 'Not started', tone: 'neutral' }
+        ? { label: t('nameCheck.state.waiting'), tone: 'warning' }
+        : { label: t('nameCheck.state.notStarted'), tone: 'neutral' }
 
   return (
     <Card as="section">
       <CardHeader
-        title="Legal-name check"
-        description="A company is paid only when the legal name on its Stripe account is the company approved here."
+        title={t('nameCheck.title')}
+        description={t('nameCheck.description')}
         action={<Badge tone={state.tone}>{state.label}</Badge>}
       />
       {!started ? (
-        <p className="text-small text-ink-tertiary">
-          The company has not started Stripe onboarding, so there is no Stripe name to compare yet.
-        </p>
+        <p className="text-small text-ink-tertiary">{t('nameCheck.notStarted')}</p>
       ) : query.isPending ? (
         <Skeleton className="h-28 w-full" />
       ) : query.isError ? (
@@ -131,7 +124,7 @@ export function NameCheckCard({
             {errorMessage(query.error)}
           </p>
           <Button variant="secondary" size="sm" onClick={() => void query.refetch()}>
-            Try again
+            {t('common.tryAgain')}
           </Button>
         </div>
       ) : (
@@ -144,6 +137,8 @@ export function NameCheckCard({
 function NameComparison({ profileId, check }: { profileId: string; check: NameCheckView }) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const t = useT()
+  const formatDate = useFormatDate()
   const [dialog, setDialog] = useState<'match' | 'mismatch' | null>(null)
   const [dashboardName, setDashboardName] = useState('')
   const [note, setNote] = useState('')
@@ -155,6 +150,23 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
   // A mismatch lives only in the audit log, so it is shown here until a match replaces it.
   const mismatch = !verified && check.lastDecision?.match === false ? check.lastDecision : null
   const noteTooShort = note.trim().length < 10
+  // The paragraph under the names: what is recorded, then what that means for the account.
+  const recorded = verified
+    ? check.nameVerifiedBy
+      ? t('nameCheck.record.matchBy', {
+          date: formatDate(check.nameVerifiedAt),
+          name: check.nameVerifiedBy,
+        })
+      : t('nameCheck.record.match', { date: formatDate(check.nameVerifiedAt) })
+    : mismatch
+      ? t('nameCheck.record.checkAgain')
+      : t('nameCheck.record.none')
+  const effect =
+    check.status === 'active'
+      ? t('nameCheck.account.active')
+      : !check.chargesEnabled
+        ? t('nameCheck.account.chargesOff')
+        : t('nameCheck.account.chargesOn')
 
   async function decide(match: boolean) {
     setBusy(true)
@@ -175,19 +187,19 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
       await queryClient.invalidateQueries({ queryKey: profileKeys.all })
       toast({
         tone: 'success',
-        title: match ? 'Match recorded' : 'Mismatch recorded',
+        title: match ? t('nameCheck.toast.match') : t('nameCheck.toast.mismatch'),
         description: match
           ? nameCheck.status === 'active'
-            ? 'The company can now be paid.'
-            : 'The company can be paid as soon as Stripe enables charges.'
-          : 'The owner has been emailed your note.',
+            ? t('nameCheck.toast.match.active')
+            : t('nameCheck.toast.match.waiting')
+          : t('nameCheck.toast.mismatch.emailed'),
       })
       setDialog(null)
       setNote('')
     } catch (error) {
       toast({
         tone: 'danger',
-        title: 'Could not record the check',
+        title: t('nameCheck.toast.failed'),
         description: errorMessage(error),
       })
     } finally {
@@ -199,10 +211,12 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <NameBox
-          label="On the Stripe account"
+          label={t('nameCheck.stripeName')}
           name={stripeName}
           placeholder={
-            source === 'dashboard' ? 'Stripe returned no legal name' : 'No legal name yet'
+            source === 'dashboard'
+              ? t('nameCheck.stripeName.notReturned')
+              : t('nameCheck.stripeName.none')
           }
           foot={
             <a
@@ -214,21 +228,22 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
               <span className="font-mono font-normal text-ink-tertiary">
                 {check.stripeAccountId}
               </span>
-              Open in Stripe <ExternalLink className="size-3.5" />
+              {t('nameCheck.openInStripe')}
+              <ExternalLink className="size-3.5" />
             </a>
           }
         />
         <NameBox
-          label="The company approved here"
+          label={t('nameCheck.companyName')}
           name={check.entityLegalName}
-          foot={<span className="font-mono">UEN {check.uen}</span>}
+          foot={<span className="font-mono">{t('company.uenValue', { uen: check.uen })}</span>}
         />
       </div>
 
       {source === 'dashboard' ? (
         <Input
-          label="Legal name shown in the Stripe dashboard"
-          hint="Stripe’s API returned no legal name for this account. Open the account in Stripe, and type the legal name exactly as it is shown there. It is kept with the audit entry."
+          label={t('nameCheck.dashboardName')}
+          hint={t('nameCheck.dashboardName.hint')}
           value={dashboardName}
           onChange={(e) => setDashboardName(e.target.value)}
           maxLength={300}
@@ -238,34 +253,30 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
       {mismatch ? (
         <div className="rounded-card border border-danger bg-danger-tint p-4 text-small text-ink">
           <p className="font-semibold">
-            Recorded as a mismatch on {formatDate(mismatch.decidedAt)}
-            {mismatch.decidedBy ? ` by ${mismatch.decidedBy}` : ''}
+            {mismatch.decidedBy
+              ? t('nameCheck.mismatch.recordedBy', {
+                  date: formatDate(mismatch.decidedAt),
+                  name: mismatch.decidedBy,
+                })
+              : t('nameCheck.mismatch.recorded', { date: formatDate(mismatch.decidedAt) })}
           </p>
           <p className="mt-1">
-            Stripe showed “{mismatch.stripeLegalName ?? 'no legal name'}”. The owner was sent this
-            note:
+            {mismatch.stripeLegalName === null
+              ? t('nameCheck.mismatch.stripeShowedNothing')
+              : t('nameCheck.mismatch.stripeShowed', { name: mismatch.stripeLegalName })}
           </p>
           <p className="mt-1 whitespace-pre-wrap text-ink-secondary">{mismatch.note}</p>
         </div>
       ) : null}
 
       <p className="text-small text-ink-secondary">
-        {verified
-          ? `Recorded as a match on ${formatDate(check.nameVerifiedAt)}${check.nameVerifiedBy ? ` by ${check.nameVerifiedBy}` : ''}.`
-          : mismatch
-            ? 'Check again when the owner says the Stripe account has been corrected.'
-            : 'No check is recorded yet.'}{' '}
-        {check.status === 'active'
-          ? 'The account is active, so the company’s courses can be bought.'
-          : !check.chargesEnabled
-            ? 'Stripe has not enabled charges for this account. A match recorded now takes effect when it does.'
-            : 'Stripe has enabled charges. The account becomes active when a match is recorded.'}
+        {t('nameCheck.sentences', { first: recorded, second: effect })}
       </p>
 
       <div className="flex flex-wrap gap-2">
         {verified ? null : (
           <Button icon={Check} disabled={!stripeName} onClick={() => setDialog('match')}>
-            Names match
+            {t('nameCheck.action.match')}
           </Button>
         )}
         <Button
@@ -274,42 +285,42 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
           disabled={!stripeName}
           onClick={() => setDialog('mismatch')}
         >
-          {verified ? 'Names no longer match' : 'Names do not match'}
+          {verified ? t('nameCheck.action.noLongerMatch') : t('nameCheck.action.mismatch')}
         </Button>
       </div>
 
       <Dialog
         open={dialog === 'match'}
         onOpenChange={(open) => !open && setDialog(null)}
-        title="Record that the names match?"
-        description="Learners can pay this company once Stripe has enabled charges. The check is recorded under your name."
+        title={t('nameCheck.matchDialog.title')}
+        description={t('nameCheck.matchDialog.description')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setDialog(null)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button loading={busy} onClick={() => decide(true)}>
-              Record a match
+              {t('nameCheck.matchDialog.confirm')}
             </Button>
           </>
         }
       >
         <DescriptionList
           items={[
-            { label: 'Stripe account', value: stripeName ?? '—' },
-            { label: 'Company', value: check.entityLegalName },
+            { label: t('stripe.account'), value: stripeName ?? '—' },
+            { label: t('nameCheck.matchDialog.company'), value: check.entityLegalName },
           ]}
         />
       </Dialog>
       <Dialog
         open={dialog === 'mismatch'}
         onOpenChange={(open) => !open && setDialog(null)}
-        title="Record that the names do not match"
-        description="The company cannot be paid until a match is recorded. Your note is emailed to the owner, so say what to change in Stripe."
+        title={t('nameCheck.mismatchDialog.title')}
+        description={t('nameCheck.mismatchDialog.description')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setDialog(null)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
@@ -317,13 +328,13 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
               disabled={noteTooShort}
               onClick={() => decide(false)}
             >
-              Record a mismatch
+              {t('nameCheck.mismatchDialog.confirm')}
             </Button>
           </>
         }
       >
         <Textarea
-          label="What does not match (sent to the owner)"
+          label={t('nameCheck.mismatchDialog.note')}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={4}

@@ -1,5 +1,6 @@
 import { useToast } from '@elevate/web-ui'
 import { errorMessage, FullPageSpinner, unwrap } from '@elevate/web-ui/portal'
+import { useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router'
@@ -14,6 +15,7 @@ export function StripeReturn() {
   const queryClient = useQueryClient()
   const { profileId, path } = useCurrentProfile()
   const { toast } = useToast()
+  const t = useT()
   const ran = useRef(false)
   useEffect(() => {
     if (ran.current) return
@@ -29,35 +31,34 @@ export function StripeReturn() {
           stripe.status === 'active' && stripe.chargesEnabled
             ? {
                 tone: 'success',
-                title: 'Stripe connected',
-                description: 'Learners can now pay for your courses.',
+                title: t('payments.return.connected.title'),
+                description: t('payments.return.connected.description'),
               }
             : stripe.businessType === 'company' && stripe.chargesEnabled
               ? {
                   // A company is paid only once Elevate has matched the legal name as well.
                   tone: 'info',
-                  title: 'Stripe is set up',
-                  description:
-                    'Elevate now checks the legal name on the account. We will email you when your courses can be bought.',
+                  title: t('payments.return.nameCheck.title'),
+                  description: t('payments.return.nameCheck.description'),
                 }
               : {
                   tone: 'info',
-                  title: 'Almost there',
-                  description: 'Stripe still needs a few details before payments are enabled.',
+                  title: t('payments.return.incomplete.title'),
+                  description: t('payments.return.incomplete.description'),
                 },
         )
       } catch (error) {
         toast({
           tone: 'danger',
-          title: 'Could not check Stripe status',
+          title: t('payments.return.failed'),
           description: errorMessage(error),
         })
       } finally {
         navigate(path(), { replace: true })
       }
     })()
-  }, [navigate, queryClient, profileId, path, toast])
-  return <FullPageSpinner label="Checking your Stripe account…" />
+  }, [navigate, queryClient, profileId, path, toast, t])
+  return <FullPageSpinner label={t('payments.return.checking')} />
 }
 
 /** Stripe sends the owner here when an onboarding link expired; mint a new one and go back. */
@@ -65,6 +66,7 @@ export function StripeRefresh() {
   const navigate = useNavigate()
   const { path } = useCurrentProfile()
   const { connect } = useStripeLinks()
+  const t = useT()
   const ran = useRef(false)
   useEffect(() => {
     if (ran.current) return
@@ -74,5 +76,5 @@ export function StripeRefresh() {
       if (outcome === 'failed') navigate(path(), { replace: true })
     })
   }, [navigate, path, connect])
-  return <FullPageSpinner label="Taking you back to Stripe…" />
+  return <FullPageSpinner label={t('payments.refresh.redirecting')} />
 }

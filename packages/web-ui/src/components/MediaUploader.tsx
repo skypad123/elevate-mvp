@@ -15,7 +15,8 @@ import {
 import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '../lib/cn'
 import { errorMessage, type PortalApi, unwrap } from '../portal/api'
-import { Badge, statusLabel, statusTone } from './Badge'
+import { useT } from '../preferences/PreferencesProvider'
+import { Badge, statusTone } from './Badge'
 import { Button } from './Button'
 
 type Phase =
@@ -44,10 +45,12 @@ export type MediaUploaderProps = {
 
 const KIND_ICON = { video: Film, audio: FileAudio, image: ImageIcon, document: FileText } as const
 
+/** `failed` words the error for the reader: it gets the HTTP status when there was an answer. */
 function putWithProgress(
   url: string,
   file: File,
   onProgress: (percent: number) => void,
+  failed: (status?: number) => string,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -57,10 +60,8 @@ function putWithProgress(
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
     }
     xhr.onload = () =>
-      xhr.status >= 200 && xhr.status < 300
-        ? resolve()
-        : reject(new Error(`Upload failed (${xhr.status})`))
-    xhr.onerror = () => reject(new Error('Upload failed'))
+      xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(failed(xhr.status)))
+    xhr.onerror = () => reject(new Error(failed()))
     xhr.send(file)
   })
 }
@@ -80,6 +81,7 @@ export function MediaUploader({
   disabled,
   className,
 }: MediaUploaderProps) {
+  const t = useT()
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const inputRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<number | null>(null)
@@ -105,7 +107,10 @@ export function MediaUploader({
             onChange(asset)
           } else if (asset.status === 'errored') {
             stopPolling()
-            setPhase({ kind: 'error', message: asset.errorMessage ?? 'Processing failed' })
+            setPhase({
+              kind: 'error',
+              message: asset.errorMessage ?? t('ui.upload.processingFailed'),
+            })
           } else {
             setPhase({ kind: 'processing', asset })
           }
@@ -117,7 +122,7 @@ export function MediaUploader({
       void tick()
       pollRef.current = window.setInterval(tick, 3000)
     },
-    [api, onChange, stopPolling],
+    [api, onChange, stopPolling, t],
   )
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
@@ -139,8 +144,12 @@ export function MediaUploader({
       )
       if (instructions.mode === 'put') {
         setPhase({ kind: 'uploading', percent: 0, instructions })
-        await putWithProgress(instructions.uploadUrl, file, (percent) =>
-          setPhase({ kind: 'uploading', percent, instructions }),
+        await putWithProgress(
+          instructions.uploadUrl,
+          file,
+          (percent) => setPhase({ kind: 'uploading', percent, instructions }),
+          (status) =>
+            status === undefined ? t('ui.upload.failed') : t('ui.upload.failedStatus', { status }),
         )
         pollUntilReady(instructions.asset.id)
       } else {
@@ -187,11 +196,11 @@ export function MediaUploader({
             <p className="truncate text-small-strong font-semibold text-ink">{value.filename}</p>
             <div className="mt-1 flex items-center gap-2">
               <Badge tone={statusTone[value.status] ?? 'neutral'}>
-                {statusLabel(value.status)}
+                {t(`ui.mediaStatus.${value.status}`)}
               </Badge>
               {value.durationSeconds ? (
                 <span className="text-caption text-ink-tertiary">
-                  {Math.round(value.durationSeconds / 60)} min
+                  {t('ui.upload.minutes', { count: Math.round(value.durationSeconds / 60) })}
                 </span>
               ) : null}
             </div>
@@ -202,12 +211,12 @@ export function MediaUploader({
             onClick={() => inputRef.current?.click()}
             disabled={disabled}
           >
-            Replace
+            {t('ui.upload.replace')}
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Remove"
+            aria-label={t('common.remove')}
             onClick={clear}
             disabled={disabled}
           >
@@ -232,7 +241,7 @@ export function MediaUploader({
               setPhase({
                 kind: 'error',
                 message:
-                  (e as CustomEvent<{ message?: string }>).detail?.message ?? 'Upload failed',
+                  (e as CustomEvent<{ message?: string }>).detail?.message ?? t('ui.upload.failed'),
               })
             }
             style={
@@ -242,7 +251,7 @@ export function MediaUploader({
               } as React.CSSProperties
             }
           />
-          <p className="mt-2 text-caption text-ink-tertiary">Uploading to the video pipeline…</p>
+          <p className="mt-2 text-caption text-ink-tertiary">{t('ui.upload.toVideoPipeline')}</p>
         </div>
       ) : (
         <button
@@ -270,14 +279,14 @@ export function MediaUploader({
           )}
           <span className="text-small-strong font-semibold text-ink">
             {phase.kind === 'requesting'
-              ? 'Preparing upload…'
+              ? t('ui.upload.preparing')
               : phase.kind === 'uploading'
-                ? `Uploading ${phase.percent}%`
+                ? t('ui.upload.uploading', { percent: phase.percent })
                 : phase.kind === 'processing'
-                  ? 'Processing…'
+                  ? t('ui.upload.processing')
                   : phase.kind === 'error'
                     ? phase.message
-                    : `Upload ${kind}`}
+                    : t(`ui.upload.${kind}`)}
           </span>
           {phase.kind === 'uploading' ? (
             <span className="h-1.5 w-full max-w-xs overflow-hidden rounded-pill bg-surface-sunken">
@@ -288,21 +297,19 @@ export function MediaUploader({
             </span>
           ) : null}
           {phase.kind === 'processing' ? (
-            <span className="text-caption text-ink-tertiary">
-              Transcoding usually takes a minute or two.
-            </span>
+            <span className="text-caption text-ink-tertiary">{t('ui.upload.processing.hint')}</span>
           ) : null}
           {phase.kind === 'idle' && hint ? (
             <span className="text-caption text-ink-tertiary">{hint}</span>
           ) : null}
           {phase.kind === 'error' ? (
-            <span className="text-caption text-ink-secondary">Click to try again</span>
+            <span className="text-caption text-ink-secondary">{t('ui.upload.retry')}</span>
           ) : null}
         </button>
       )}
       {value && phase.kind === 'idle' && value.status === 'ready' ? (
         <p className="flex items-center gap-1 text-caption text-success">
-          <CheckCircle2 className="size-3.5" /> Ready
+          <CheckCircle2 className="size-3.5" /> {t('ui.upload.ready')}
         </p>
       ) : null}
     </div>

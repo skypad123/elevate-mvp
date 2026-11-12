@@ -1,6 +1,5 @@
 import {
   type CorporateApplicationInput,
-  ENTITY_TYPE_LABEL,
   ENTITY_TYPES,
   type EntityType,
   isValidUen,
@@ -22,6 +21,7 @@ import {
   useToast,
 } from '@elevate/web-ui'
 import { errorMessage, fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
+import { fillSlots, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
@@ -42,17 +42,18 @@ export function CorporateApplyPage() {
  */
 export function CorporateReapplyPage() {
   const { profile, profileId, role, type, status, path } = useCurrentProfile()
+  const t = useT()
   if (type !== 'corporate') return <Navigate to="/apply" replace />
   if (status === 'approved') return <Navigate to={path()} replace />
   if (!profile) return null
   if (role !== 'owner')
     return (
       <EmptyState
-        title="Only the owner can resubmit"
-        body="The application of this company profile can be changed by its owner."
+        title={t('companyApply.ownerOnly.title')}
+        body={t('companyApply.ownerOnly.body')}
         action={
           <Link to={path()}>
-            <Button variant="secondary">Back</Button>
+            <Button variant="secondary">{t('common.back')}</Button>
           </Link>
         }
       />
@@ -76,6 +77,7 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const t = useT()
   const entity = existing?.legalEntity ?? null
   const [form, setForm] = useState<Fields>({
     uen: entity?.uen ?? '',
@@ -105,7 +107,7 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!documentId) {
-      setErrors({ registryDocumentMediaId: 'Upload the company’s business profile as a PDF' })
+      setErrors({ registryDocumentMediaId: t('companyApply.document.required') })
       return
     }
     setBusy(true)
@@ -135,15 +137,19 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
       await refreshUser()
       toast({
         tone: 'success',
-        title: 'Application sent',
-        description: 'We will email you when it has been reviewed.',
+        title: t('companyApply.sent.title'),
+        description: t('companyApply.sent.description'),
       })
       navigate(profilePath(profile.id), { replace: true })
     } catch (error) {
       const fields = fieldErrors(error)
       setErrors(fields)
       if (Object.keys(fields).length === 0)
-        toast({ tone: 'danger', title: 'Could not submit', description: errorMessage(error) })
+        toast({
+          tone: 'danger',
+          title: t('companyApply.submit.failed'),
+          description: errorMessage(error),
+        })
     } finally {
       setBusy(false)
     }
@@ -152,29 +158,28 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
   return (
     <div className="space-y-8 animate-rise">
       <div className="space-y-3">
-        <Eyebrow>{isResubmission ? 'Update your application' : 'Teach as a company'}</Eyebrow>
+        <Eyebrow>
+          {t(isResubmission ? 'companyApply.eyebrow.reapply' : 'companyApply.eyebrow.apply')}
+        </Eyebrow>
         <h1 className="font-display text-display font-semibold leading-tight text-ink">
-          A profile for your company.
+          {t('companyApply.title')}
         </h1>
-        <p className="max-w-2xl text-body-lg text-ink-secondary">
-          For a private limited company or a limited liability partnership registered in Singapore.
-          Courses are sold under the company’s name and paid to the company’s own Stripe account. We
-          check the company against its business profile, then review the teaching, usually within
-          two working days.
-        </p>
+        <p className="max-w-2xl text-body-lg text-ink-secondary">{t('companyApply.intro')}</p>
         {!isResubmission ? (
           <p className="text-small text-ink-secondary">
-            Teaching under your own name, or as a sole proprietor?{' '}
-            <Link to="/apply" className="font-semibold text-brand-fg hover:underline">
-              Apply as a person instead
-            </Link>
-            .
+            {fillSlots(t('companyApply.personalInstead'), {
+              link: (
+                <Link to="/apply" className="font-semibold text-brand-fg hover:underline">
+                  {t('companyApply.personalInstead.link')}
+                </Link>
+              ),
+            })}
           </p>
         ) : null}
         {existing?.status === 'rejected' && existing.reviewNote ? (
           <div className="rounded-card border border-warning bg-warning-tint p-4 text-small text-ink">
             <p className="mb-1 flex items-center gap-2 font-semibold">
-              <Badge tone="warning">Reviewer note</Badge>
+              <Badge tone="warning">{t('companyApply.reviewerNote')}</Badge>
             </p>
             {existing.reviewNote}
           </div>
@@ -183,28 +188,30 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
 
       <form onSubmit={submit} className="space-y-6">
         <Card as="section" className="space-y-5">
-          <h2 className="font-display text-h2 font-semibold text-ink">The company</h2>
+          <h2 className="font-display text-h2 font-semibold text-ink">
+            {t('companyApply.company.title')}
+          </h2>
           <NativeSelect
-            label="Legal form"
+            label={t('company.legalForm')}
             value={form.entityType}
             onChange={(e) => setForm((f) => ({ ...f, entityType: e.target.value as EntityType }))}
             error={errors.entityType}
           >
             {ENTITY_TYPES.map((type) => (
               <option key={type} value={type}>
-                {ENTITY_TYPE_LABEL[type]}
+                {t(`entityType.${type}`)}
               </option>
             ))}
           </NativeSelect>
           <Input
-            label="UEN"
-            hint={`The Unique Entity Number, as on the business profile. It looks like ${UEN_EXAMPLE[form.entityType]}.`}
+            label={t('company.uen')}
+            hint={t('companyApply.uen.hint', { example: UEN_EXAMPLE[form.entityType] })}
             value={form.uen}
             onChange={set('uen')}
             error={
               errors.uen ??
               (uenLooksWrong
-                ? `That is not the UEN of this kind of company. It looks like ${UEN_EXAMPLE[form.entityType]}.`
+                ? t('companyApply.uen.invalid', { example: UEN_EXAMPLE[form.entityType] })
                 : undefined)
             }
             required
@@ -212,8 +219,8 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
             autoCapitalize="characters"
           />
           <Input
-            label="Legal name"
-            hint="The registered name, exactly as on the business profile."
+            label={t('company.legalName')}
+            hint={t('companyApply.legalName.hint')}
             value={form.legalName}
             onChange={set('legalName')}
             error={errors.legalName}
@@ -226,17 +233,15 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
               kind="document"
               value={document}
               onChange={setDocument}
-              label={
+              label={t(
                 entity?.registryDocumentMediaId
-                  ? 'Replace the business profile (PDF)'
-                  : 'Business profile (PDF)'
-              }
-              hint="The company’s business profile from ACRA’s Bizfile. Only the Elevate team reads it."
+                  ? 'companyApply.document.replace'
+                  : 'companyApply.document.upload',
+              )}
+              hint={t('companyApply.document.hint')}
             />
             {entity?.registryDocumentMediaId && !document ? (
-              <p className="text-small text-ink-tertiary">
-                The document sent with the earlier application is kept unless you upload another.
-              </p>
+              <p className="text-small text-ink-tertiary">{t('companyApply.document.kept')}</p>
             ) : null}
             {errors.registryDocumentMediaId ? (
               <p role="alert" className="text-small text-danger">
@@ -247,10 +252,12 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
         </Card>
 
         <Card as="section" className="space-y-5">
-          <h2 className="font-display text-h2 font-semibold text-ink">How learners see it</h2>
+          <h2 className="font-display text-h2 font-semibold text-ink">
+            {t('companyApply.public.title')}
+          </h2>
           <Input
-            label="Public name"
-            hint="Shown on courses and certificates. It can be the trading name."
+            label={t('companyApply.publicName')}
+            hint={t('companyApply.publicName.hint')}
             value={form.displayName}
             onChange={set('displayName')}
             error={errors.displayName}
@@ -258,8 +265,8 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
             maxLength={80}
           />
           <Input
-            label="Headline"
-            hint="One line, e.g. “Studio ceramics classes by working potters”."
+            label={t('profileField.headline')}
+            hint={t('companyApply.headline.hint')}
             value={form.headline}
             onChange={set('headline')}
             error={errors.headline}
@@ -267,8 +274,8 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
             maxLength={120}
           />
           <Textarea
-            label="About"
-            hint="50–3000 characters. Learners read this on the course pages."
+            label={t('companyApply.about')}
+            hint={t('companyApply.about.hint')}
             value={form.bio}
             onChange={set('bio')}
             error={errors.bio}
@@ -278,10 +285,12 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
         </Card>
 
         <Card as="section" className="space-y-5">
-          <h2 className="font-display text-h2 font-semibold text-ink">Teaching</h2>
+          <h2 className="font-display text-h2 font-semibold text-ink">
+            {t('companyApply.teaching.title')}
+          </h2>
           <Textarea
-            label="Credentials and experience"
-            hint="Who teaches, their qualifications, how long the company has been teaching."
+            label={t('companyApply.credentials')}
+            hint={t('companyApply.credentials.hint')}
             value={form.credentials}
             onChange={set('credentials')}
             error={errors.credentials}
@@ -293,11 +302,11 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
             kind="video"
             value={sample}
             onChange={setSample}
-            label="A teaching sample: upload a video"
-            hint="A few minutes of one of your teachers teaching. MP4 or MOV."
+            label={t('companyApply.sample.upload')}
+            hint={t('companyApply.sample.upload.hint')}
           />
           <Input
-            label="Or a link to one"
+            label={t('companyApply.sample.link')}
             placeholder="https://youtube.com/…"
             value={form.teachingSampleUrl}
             onChange={set('teachingSampleUrl')}
@@ -307,11 +316,7 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
         </Card>
 
         <div className="flex items-center justify-between gap-4">
-          <p className="text-small text-ink-tertiary">
-            By applying you confirm that you may act for this company, and agree to the teacher
-            agreement: the company owns its content; Elevate holds a non-exclusive hosting licence
-            while it is listed.
-          </p>
+          <p className="text-small text-ink-tertiary">{t('companyApply.agreement')}</p>
           <Button
             type="submit"
             variant="accent"
@@ -320,7 +325,7 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
             disabled={uenLooksWrong}
             iconRight={ArrowRight}
           >
-            {isResubmission ? 'Resubmit' : 'Submit application'}
+            {t(isResubmission ? 'companyApply.submit.reapply' : 'companyApply.submit.apply')}
           </Button>
         </div>
       </form>

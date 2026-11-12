@@ -1,32 +1,12 @@
-import type { InvitationAccepted, InvitationStatus } from '@elevate/core'
-import { Badge, Button, Card, EmptyState, formatDate, Logo, Skeleton } from '@elevate/web-ui'
+import type { InvitationAccepted } from '@elevate/core'
+import { Badge, Button, Card, EmptyState, Logo, Skeleton } from '@elevate/web-ui'
 import { errorMessage, usePortalAuth } from '@elevate/web-ui/portal'
-import { PreferencesButton } from '@elevate/web-ui/preferences'
+import { fillSlots, PreferencesButton, useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { MailCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { acceptInvitation, ROLE_LABEL, ROLE_SUMMARY, useInvitationPreview } from '../lib/members'
+import { acceptInvitation, useInvitationPreview } from '../lib/members'
 import { profilePath } from '../lib/urls'
-
-/** Why an invitation that is not waiting any more cannot be used. */
-const CLOSED: Record<Exclude<InvitationStatus, 'pending'>, { title: string; body: string }> = {
-  expired: {
-    title: 'This invitation has expired',
-    body: 'Invitations work for 7 days. Ask whoever invited you to send a new one.',
-  },
-  revoked: {
-    title: 'This invitation is no longer valid',
-    body: 'It was withdrawn, or replaced by a newer one. Check your inbox for a later email, or ask for a new invitation.',
-  },
-  accepted: {
-    title: 'This invitation was already used',
-    body: 'If it was you, the profile is in Elevate Teach under your account.',
-  },
-  awaiting_confirmation: {
-    title: 'Waiting for the owner',
-    body: 'This invitation was used from a different address from the one it was sent to. The profile’s owner has been asked to confirm.',
-  },
-}
 
 /**
  * Where an invitation link lands. It is the one Teach page outside a profile that a signed-out
@@ -38,6 +18,8 @@ export function InvitationPage() {
   const preview = useInvitationPreview(token)
   const { status: session, user, refreshUser, signOut } = usePortalAuth()
   const navigate = useNavigate()
+  const t = useT()
+  const formatDate = useFormatDate()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [accepted, setAccepted] = useState<InvitationAccepted | null>(null)
@@ -79,23 +61,24 @@ export function InvitationPage() {
         ) : preview.isError || !invitation ? (
           <EmptyState
             tone="danger"
-            title="Invitation not found"
-            body="This link is not a valid invitation. Check that the whole link was copied from the email."
+            title={t('invitation.notFound.title')}
+            body={t('invitation.notFound.body')}
           />
         ) : accepted ? (
           <EmptyState
             icon={MailCheck}
-            title="Almost there"
-            body={`You accepted the invitation to ${accepted.profileName} from a different address from the one it was sent to. The owner has been asked to confirm that it is you. You will get an email when they do.`}
+            title={t('invitation.almostThere.title')}
+            body={t('invitation.almostThere.body', { profile: accepted.profileName })}
           />
         ) : invitation.status !== 'pending' ? (
+          // Why an invitation that is not waiting any more cannot be used.
           <EmptyState
-            title={CLOSED[invitation.status].title}
-            body={CLOSED[invitation.status].body}
+            title={t(`invitation.closed.${invitation.status}.title`)}
+            body={t(`invitation.closed.${invitation.status}.body`)}
             action={
               user ? (
                 <Link to="/">
-                  <Button variant="secondary">Go to Elevate Teach</Button>
+                  <Button variant="secondary">{t('invitation.goToTeach')}</Button>
                 </Link>
               ) : undefined
             }
@@ -103,19 +86,27 @@ export function InvitationPage() {
         ) : (
           <Card as="section" className="space-y-5">
             <div className="space-y-2">
-              <Badge tone="brand">Invitation</Badge>
+              <Badge tone="brand">{t('invitation.badge')}</Badge>
               <h1 className="font-display text-h1 font-semibold text-ink">
-                Join {invitation.profileName} as a {ROLE_LABEL[invitation.role].toLowerCase()}
+                {t(`invitation.join.${invitation.role}`, { profile: invitation.profileName })}
               </h1>
               <p className="text-body text-ink-secondary">
-                {invitation.invitedByName ?? 'Someone'} invited you to work on{' '}
-                {invitation.profileType === 'corporate' ? 'this company’s' : 'their'} courses on
-                Elevate.
+                {invitation.invitedByName
+                  ? t(`invitation.invitedBy.${invitation.profileType}`, {
+                      name: invitation.invitedByName,
+                    })
+                  : t(`invitation.invitedBy.someone.${invitation.profileType}`)}
               </p>
             </div>
             <p className="rounded-card border border-border bg-surface-muted px-4 py-3 text-small text-ink-secondary">
-              <strong className="font-semibold text-ink">{ROLE_LABEL[invitation.role]}.</strong>{' '}
-              {ROLE_SUMMARY[invitation.role]}
+              {fillSlots(t('profileRole.note'), {
+                role: (
+                  <strong className="font-semibold text-ink">
+                    {t(`profileRole.${invitation.role}`)}
+                  </strong>
+                ),
+                summary: t(`profileRole.${invitation.role}.summary`),
+              })}
             </p>
             {error ? (
               <p role="alert" className="text-small text-danger">
@@ -127,35 +118,34 @@ export function InvitationPage() {
             ) : user ? (
               <div className="space-y-3">
                 <Button size="lg" className="w-full" loading={busy} onClick={() => void accept()}>
-                  Accept as {user.email}
+                  {t('invitation.accept', { email: user.email })}
                 </Button>
                 <p className="text-small text-ink-tertiary">
-                  Not you?{' '}
-                  <button
-                    type="button"
-                    className="font-semibold text-brand-fg hover:underline"
-                    onClick={() => void signOut()}
-                  >
-                    Sign out
-                  </button>{' '}
-                  and sign in with the address you want to use.
+                  {fillSlots(t('invitation.notYou'), {
+                    signOut: (
+                      <button
+                        type="button"
+                        className="font-semibold text-brand-fg hover:underline"
+                        onClick={() => void signOut()}
+                      >
+                        {t('nav.signOut')}
+                      </button>
+                    ),
+                  })}
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
                 <Link to={`/sign-in?redirect=${encodeURIComponent(`/invitations/${token}`)}`}>
                   <Button size="lg" className="w-full">
-                    Sign in to accept
+                    {t('invitation.signInToAccept')}
                   </Button>
                 </Link>
-                <p className="text-small text-ink-tertiary">
-                  New to Elevate? Signing in with your email creates your account. There is no
-                  password to choose.
-                </p>
+                <p className="text-small text-ink-tertiary">{t('invitation.newHere')}</p>
               </div>
             )}
             <p className="text-caption text-ink-tertiary">
-              This invitation expires on {formatDate(invitation.expiresAt)}.
+              {t('invitation.expires', { date: formatDate(invitation.expiresAt) })}
             </p>
           </Card>
         )}

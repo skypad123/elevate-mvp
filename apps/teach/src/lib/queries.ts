@@ -6,6 +6,7 @@ import type {
 } from '@elevate/core'
 import { useToast } from '@elevate/web-ui'
 import { ApiError, errorMessage, unwrap } from '@elevate/web-ui/portal'
+import { useT } from '@elevate/web-ui/preferences'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -72,6 +73,7 @@ export function useStripeLinks() {
   const navigate = useNavigate()
   const location = useLocation()
   const { toast } = useToast()
+  const t = useT()
   const [busy, setBusy] = useState(false)
 
   /** `reauth`: the user is on their way to sign in again and will come back to this page. */
@@ -85,8 +87,8 @@ export function useStripeLinks() {
         if (error instanceof ApiError && error.code === 'reauth_required') {
           toast({
             tone: 'info',
-            title: 'Sign in again to continue',
-            description: 'Managing payouts needs a sign-in from the last 24 hours.',
+            title: t('payments.reauth.title'),
+            description: t('payments.reauth.description'),
           })
           const back = encodeURIComponent(location.pathname + location.search)
           navigate(`/sign-in?redirect=${back}`)
@@ -98,7 +100,7 @@ export function useStripeLinks() {
         setBusy(false)
       }
     },
-    [navigate, location.pathname, location.search, toast],
+    [navigate, location.pathname, location.search, toast, t],
   )
 
   const connect = useCallback(

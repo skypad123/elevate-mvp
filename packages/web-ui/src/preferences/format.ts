@@ -20,11 +20,16 @@ export function useFormatDate(): (
   return useCallback((iso, options) => formatDate(iso, options, locale), [locale])
 }
 
-/** Joins a list the way the chosen language does: "a, b and c" in English, "a、b和c" in Chinese. */
+/**
+ * Joins a list of names or titles with the chosen language's list comma: "a, b, c" in English,
+ * "a、b、c" in Chinese. There is no "and" before the last item, on purpose: the items are often
+ * what someone typed (lesson titles), and a word of one language between two titles of another
+ * reads badly.
+ */
 export function useFormatList(): (items: readonly string[]) => string {
   const locale = useIntlLocale()
   return useMemo(() => {
-    const format = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' })
+    const format = new Intl.ListFormat(locale, { style: 'narrow', type: 'conjunction' })
     return (items) => format.format(items)
   }, [locale])
 }

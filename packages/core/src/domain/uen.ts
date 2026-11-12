@@ -21,11 +21,6 @@
 export const ENTITY_TYPES = ['private_limited', 'llp'] as const
 export type EntityType = (typeof ENTITY_TYPES)[number]
 
-export const ENTITY_TYPE_LABEL: Record<EntityType, string> = {
-  private_limited: 'Private limited company (Pte. Ltd.)',
-  llp: 'Limited liability partnership (LLP)',
-}
-
 const UEN_PATTERN: Record<EntityType, RegExp> = {
   // yyyynnnnnX: nine digits and a letter, whatever the year of incorporation.
   private_limited: /^\d{9}[A-Z]$/,

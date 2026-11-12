@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react'
 import { cn } from '../lib/cn'
+import { useT } from '../preferences/PreferencesProvider'
 
 export type ToastTone = 'success' | 'danger' | 'info'
 export type ToastInput = {
@@ -22,6 +23,7 @@ type ToastItem = ToastInput & { id: number }
 const ToastContext = createContext<{ toast: (input: ToastInput) => void } | null>(null)
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const t = useT()
   const [items, setItems] = useState<ToastItem[]>([])
   const counter = useRef(0)
   const dismiss = useCallback(
@@ -72,7 +74,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => dismiss(item.id)}
                 className="rounded-sm p-1 text-ink-tertiary hover:bg-surface-muted hover:text-ink"
-                aria-label="Dismiss"
+                aria-label={t('ui.dismiss')}
               >
                 <X className="size-4" />
               </button>

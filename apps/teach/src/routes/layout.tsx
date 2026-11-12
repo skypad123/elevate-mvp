@@ -1,12 +1,11 @@
 import { Avatar, Button, NativeSelect, PortalShell } from '@elevate/web-ui'
 import { usePortalAuth } from '@elevate/web-ui/portal'
-import { useT } from '@elevate/web-ui/preferences'
+import { fillSlots, useT } from '@elevate/web-ui/preferences'
 import { BookOpen, LayoutDashboard, LogOut, Settings, Users, Wallet } from 'lucide-react'
 import { Outlet, useNavigate } from 'react-router'
 import { useCurrentProfile } from '../lib/profile'
 import { profilePath } from '../lib/urls'
 
-const STATUS_NOTE = { applied: 'under review', rejected: 'not approved', approved: '' } as const
 const NEW_COMPANY = 'new-company'
 
 /**
@@ -25,12 +24,13 @@ export function ProfileSwitcher({
 }) {
   const { user } = usePortalAuth()
   const navigate = useNavigate()
+  const t = useT()
   const profiles = user?.profiles ?? []
   if (profiles.length === 0 && !staffLabel) return null
   return (
     <NativeSelect
-      label="Profile"
-      aria-label="Switch profile"
+      label={t('switcher.label')}
+      aria-label={t('switcher.ariaLabel')}
       value={current ?? ''}
       wrapperClassName={className}
       onChange={(e) =>
@@ -39,17 +39,21 @@ export function ProfileSwitcher({
     >
       {current ? null : (
         <option value="" disabled>
-          Your profiles…
+          {t('switcher.placeholder')}
         </option>
       )}
-      {current && staffLabel ? <option value={current}>{staffLabel} (as staff)</option> : null}
+      {current && staffLabel ? (
+        <option value={current}>{t('switcher.option.staff', { name: staffLabel })}</option>
+      ) : null}
+      {/* An approved profile shows its name alone; the others say where they stand. */}
       {profiles.map((p) => (
         <option key={p.id} value={p.id}>
-          {p.displayName}
-          {p.status === 'approved' ? '' : ` (${STATUS_NOTE[p.status]})`}
+          {p.status === 'approved'
+            ? p.displayName
+            : t(`switcher.option.${p.status}`, { name: p.displayName })}
         </option>
       ))}
-      <option value={NEW_COMPANY}>+ Create a company profile…</option>
+      <option value={NEW_COMPANY}>{t('switcher.createCompany')}</option>
     </NativeSelect>
   )
 }
@@ -99,10 +103,10 @@ export function TeachLayout() {
           role="status"
           className="mb-6 rounded-card border border-warning bg-warning-tint px-4 py-3 text-small text-ink"
         >
-          <strong className="font-semibold">You are acting as Elevate staff.</strong> This is{' '}
-          {displayName}’s profile, not yours. You can fix content and read the profile; prices,
-          publishing and payouts stay with the teacher. Every change you make is recorded under your
-          name.
+          {fillSlots(t('staffBanner.sentences'), {
+            first: <strong className="font-semibold">{t('staffBanner.title')}</strong>,
+            second: t('staffBanner.body', { name: displayName }),
+          })}
         </div>
       ) : null}
       <Outlet />

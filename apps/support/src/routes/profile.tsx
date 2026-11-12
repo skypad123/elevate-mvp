@@ -8,13 +8,11 @@ import {
   Dialog,
   EmptyState,
   formatBps,
-  formatDate,
   Input,
   MediaPreview,
   PageHeader,
   Skeleton,
   StatCard,
-  statusLabel,
   statusTone,
   Table,
   TBody,
@@ -26,6 +24,7 @@ import {
   useToast,
 } from '@elevate/web-ui'
 import { errorMessage, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
+import { useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, ExternalLink, X } from 'lucide-react'
 import { useState } from 'react'
@@ -37,6 +36,7 @@ import { CompanyCard, NameCheckCard } from './profile-company'
 import { OwnerRecovery } from './profile-recovery'
 
 export function Profile() {
+  const t = useT()
   const { id = '' } = useParams()
   const query = useProfile(id)
   if (query.isPending) return <Skeleton className="h-64 w-full" />
@@ -44,7 +44,7 @@ export function Profile() {
     return (
       <EmptyState
         tone="danger"
-        title="Could not load this profile"
+        title={t('profileDetail.loadError')}
         body={errorMessage(query.error)}
       />
     )
@@ -57,6 +57,8 @@ export function Profile() {
  */
 function ProfileView({ detail }: { detail: SupportProfileDetail }) {
   const { profile, courses, payoutAccounts, legalEntity, earnings } = detail
+  const t = useT()
+  const formatDate = useFormatDate()
   const { hasRole } = usePortalAuth()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -68,7 +70,8 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
   const isSuperAdmin = hasRole('super_admin')
   const liveCourses = courses.filter((c) => c.status === 'live').length
 
-  async function act(label: string, fn: () => Promise<unknown>) {
+  /** Runs one action on the profile; `done` is the title of the toast when it succeeds. */
+  async function act(done: string, fn: () => Promise<unknown>) {
     setBusy(true)
     try {
       await fn()
@@ -76,11 +79,11 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
       await queryClient.invalidateQueries({ queryKey: profileKeys.all })
       await queryClient.invalidateQueries({ queryKey: ['support', 'people'] })
       await queryClient.invalidateQueries({ queryKey: ['support', 'person'] })
-      toast({ tone: 'success', title: label })
+      toast({ tone: 'success', title: done })
       setDialog(null)
       setNote('')
     } catch (error) {
-      toast({ tone: 'danger', title: `${label} failed`, description: errorMessage(error) })
+      toast({ tone: 'danger', title: t('common.actionFailed'), description: errorMessage(error) })
     } finally {
       setBusy(false)
     }
@@ -88,7 +91,7 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
 
   const param = { id: profile.id }
   const approve = () =>
-    act('Profile approved', async () =>
+    act(t('profileDetail.approve.done'), async () =>
       unwrap(
         await api.support.profiles[':id'].approve.$post({
           param,
@@ -97,13 +100,13 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
       ),
     )
   const reject = () =>
-    act('Application rejected', async () =>
+    act(t('profileDetail.reject.done'), async () =>
       unwrap(
         await api.support.profiles[':id'].reject.$post({ param, json: { reason: note.trim() } }),
       ),
     )
   const saveCommission = () =>
-    act('Commission updated', async () => {
+    act(t('profileDetail.commission.updated'), async () => {
       const bps = Math.round(Number.parseFloat(commission) * 100)
       return unwrap(
         await api.support.profiles[':id'].commission.$patch({
@@ -119,15 +122,15 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
         to="/profiles"
         className="mb-4 inline-flex items-center gap-1 text-small text-ink-secondary hover:text-ink"
       >
-        <ArrowLeft className="size-4" /> Profiles
+        <ArrowLeft className="size-4" /> {t('profileDetail.back')}
       </Link>
       <PageHeader
-        eyebrow={profile.type === 'corporate' ? 'Corporate profile' : 'Personal profile'}
+        eyebrow={t(`profileDetail.eyebrow.${profile.type}`)}
         title={profile.displayName}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <span>Owned by {profile.owner.email}</span>
-            <Badge tone={statusTone[profile.status]}>{statusLabel(profile.status)}</Badge>
+            <span>{t('profileDetail.ownedBy', { email: profile.owner.email })}</span>
+            <Badge tone={statusTone[profile.status]}>{t(`status.profile.${profile.status}`)}</Badge>
           </span>
         }
         actions={
@@ -137,17 +140,17 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
               // a banner, and every change is recorded under their own name.
               <a href={teachUrl(`/p/${profile.id}`)} target="_blank" rel="noreferrer">
                 <Button variant="secondary" icon={ExternalLink}>
-                  Open in Teach
+                  {t('profileDetail.openInTeach')}
                 </Button>
               </a>
             ) : null}
             {profile.status !== 'approved' ? (
               <>
                 <Button variant="secondary" icon={X} onClick={() => setDialog('reject')}>
-                  Reject
+                  {t('profileDetail.reject')}
                 </Button>
                 <Button icon={Check} onClick={() => setDialog('approve')}>
-                  Approve
+                  {t('profileDetail.approve')}
                 </Button>
               </>
             ) : null}
@@ -156,14 +159,22 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
       />
 
       <div className="grid gap-6 md:grid-cols-4">
-        <StatCard label="Courses" value={courses.length} hint={`${liveCourses} live`} />
-        <StatCard label="Sales" value={earnings.paymentCount} hint="Paid enrolments" />
         <StatCard
-          label="Net earnings"
-          value={formatSgd(earnings.netCents)}
-          hint="After Stripe fees, commission and refunds"
+          label={t('profileDetail.stat.courses')}
+          value={courses.length}
+          hint={t('profileDetail.stat.courses.live', { count: liveCourses })}
         />
-        <StatCard label="Applied" value={formatDate(profile.appliedAt)} />
+        <StatCard
+          label={t('profileDetail.stat.sales')}
+          value={earnings.paymentCount}
+          hint={t('profileDetail.stat.sales.hint')}
+        />
+        <StatCard
+          label={t('profileDetail.stat.netEarnings')}
+          value={formatSgd(earnings.netCents)}
+          hint={t('profileDetail.stat.netEarnings.hint')}
+        />
+        <StatCard label={t('profileDetail.stat.applied')} value={formatDate(profile.appliedAt)} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
@@ -178,25 +189,42 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
           ) : null}
           <Card as="section">
             <CardHeader
-              title="Application"
-              description={`Applied ${formatDate(profile.appliedAt)}${profile.reviewedAt ? ` · reviewed ${formatDate(profile.reviewedAt)}` : ''}`}
+              title={t('profileDetail.application.title')}
+              description={
+                profile.reviewedAt
+                  ? t('profileDetail.application.appliedReviewed', {
+                      applied: formatDate(profile.appliedAt),
+                      reviewed: formatDate(profile.reviewedAt),
+                    })
+                  : t('profileDetail.application.applied', {
+                      applied: formatDate(profile.appliedAt),
+                    })
+              }
             />
             <DescriptionList
               items={[
-                { label: 'Headline', value: profile.headline },
-                { label: 'Bio', value: <p className="whitespace-pre-wrap">{profile.bio}</p> },
+                { label: t('profileField.headline'), value: profile.headline },
                 {
-                  label: 'Credentials',
+                  label: t('profileField.bio'),
+                  value: <p className="whitespace-pre-wrap">{profile.bio}</p>,
+                },
+                {
+                  label: t('profileDetail.application.credentials'),
                   value: <p className="whitespace-pre-wrap">{profile.credentials}</p>,
                 },
                 ...(profile.reviewNote
-                  ? [{ label: 'Review note', value: profile.reviewNote }]
+                  ? [
+                      {
+                        label: t('profileDetail.application.reviewNote'),
+                        value: profile.reviewNote,
+                      },
+                    ]
                   : []),
               ]}
             />
           </Card>
           <Card as="section">
-            <CardHeader title="Teaching sample" />
+            <CardHeader title={t('profileDetail.sample.title')} />
             {profile.teachingSampleMediaId ? (
               <MediaPreview api={api} assetId={profile.teachingSampleMediaId} />
             ) : null}
@@ -211,21 +239,24 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
               </a>
             ) : null}
             {!profile.teachingSampleMediaId && !profile.teachingSampleUrl ? (
-              <p className="text-small text-ink-tertiary">No sample provided.</p>
+              <p className="text-small text-ink-tertiary">{t('profileDetail.sample.none')}</p>
             ) : null}
           </Card>
           <Card as="section">
-            <CardHeader title="Courses" description="Open a course to read it as a reviewer." />
+            <CardHeader
+              title={t('profileDetail.courses.title')}
+              description={t('profileDetail.courses.description')}
+            />
             {courses.length === 0 ? (
-              <p className="text-small text-ink-tertiary">This profile has no courses yet.</p>
+              <p className="text-small text-ink-tertiary">{t('profileDetail.courses.empty')}</p>
             ) : (
               <Table>
                 <THead>
                   <TR>
-                    <TH>Course</TH>
-                    <TH>Status</TH>
-                    <TH className="text-right">Price</TH>
-                    <TH className="text-right">Enrolled</TH>
+                    <TH>{t('profileDetail.courses.column.course')}</TH>
+                    <TH>{t('common.status')}</TH>
+                    <TH className="text-right">{t('profileDetail.courses.column.price')}</TH>
+                    <TH className="text-right">{t('profileDetail.courses.column.enrolled')}</TH>
                   </TR>
                 </THead>
                 <TBody>
@@ -237,10 +268,11 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
                     >
                       <TD className="font-semibold text-ink">{c.title}</TD>
                       <TD>
-                        <Badge tone={statusTone[c.status]}>{statusLabel(c.status)}</Badge>
+                        <Badge tone={statusTone[c.status]}>{t(`status.course.${c.status}`)}</Badge>
                       </TD>
                       <TD className="text-right font-mono">
-                        {formatSgd(c.priceCents, { showFree: true })}
+                        {/* formatSgd's own "Free" is English, so a zero price is worded here. */}
+                        {c.priceCents === 0 ? t('common.free') : formatSgd(c.priceCents)}
                       </TD>
                       <TD className="text-right font-mono">{c.enrolCount}</TD>
                     </TR>
@@ -253,36 +285,40 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
 
         <div className="space-y-6">
           <Card as="section">
-            <CardHeader title="Owner" description="The one person who holds this profile." />
+            <CardHeader
+              title={t('profileDetail.owner.title')}
+              description={t('profileDetail.owner.description')}
+            />
             <DescriptionList
               items={[
-                { label: 'Name', value: profile.owner.name ?? '—' },
-                { label: 'Email', value: profile.owner.email },
+                { label: t('common.name'), value: profile.owner.name ?? '—' },
+                { label: t('common.email'), value: profile.owner.email },
               ]}
             />
             <Link
               to={`/people/${profile.owner.id}`}
               className="mt-3 block text-small font-semibold text-brand-fg hover:underline"
             >
-              Open this person
+              {t('profileDetail.owner.open')}
             </Link>
             {isSuperAdmin ? (
               <OwnerRecovery detail={detail} />
             ) : (
               <p className="mt-3 text-caption text-ink-tertiary">
-                Only super admins can recover an owner who can no longer sign in.
+                {t('profileDetail.owner.recoveryNote')}
               </p>
             )}
           </Card>
           <Card as="section">
             <CardHeader
-              title="Payout accounts"
-              description="The Stripe accounts this profile is paid through."
+              title={t('profileDetail.payout.title')}
+              description={t('profileDetail.payout.description')}
             />
             {payoutAccounts.length === 0 ? (
               <p className="text-small text-ink-tertiary">
-                None yet. The owner has not started Stripe onboarding
-                {legalEntity ? ' for the company' : ''}, so the profile’s courses cannot be bought.
+                {legalEntity
+                  ? t('profileDetail.payout.none.corporate')
+                  : t('profileDetail.payout.none.personal')}
               </p>
             ) : (
               payoutAccounts.map((account) => (
@@ -290,40 +326,55 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
                   key={account.id}
                   items={[
                     {
-                      label: 'Status',
+                      label: t('common.status'),
                       value: (
                         <Badge tone={account.status === 'active' ? 'success' : 'warning'}>
-                          {account.status === 'active' ? 'Active' : 'Onboarding'}
+                          {t(`status.payout.${account.status}`)}
                         </Badge>
                       ),
                     },
                     {
-                      label: 'Kind',
-                      value: account.businessType === 'company' ? 'Company' : 'Individual',
+                      label: t('profileDetail.payout.kind'),
+                      value: t(`profileDetail.payout.kind.${account.businessType}`),
                     },
                     {
-                      label: 'Stripe account',
+                      label: t('stripe.account'),
                       value: account.stripeAccountId ? (
                         <span className="font-mono text-caption">{account.stripeAccountId}</span>
                       ) : (
                         '—'
                       ),
                     },
-                    { label: 'Charges', value: account.chargesEnabled ? 'Enabled' : 'Not enabled' },
-                    { label: 'Payouts', value: account.payoutsEnabled ? 'Enabled' : 'Not enabled' },
+                    {
+                      label: t('profileDetail.payout.charges'),
+                      value: account.chargesEnabled
+                        ? t('profileDetail.payout.enabled')
+                        : t('profileDetail.payout.notEnabled'),
+                    },
+                    {
+                      label: t('profileDetail.payout.payouts'),
+                      value: account.payoutsEnabled
+                        ? t('profileDetail.payout.enabled')
+                        : t('profileDetail.payout.notEnabled'),
+                    },
                     // A company account also needs the legal-name check before it is active.
                     ...(account.businessType === 'company'
                       ? [
                           {
-                            label: 'Legal name',
+                            label: t('company.legalName'),
                             value: account.nameVerifiedAt
-                              ? `Matched ${formatDate(account.nameVerifiedAt)}`
-                              : 'Not checked yet',
+                              ? t('profileDetail.payout.legalName.matched', {
+                                  date: formatDate(account.nameVerifiedAt),
+                                })
+                              : t('profileDetail.payout.legalName.notChecked'),
                           },
                         ]
                       : []),
                     {
-                      label: account.status === 'active' ? 'Active since' : 'First active',
+                      label:
+                        account.status === 'active'
+                          ? t('profileDetail.payout.activeSince')
+                          : t('profileDetail.payout.firstActive'),
                       value: formatDate(account.activatedAt),
                     },
                   ]}
@@ -333,16 +384,21 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
           </Card>
           <Card as="section">
             <CardHeader
-              title="Commission"
-              description="Platform share of each sale after Stripe fees."
+              title={t('profileDetail.commission.title')}
+              description={t('profileDetail.commission.description')}
             />
             <DescriptionList
-              items={[{ label: 'Current', value: formatBps(profile.commissionBps) }]}
+              items={[
+                {
+                  label: t('profileDetail.commission.current'),
+                  value: formatBps(profile.commissionBps),
+                },
+              ]}
             />
             {isSuperAdmin ? (
               <div className="mt-4 flex items-end gap-2">
                 <Input
-                  label="New rate (%)"
+                  label={t('profileDetail.commission.newRate')}
                   type="number"
                   min={0}
                   max={50}
@@ -352,12 +408,12 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
                   wrapperClassName="w-32"
                 />
                 <Button variant="secondary" loading={busy} onClick={saveCommission}>
-                  Save
+                  {t('common.save')}
                 </Button>
               </div>
             ) : (
               <p className="mt-3 text-caption text-ink-tertiary">
-                Only super admins can change commission.
+                {t('profileDetail.commission.superAdminOnly')}
               </p>
             )}
           </Card>
@@ -367,25 +423,28 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
       <Dialog
         open={dialog === 'approve'}
         onOpenChange={(o) => !o && setDialog(null)}
-        title="Approve this profile?"
+        title={t('profileDetail.approve.title')}
         description={
           legalEntity
-            ? `Approving records that you checked ${legalEntity.legalName} (UEN ${legalEntity.uen}) against its business profile. Its owner can then connect the company’s Stripe account, and gets an email.`
-            : 'Its owner can connect Stripe and build courses straight away. They get an email.'
+            ? t('profileDetail.approve.description.corporate', {
+                legalName: legalEntity.legalName,
+                uen: legalEntity.uen,
+              })
+            : t('profileDetail.approve.description.personal')
         }
         footer={
           <>
             <Button variant="ghost" onClick={() => setDialog(null)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button loading={busy} onClick={approve}>
-              Approve
+              {t('profileDetail.approve')}
             </Button>
           </>
         }
       >
         <Textarea
-          label="Internal note (optional)"
+          label={t('profileDetail.approve.note')}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
@@ -394,12 +453,12 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
       <Dialog
         open={dialog === 'reject'}
         onOpenChange={(o) => !o && setDialog(null)}
-        title="Reject this application"
-        description="The reason is emailed to the owner. They can update the application and resubmit."
+        title={t('profileDetail.reject.title')}
+        description={t('profileDetail.reject.description')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setDialog(null)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
@@ -407,13 +466,13 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
               disabled={note.trim().length < 10}
               onClick={reject}
             >
-              Reject
+              {t('profileDetail.reject')}
             </Button>
           </>
         }
       >
         <Textarea
-          label="Reason (sent to the owner)"
+          label={t('profileDetail.reject.reason')}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={4}

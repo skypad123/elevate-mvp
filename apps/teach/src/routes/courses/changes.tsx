@@ -1,5 +1,6 @@
 import { Button, EmptyState, PageHeader, Skeleton } from '@elevate/web-ui'
 import { errorMessage } from '@elevate/web-ui/portal'
+import { useT } from '@elevate/web-ui/preferences'
 import { ArrowLeft } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ChangeSetReview } from '../../components/change-set-review'
@@ -16,6 +17,7 @@ export function CourseChangesPage() {
   const { id = '' } = useParams()
   const { path } = useCurrentProfile()
   const navigate = useNavigate()
+  const t = useT()
   const builder = path(`/courses/${id}`)
   const changeSet = useChangeSet(id)
   const live = useCourseTree(id, 'live')
@@ -26,7 +28,7 @@ export function CourseChangesPage() {
       to={builder}
       className="mb-4 inline-flex items-center gap-1 text-small text-ink-secondary hover:text-ink"
     >
-      <ArrowLeft className="size-4" /> Back to the course
+      <ArrowLeft className="size-4" /> {t('changes.back')}
     </Link>
   )
 
@@ -37,7 +39,7 @@ export function CourseChangesPage() {
         {back}
         <EmptyState
           tone="danger"
-          title="Could not load the changes"
+          title={t('changes.loadFailed')}
           body={errorMessage(changeSet.error ?? live.error)}
         />
       </>
@@ -46,9 +48,9 @@ export function CourseChangesPage() {
     <>
       {back}
       <PageHeader
-        eyebrow="Changes waiting for approval"
+        eyebrow={t('changes.eyebrow')}
         title={live.data.title}
-        description="Edits a writer made to this live course. Learners do not see them until they are approved."
+        description={t('changes.description')}
       />
       {changeSet.data ? (
         <ChangeSetReview
@@ -60,11 +62,11 @@ export function CourseChangesPage() {
         />
       ) : (
         <EmptyState
-          title="Nothing is waiting"
-          body="This course has no changes waiting for approval."
+          title={t('changes.none.title')}
+          body={t('changes.none.body')}
           action={
             <Link to={builder}>
-              <Button variant="secondary">Open the course</Button>
+              <Button variant="secondary">{t('changes.none.open')}</Button>
             </Link>
           }
         />

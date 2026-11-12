@@ -7,7 +7,6 @@ import {
   DescriptionList,
   Dialog,
   formatBps,
-  formatDate,
   Input,
   MediaUploader,
   PageHeader,
@@ -15,13 +14,13 @@ import {
   useToast,
 } from '@elevate/web-ui'
 import { errorMessage, fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
-import { PreferencesCard, useT } from '@elevate/web-ui/preferences'
+import { PreferencesCard, useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { api } from '../lib/api'
 import { teachKeys } from '../lib/keys'
-import { ROLE_LABEL, ROLE_SUMMARY, useMemberActions } from '../lib/members'
+import { useMemberActions } from '../lib/members'
 import { useCurrentProfile } from '../lib/profile'
 import { StripeCard } from './dashboard'
 
@@ -32,6 +31,7 @@ function MembershipCard() {
   const actions = useMemberActions()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const t = useT()
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   if (role !== 'manager' && role !== 'writer') return null
@@ -42,32 +42,39 @@ function MembershipCard() {
       await actions.leave()
       // The profile is gone from the user's list once the session is read again.
       await refreshUser()
-      toast({ tone: 'success', title: `You left ${displayName}` })
+      toast({ tone: 'success', title: t('membership.leave.done', { name: displayName }) })
       navigate('/', { replace: true })
     } catch (error) {
-      toast({ tone: 'danger', title: 'Could not leave', description: errorMessage(error) })
+      toast({
+        tone: 'danger',
+        title: t('membership.leave.failed'),
+        description: errorMessage(error),
+      })
       setBusy(false)
     }
   }
 
   return (
     <Card as="section" className="space-y-3">
-      <CardHeader title={`Your role: ${ROLE_LABEL[role]}`} description={ROLE_SUMMARY[role]} />
+      <CardHeader
+        title={t('membership.yourRole', { role: t(`profileRole.${role}`) })}
+        description={t(`profileRole.${role}.summary`)}
+      />
       <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
-        Leave this profile
+        {t('membership.leave')}
       </Button>
       <Dialog
         open={confirming}
         onOpenChange={setConfirming}
-        title={`Leave ${displayName}?`}
-        description="You lose access to this profile and its courses at once. What you wrote stays with the profile. To come back you need a new invitation."
+        title={t('membership.leave.title', { name: displayName })}
+        description={t('membership.leave.description')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirming(false)}>
-              Stay
+              {t('membership.leave.stay')}
             </Button>
             <Button variant="danger" loading={busy} onClick={() => void leave()}>
-              Leave
+              {t('membership.leave.confirm')}
             </Button>
           </>
         }
@@ -82,6 +89,7 @@ export function SettingsPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const t = useT()
+  const formatDate = useFormatDate()
   const [form, setForm] = useState({ displayName: '', headline: '', bio: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
@@ -118,10 +126,14 @@ export function SettingsPage() {
     setErrors({})
     try {
       await patch(form)
-      toast({ tone: 'success', title: 'Profile saved' })
+      toast({ tone: 'success', title: t('settings.teach.saved') })
     } catch (error) {
       setErrors(fieldErrors(error))
-      toast({ tone: 'danger', title: 'Could not save', description: errorMessage(error) })
+      toast({
+        tone: 'danger',
+        title: t('settings.teach.saveFailed'),
+        description: errorMessage(error),
+      })
     } finally {
       setBusy(false)
     }
@@ -134,9 +146,16 @@ export function SettingsPage() {
     try {
       await patch({ avatarMediaId: asset?.id ?? null })
       setUpload(null)
-      toast({ tone: 'success', title: asset ? 'Picture saved' : 'Picture removed' })
+      toast({
+        tone: 'success',
+        title: asset ? t('settings.teach.picture.saved') : t('settings.teach.picture.removed'),
+      })
     } catch (error) {
-      toast({ tone: 'danger', title: 'Could not save picture', description: errorMessage(error) })
+      toast({
+        tone: 'danger',
+        title: t('settings.teach.picture.saveFailed'),
+        description: errorMessage(error),
+      })
     }
   }
 
@@ -152,7 +171,7 @@ export function SettingsPage() {
           <form onSubmit={save}>
             <Card as="section" className="space-y-5">
               <Input
-                label="Display name"
+                label={t('profileField.displayName')}
                 value={form.displayName}
                 onChange={(e) => setForm({ ...form, displayName: e.target.value })}
                 error={errors.displayName}
@@ -160,7 +179,7 @@ export function SettingsPage() {
                 required
               />
               <Input
-                label="Headline"
+                label={t('profileField.headline')}
                 value={form.headline}
                 onChange={(e) => setForm({ ...form, headline: e.target.value })}
                 error={errors.headline}
@@ -168,7 +187,7 @@ export function SettingsPage() {
                 required
               />
               <Textarea
-                label="Bio"
+                label={t('profileField.bio')}
                 rows={7}
                 value={form.bio}
                 onChange={(e) => setForm({ ...form, bio: e.target.value })}
@@ -178,21 +197,21 @@ export function SettingsPage() {
               />
               <div className="flex justify-end">
                 <Button type="submit" loading={busy} disabled={!canEdit}>
-                  Save changes
+                  {t('settings.teach.save')}
                 </Button>
               </div>
             </Card>
           </form>
           <Card as="section" className="space-y-4">
             <CardHeader
-              title="Profile picture"
-              description="Shown beside your name on course pages. A square JPG, PNG or WebP works best."
+              title={t('settings.teach.picture')}
+              description={t('settings.teach.picture.description')}
             />
             <div className="flex items-center gap-4">
               <Avatar name={profile?.displayName} url={profile?.avatarUrl} size="lg" />
               {profile?.avatarMediaId && canEdit ? (
                 <Button variant="ghost" size="sm" onClick={() => setAvatar(null)}>
-                  Remove picture
+                  {t('settings.teach.picture.remove')}
                 </Button>
               ) : null}
             </div>
@@ -203,7 +222,11 @@ export function SettingsPage() {
               value={upload}
               disabled={!canEdit}
               onChange={setAvatar}
-              label={profile?.avatarMediaId ? 'Replace picture' : 'Upload a picture'}
+              label={
+                profile?.avatarMediaId
+                  ? t('settings.teach.picture.replace')
+                  : t('settings.teach.picture.upload')
+              }
             />
           </Card>
         </div>
@@ -215,8 +238,8 @@ export function SettingsPage() {
             <CardHeader title={t('account.title')} />
             <DescriptionList
               items={[
-                { label: 'Signed in as', value: user?.email },
-                { label: 'Owner', value: profile?.owner.email },
+                { label: t('account.signedInAs'), value: user?.email },
+                { label: t('account.owner'), value: profile?.owner.email },
                 {
                   label: t('account.commission'),
                   value: profile ? formatBps(profile.commissionBps) : '—',

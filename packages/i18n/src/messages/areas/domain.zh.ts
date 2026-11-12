@@ -6,7 +6,7 @@ export const domainZh = {
   'profileRole.writer': '撰稿人',
   'profileRole.owner.summary': '拥有全部权限，包括收款设置和管理员的任免。',
   'profileRole.manager.summary':
-    '与所有者一起运营档案：课程、价格、发布、撰稿人和收入。收款设置和管理员的任免仍由所有者负责。',
+    '与所有者一起运营档案，包括课程、价格、发布、撰稿人和收入。收款设置和管理员的任免仍由所有者负责。',
   'profileRole.writer.summary':
     '创建和编辑课程内容。不能修改价格、发布课程或查看收入。对已上线课程的修改需等待批准。',
   'profileRole.note': '{role}：{summary}',

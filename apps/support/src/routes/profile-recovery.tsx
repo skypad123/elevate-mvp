@@ -6,6 +6,7 @@ import type {
 } from '@elevate/core'
 import { Badge, Button, Dialog, Input, MediaUploader, useToast } from '@elevate/web-ui'
 import { errorMessage, unwrap } from '@elevate/web-ui/portal'
+import { fillSlots, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { KeyRound } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
@@ -18,6 +19,7 @@ import { profileKeys, usePeople } from '../lib/queries'
  * profile's owner changes, and only a super admin can do it: the API refuses anyone else.
  */
 export function OwnerRecovery({ detail }: { detail: SupportProfileDetail }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const corporate = detail.profile.type === 'corporate'
   const close = () => setOpen(false)
@@ -30,7 +32,7 @@ export function OwnerRecovery({ detail }: { detail: SupportProfileDetail }) {
         className="mt-4"
         onClick={() => setOpen(true)}
       >
-        {corporate ? 'Name a new owner' : 'Change the owner’s email'}
+        {corporate ? t('recovery.open.company') : t('recovery.open.personal')}
       </Button>
       {/* Mounted only while open, so each recovery starts from an empty form. */}
       {open ? (
@@ -47,8 +49,10 @@ export function OwnerRecovery({ detail }: { detail: SupportProfileDetail }) {
 function useRecover(profileId: string, onDone: () => void) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const t = useT()
   const [busy, setBusy] = useState(false)
 
+  /** `done` is the title of the toast shown when the recovery has gone through. */
   async function recover(json: RecoverOwner, done: string) {
     setBusy(true)
     try {
@@ -63,18 +67,20 @@ function useRecover(profileId: string, onDone: () => void) {
       await queryClient.invalidateQueries({ queryKey: profileKeys.all })
       await queryClient.invalidateQueries({ queryKey: ['support', 'people'] })
       await queryClient.invalidateQueries({ queryKey: ['support', 'person'] })
-      toast({ tone: 'success', title: done, description: 'Both addresses have been emailed.' })
+      toast({ tone: 'success', title: done, description: t('recovery.toast.emailed') })
       onDone()
     } catch (error) {
-      toast({ tone: 'danger', title: 'Recovery failed', description: errorMessage(error) })
+      toast({
+        tone: 'danger',
+        title: t('recovery.toast.failed'),
+        description: errorMessage(error),
+      })
     } finally {
       setBusy(false)
     }
   }
   return { busy, recover }
 }
-
-const RECORDED = 'The change is recorded in the audit log under your name.'
 
 /** A personal profile belongs to a person, so the person stays and their address changes. */
 function PersonalRecovery({
@@ -84,6 +90,7 @@ function PersonalRecovery({
   detail: SupportProfileDetail
   onClose: () => void
 }) {
+  const t = useT()
   const owner = detail.profile.owner
   const [email, setEmail] = useState('')
   const { busy, recover } = useRecover(detail.profile.id, onClose)
@@ -94,42 +101,36 @@ function PersonalRecovery({
     <Dialog
       open
       onOpenChange={(open) => !open && onClose()}
-      title="Change the owner’s email address"
-      description={
-        <>
-          For an owner who can no longer sign in as <strong>{owner.email}</strong>. Be sure who is
-          asking: whoever reads the new address gets the profile, its courses and its earnings.
-        </>
-      }
+      title={t('recovery.personal.title')}
+      description={fillSlots(t('recovery.personal.description'), {
+        email: <strong>{owner.email}</strong>,
+      })}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="danger"
             loading={busy}
             disabled={!usable}
-            onClick={() => recover({ newEmail: next }, 'Owner’s email changed')}
+            onClick={() => recover({ newEmail: next }, t('recovery.toast.emailChanged'))}
           >
-            Change address
+            {t('recovery.personal.confirm')}
           </Button>
         </>
       }
     >
       <Input
-        label="New email address"
+        label={t('recovery.personal.newEmail')}
         type="email"
         autoComplete="off"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        hint="It must not belong to another Elevate account."
+        hint={t('recovery.personal.newEmail.hint')}
         required
       />
-      <p className="mt-4 text-small text-ink-secondary">
-        The owner is signed out everywhere and signs in with the new address from now on. Both
-        addresses are emailed. {RECORDED}
-      </p>
+      <p className="mt-4 text-small text-ink-secondary">{t('recovery.personal.effects')}</p>
     </Dialog>
   )
 }
@@ -142,6 +143,7 @@ function CompanyRecovery({
   detail: SupportProfileDetail
   onClose: () => void
 }) {
+  const t = useT()
   const { profile, legalEntity } = detail
   const previous = profile.owner
   const [q, setQ] = useState('')
@@ -160,18 +162,15 @@ function CompanyRecovery({
       open
       onOpenChange={(open) => !open && onClose()}
       className="max-h-[calc(100vh-32px)] overflow-y-auto"
-      title="Name a new owner"
-      description={
-        <>
-          For a company whose owner, <strong>{previous.email}</strong>, has left or cannot sign in.
-          An officer of {legalEntity?.legalName ?? profile.displayName} must authorise the change in
-          writing.
-        </>
-      }
+      title={t('recovery.company.title')}
+      description={fillSlots(t('recovery.company.description'), {
+        email: <strong>{previous.email}</strong>,
+        company: legalEntity?.legalName ?? profile.displayName,
+      })}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="danger"
@@ -185,11 +184,11 @@ function CompanyRecovery({
                   authorisationMediaId: authorisation.id,
                   removePreviousOwner: removePrevious,
                 },
-                'Owner changed',
+                t('recovery.toast.ownerChanged'),
               )
             }}
           >
-            Change owner
+            {t('recovery.company.confirm')}
           </Button>
         </>
       }
@@ -197,33 +196,35 @@ function CompanyRecovery({
       <div className="space-y-5">
         {person ? (
           <div>
-            <p className="mb-1.5 text-small font-semibold text-ink">New owner</p>
+            <p className="mb-1.5 text-small font-semibold text-ink">
+              {t('recovery.company.newOwner')}
+            </p>
             <div className="flex items-center justify-between gap-3 rounded-control border border-border px-3 py-2">
               <PersonLine person={person} profileId={profile.id} />
               <Button variant="ghost" size="sm" onClick={() => setPerson(null)}>
-                Change
+                {t('recovery.company.newOwner.change')}
               </Button>
             </div>
           </div>
         ) : (
           <div>
             <Input
-              label="New owner"
-              hint="Search by email or name. The new owner needs an Elevate account: ask them to sign in to Teach once."
+              label={t('recovery.company.newOwner')}
+              hint={t('recovery.company.newOwner.hint')}
               placeholder="name@example.com"
               autoComplete="off"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
             {!searching ? null : people.isPending ? (
-              <p className="mt-2 text-small text-ink-tertiary">Searching…</p>
+              <p className="mt-2 text-small text-ink-tertiary">{t('recovery.company.searching')}</p>
             ) : people.isError ? (
               <p role="alert" className="mt-2 text-small text-danger">
                 {errorMessage(people.error)}
               </p>
             ) : candidates.length === 0 ? (
               <p className="mt-2 text-small text-ink-tertiary">
-                No other account matches “{search}”.
+                {t('recovery.company.noMatch', { search })}
               </p>
             ) : (
               <ul className="mt-2 divide-y divide-border rounded-control border border-border">
@@ -248,8 +249,8 @@ function CompanyRecovery({
           kind="document"
           value={authorisation}
           onChange={setAuthorisation}
-          label="Officer’s authorisation (PDF)"
-          hint="A signed letter from a director or partner of the company that names the new owner. It is kept with the audit entry."
+          label={t('recovery.company.authorisation')}
+          hint={t('recovery.company.authorisation.hint')}
         />
 
         <label className="flex cursor-pointer items-start gap-2 text-small text-ink">
@@ -260,20 +261,21 @@ function CompanyRecovery({
             onChange={(e) => setRemovePrevious(e.target.checked)}
           />
           <span>
-            Remove {previous.email} from the profile
+            {t('recovery.company.removePrevious', { email: previous.email })}
             <span className="block text-ink-tertiary">
-              Left unticked, they stay on the profile as a manager. Either way they are signed out.
+              {t('recovery.company.removePrevious.hint')}
             </span>
           </span>
         </label>
 
-        <p className="text-small text-ink-secondary">Both people are emailed. {RECORDED}</p>
+        <p className="text-small text-ink-secondary">{t('recovery.company.effects')}</p>
       </div>
     </Dialog>
   )
 }
 
 function PersonLine({ person, profileId }: { person: PersonSummary; profileId: string }) {
+  const t = useT()
   const membership = person.profiles.find((p) => p.id === profileId)
   return (
     <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
@@ -282,7 +284,11 @@ function PersonLine({ person, profileId }: { person: PersonSummary; profileId: s
         <span className="block truncate text-caption text-ink-tertiary">{person.email}</span>
       </span>
       {membership ? (
-        <Badge tone="info">{membership.role === 'manager' ? 'Manager here' : 'Writer here'}</Badge>
+        <Badge tone="info">
+          {membership.role === 'manager'
+            ? t('recovery.company.managerHere')
+            : t('recovery.company.writerHere')}
+        </Badge>
       ) : null}
     </span>
   )

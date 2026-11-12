@@ -8,6 +8,7 @@ import {
 } from '@elevate/core'
 import { Button, EmptyState } from '@elevate/web-ui'
 import { FullPageSpinner, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
+import { useT } from '@elevate/web-ui/preferences'
 import { useQuery } from '@tanstack/react-query'
 import { createContext, type ReactNode, useContext, useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router'
@@ -80,6 +81,7 @@ export function useProfileView(profileId: string | undefined) {
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { profileId = '' } = useParams()
   const { user } = usePortalAuth()
+  const t = useT()
   const mine = user?.profiles.find((p) => p.id === profileId)
   const query = useProfileView(profileId)
   const view = query.data
@@ -112,11 +114,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     <div className="mx-auto max-w-xl px-4 py-24">
       <EmptyState
         tone="danger"
-        title="Profile not found"
-        body="This teaching profile does not exist, or your account is not part of it."
+        title={t('profileNotFound.title')}
+        body={t('profileNotFound.body')}
         action={
           <Link to="/">
-            <Button variant="secondary">Go to your profiles</Button>
+            <Button variant="secondary">{t('profileNotFound.action')}</Button>
           </Link>
         }
       />

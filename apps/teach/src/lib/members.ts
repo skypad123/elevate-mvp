@@ -8,15 +8,6 @@ import { useCurrentProfile } from './profile'
 
 const scoped = api.teach.profiles[':profileId']
 
-/** What each role is for, in the words the members page and the invitation page both use. */
-export const ROLE_LABEL: Record<MembershipRole, string> = { manager: 'Manager', writer: 'Writer' }
-export const ROLE_SUMMARY: Record<MembershipRole, string> = {
-  writer:
-    'Creates and edits course content. Cannot change prices, publish courses or see earnings. Edits to a live course wait for approval.',
-  manager:
-    'Runs the profile with the owner: courses, prices, publishing, writers and earnings. Payout settings and managers stay with the owner.',
-}
-
 /** The profile's managers and writers, and the invitations still waiting on someone. */
 export function useMembers(enabled = true) {
   const { profileId } = useCurrentProfile()
