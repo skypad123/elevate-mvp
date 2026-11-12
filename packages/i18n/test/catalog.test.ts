@@ -8,7 +8,8 @@ import {
   supportedLocales,
   translate,
 } from '../src/index'
-import { en } from '../src/messages/en'
+import { en, enAreas } from '../src/messages/en'
+import { zhAreas } from '../src/messages/zh'
 
 const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort()
 
@@ -48,6 +49,22 @@ describe('catalogs', () => {
         expect(value.trim(), `${locale}:${key}`).not.toBe('')
     }
   })
+})
+
+describe('areas', () => {
+  // A key defined in two areas is silently overwritten by the later one when they are spread.
+  it.each([
+    ['en', enAreas, en],
+    ['zh', zhAreas, catalogs.zh],
+  ] as const)(
+    '%s: no key is defined in two areas, and every area is in the catalog',
+    (_locale, areas, catalog) => {
+      const keys = areas.flatMap((area) => Object.keys(area))
+      const twice = keys.filter((key, index) => keys.indexOf(key) !== index)
+      expect(twice).toEqual([])
+      expect(keys.sort()).toEqual(Object.keys(catalog).sort())
+    },
+  )
 })
 
 describe('translate', () => {

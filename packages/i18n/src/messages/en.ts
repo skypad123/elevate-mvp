@@ -2,60 +2,70 @@
  * English is the source of truth: its keys define `MessageKey`, so a typo in `t('…')` is a type
  * error, and every other catalog is checked against these keys.
  *
- * Keys are flat, dot-separated by area. `{name}` placeholders are interpolated by `translate`.
- * Scope today: navigation chrome and the Settings/Preferences/Profile screens.
+ * The catalog is written one area at a time in `areas/<area>.en.ts` (and `<area>.zh.ts`) and put
+ * together here. Keys are flat, dot-separated and start with their area. `{name}` placeholders
+ * are interpolated by `translate`.
+ *
+ * Translated today: navigation, the Settings/Preferences/Profile screens, and the teaching-profile
+ * screens of Teach and Support (members, invitations, held changes, company application and
+ * set-up, Support's profile pages). Other pages are still English.
+ *
+ * To add an area: write the two files, then add it to `enAreas` and to `en` below, and to the
+ * same two places in `zh.ts`. `test/catalog.test.ts` fails if the two lists disagree or if two
+ * areas define the same key.
  */
+import { applicationEn } from './areas/application.en'
+import { changesEn } from './areas/changes.en'
+import { chromeEn } from './areas/chrome.en'
+import { commonEn } from './areas/common.en'
+import { companyApplyEn } from './areas/companyApply.en'
+import { domainEn } from './areas/domain.en'
+import { invitationEn } from './areas/invitation.en'
+import { membersEn } from './areas/members.en'
+import { paymentsEn } from './areas/payments.en'
+import { supportCompanyEn } from './areas/supportCompany.en'
+import { supportProfileEn } from './areas/supportProfile.en'
+import { supportProfilesEn } from './areas/supportProfiles.en'
+import { supportRecoveryEn } from './areas/supportRecovery.en'
+import { teachSettingsEn } from './areas/teachSettings.en'
+import { teachShellEn } from './areas/teachShell.en'
+import { uiEn } from './areas/ui.en'
+
+/** Every area, for the test that no key is defined twice. Keep in step with `en`. */
+export const enAreas: readonly Readonly<Record<string, string>>[] = [
+  chromeEn,
+  commonEn,
+  domainEn,
+  uiEn,
+  teachShellEn,
+  teachSettingsEn,
+  paymentsEn,
+  membersEn,
+  invitationEn,
+  companyApplyEn,
+  applicationEn,
+  changesEn,
+  supportProfilesEn,
+  supportProfileEn,
+  supportCompanyEn,
+  supportRecoveryEn,
+]
+
 export const en = {
-  // Portal and tab navigation
-  'nav.dashboard': 'Dashboard',
-  'nav.courses': 'Courses',
-  'nav.earnings': 'Earnings',
-  'nav.settings': 'Settings',
-  'nav.reviewQueue': 'Review queue',
-  'nav.people': 'People',
-  'nav.transactions': 'Transactions',
-  'nav.insights': 'Insights',
-  'nav.auditLog': 'Audit log',
-  'nav.explore': 'Explore',
-  'nav.myLearning': 'My Learning',
-  'nav.profile': 'Profile',
-  'nav.signIn': 'Sign in',
-  'nav.signOut': 'Sign out',
-
-  // Preferences (shared by all three portals)
-  'prefs.title': 'Preferences',
-  'prefs.description': 'How Elevate looks and which language it uses on this device.',
-  'prefs.appearance': 'Appearance',
-  'prefs.appearance.description': 'System follows your device setting.',
-  'prefs.theme.system': 'System',
-  'prefs.theme.light': 'Light',
-  'prefs.theme.dark': 'Dark',
-  'prefs.language': 'Language',
-  'prefs.language.description':
-    'Applies to menus and settings. More of Elevate is translated over time.',
-
-  // Settings pages
-  'settings.eyebrow': 'Settings',
-  'settings.teach.title': 'Your teacher profile',
-  'settings.teach.description': 'What learners see on your course pages.',
-  'settings.support.title': 'Your account',
-  'settings.support.description': 'Preferences are saved on this device.',
-  'account.title': 'Account',
-  'account.email': 'Email',
-  'account.role': 'Role',
-  'account.commission': 'Commission',
-  'account.approved': 'Approved',
-  'role.superAdmin': 'Super admin',
-  'role.supportAgent': 'Support agent',
-  'role.teacher': 'Teacher',
-  'role.learner': 'Learner',
-  'role.staff': 'Staff',
-
-  // Learner profile tab
-  'profile.title': 'Your profile',
-  'profile.displayName': 'Display name',
-  'profile.displayName.hint': 'This is the name printed on your certificates.',
-  'profile.name.placeholder': 'Your name',
-  'profile.save': 'Save',
-  'profile.saved': 'Saved',
+  ...chromeEn,
+  ...commonEn,
+  ...domainEn,
+  ...uiEn,
+  ...teachShellEn,
+  ...teachSettingsEn,
+  ...paymentsEn,
+  ...membersEn,
+  ...invitationEn,
+  ...companyApplyEn,
+  ...applicationEn,
+  ...changesEn,
+  ...supportProfilesEn,
+  ...supportProfileEn,
+  ...supportCompanyEn,
+  ...supportRecoveryEn,
 } as const

@@ -69,7 +69,9 @@ export function TeachLayout() {
         ...(can('earnings.read')
           ? [{ to: path('/earnings'), label: t('nav.earnings'), icon: Wallet }]
           : []),
-        ...(can('members.read') ? [{ to: path('/members'), label: 'Members', icon: Users }] : []),
+        ...(can('members.read')
+          ? [{ to: path('/members'), label: t('nav.members'), icon: Users }]
+          : []),
         { to: path('/settings'), label: t('nav.settings'), icon: Settings },
       ]}
       footer={

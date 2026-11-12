@@ -41,7 +41,7 @@ export function SupportLayout() {
         tone="brand"
         items={[
           { to: '/review', label: t('nav.reviewQueue'), icon: ClipboardCheck },
-          { to: '/profiles', label: 'Profiles', icon: GraduationCap },
+          { to: '/profiles', label: t('nav.profiles'), icon: GraduationCap },
           { to: '/people', label: t('nav.people'), icon: Users },
           { to: '/transactions', label: t('nav.transactions'), icon: Receipt },
           { to: '/insights', label: t('nav.insights'), icon: TrendingUp },

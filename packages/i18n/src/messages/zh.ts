@@ -1,52 +1,75 @@
+/**
+ * 简体中文. Each area in `areas/<area>.zh.ts` is checked against its English file when it is
+ * compiled (`satisfies`), so a missing or unknown key is a type error in that file. A key that is
+ * missing here would fall back to English at runtime; the catalog test lists such keys.
+ *
+ * Terms, so that areas agree:
+ *
+ * - teaching profile 教学档案 · personal profile 个人档案 · company profile 公司档案 · company 公司
+ * - owner 所有者 · manager 管理员 · writer 撰稿人 · member 成员 · invitation 邀请
+ * - learner 学员 · teacher 教师 · Elevate staff Elevate 员工
+ * - course 课程 · lesson 课时 · item (video, audio, text, quiz) 内容 · quiz 测验 · prerequisite 先修课时
+ * - live 已上线 · draft 草稿 · changes 更改 · clash 冲突 · approve 批准 · reject 拒绝 · discard 放弃
+ * - application 申请 · review 审核 · payout account 收款账户 · earnings 收入 · commission 佣金
+ * - legal name 法定名称 · legal-name check 法定名称核对 · sign in 登录 · sign out 退出登录
+ * - Elevate, Teach, Support, Stripe and UEN stay as they are.
+ *
+ * Style: address the reader as 您; a half-width space between Chinese and Latin letters or
+ * digits; full-width punctuation (，。：；？！（）“”) in Chinese sentences.
+ */
 import type { Messages } from '../types'
+import { applicationZh } from './areas/application.zh'
+import { changesZh } from './areas/changes.zh'
+import { chromeZh } from './areas/chrome.zh'
+import { commonZh } from './areas/common.zh'
+import { companyApplyZh } from './areas/companyApply.zh'
+import { domainZh } from './areas/domain.zh'
+import { invitationZh } from './areas/invitation.zh'
+import { membersZh } from './areas/members.zh'
+import { paymentsZh } from './areas/payments.zh'
+import { supportCompanyZh } from './areas/supportCompany.zh'
+import { supportProfileZh } from './areas/supportProfile.zh'
+import { supportProfilesZh } from './areas/supportProfiles.zh'
+import { supportRecoveryZh } from './areas/supportRecovery.zh'
+import { teachSettingsZh } from './areas/teachSettings.zh'
+import { teachShellZh } from './areas/teachShell.zh'
+import { uiZh } from './areas/ui.zh'
 
-/** 简体中文. Keys missing here fall back to English at runtime; the catalog test lists them. */
+/** Every area, for the test that no key is defined twice. Keep in step with `zh`. */
+export const zhAreas: readonly Readonly<Record<string, string>>[] = [
+  chromeZh,
+  commonZh,
+  domainZh,
+  uiZh,
+  teachShellZh,
+  teachSettingsZh,
+  paymentsZh,
+  membersZh,
+  invitationZh,
+  companyApplyZh,
+  applicationZh,
+  changesZh,
+  supportProfilesZh,
+  supportProfileZh,
+  supportCompanyZh,
+  supportRecoveryZh,
+]
+
 export const zh: Partial<Messages> = {
-  'nav.dashboard': '仪表盘',
-  'nav.courses': '课程',
-  'nav.earnings': '收入',
-  'nav.settings': '设置',
-  'nav.reviewQueue': '审核队列',
-  'nav.people': '用户',
-  'nav.transactions': '交易',
-  'nav.insights': '洞察',
-  'nav.auditLog': '审计日志',
-  'nav.explore': '探索',
-  'nav.myLearning': '我的学习',
-  'nav.profile': '个人资料',
-  'nav.signIn': '登录',
-  'nav.signOut': '退出登录',
-
-  'prefs.title': '偏好设置',
-  'prefs.description': '设置 Elevate 在此设备上的外观和语言。',
-  'prefs.appearance': '外观',
-  'prefs.appearance.description': '“跟随系统”会使用设备的显示设置。',
-  'prefs.theme.system': '跟随系统',
-  'prefs.theme.light': '浅色',
-  'prefs.theme.dark': '深色',
-  'prefs.language': '语言',
-  'prefs.language.description': '适用于菜单和设置。更多内容将陆续翻译。',
-
-  'settings.eyebrow': '设置',
-  'settings.teach.title': '您的教师资料',
-  'settings.teach.description': '学员在您的课程页面上看到的内容。',
-  'settings.support.title': '您的账户',
-  'settings.support.description': '偏好设置保存在此设备上。',
-  'account.title': '账户',
-  'account.email': '邮箱',
-  'account.role': '角色',
-  'account.commission': '佣金',
-  'account.approved': '批准日期',
-  'role.superAdmin': '超级管理员',
-  'role.supportAgent': '客服专员',
-  'role.teacher': '教师',
-  'role.learner': '学员',
-  'role.staff': '员工',
-
-  'profile.title': '您的个人资料',
-  'profile.displayName': '显示名称',
-  'profile.displayName.hint': '此名称将印在您的证书上。',
-  'profile.name.placeholder': '您的姓名',
-  'profile.save': '保存',
-  'profile.saved': '已保存',
+  ...chromeZh,
+  ...commonZh,
+  ...domainZh,
+  ...uiZh,
+  ...teachShellZh,
+  ...teachSettingsZh,
+  ...paymentsZh,
+  ...membersZh,
+  ...invitationZh,
+  ...companyApplyZh,
+  ...applicationZh,
+  ...changesZh,
+  ...supportProfilesZh,
+  ...supportProfileZh,
+  ...supportCompanyZh,
+  ...supportRecoveryZh,
 }
