@@ -62,7 +62,7 @@ export function Profiles() {
           </TabsList>
         </Tabs>
         <Input
-          placeholder="Search profile name or owner"
+          placeholder="Search profile, owner, UEN or legal name"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           wrapperClassName="w-72"
@@ -106,7 +106,14 @@ export function Profiles() {
                 className="cursor-pointer"
                 onClick={() => navigate(`/profiles/${p.id}`)}
               >
-                <TD className="font-semibold text-ink">{p.displayName}</TD>
+                <TD>
+                  <p className="font-semibold text-ink">{p.displayName}</p>
+                  {p.legalName ? (
+                    <p className="text-caption text-ink-tertiary">
+                      {p.legalName} · UEN {p.uen}
+                    </p>
+                  ) : null}
+                </TD>
                 <TD className="text-ink-secondary">
                   {p.type === 'corporate' ? 'Corporate' : 'Personal'}
                 </TD>

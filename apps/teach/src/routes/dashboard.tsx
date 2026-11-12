@@ -28,6 +28,9 @@ export function StripeCard() {
 
   // Payable: the account is active on our side and Stripe allows charges.
   const enabled = status?.status === 'active' && status.chargesEnabled
+  // A company whose Stripe side is done but whose legal name Elevate has not matched (again).
+  const awaitingNameCheck =
+    !enabled && status?.businessType === 'company' && status.chargesEnabled && !status.nameVerified
   return (
     <Card as="section">
       <CardHeader
@@ -35,20 +38,41 @@ export function StripeCard() {
         description={
           enabled
             ? 'Learners can pay you. Payouts land in your bank on Stripe’s schedule.'
-            : 'Connect a Stripe account so learners can pay you. Takes about five minutes.'
+            : awaitingNameCheck
+              ? 'The Stripe account is connected. Courses can be bought once Elevate has matched its legal name to the company.'
+              : 'Connect a Stripe account so learners can pay you. Takes about five minutes.'
         }
         action={
           <Badge tone={enabled ? 'success' : status?.connected ? 'warning' : 'neutral'}>
             {enabled
               ? 'Payments enabled'
-              : status?.connected
-                ? 'Onboarding incomplete'
-                : 'Not connected'}
+              : awaitingNameCheck
+                ? 'Name check pending'
+                : status?.connected
+                  ? 'Onboarding incomplete'
+                  : 'Not connected'}
           </Badge>
         }
       />
       <div className="flex flex-wrap items-center gap-3">
-        {!canManage ? (
+        {awaitingNameCheck ? (
+          <>
+            <span className="text-small text-ink-secondary">
+              Elevate compares the legal name on the Stripe account with the company. If they
+              differ, the owner gets an email that says what to change in Stripe.
+            </span>
+            {canManage ? (
+              <Button
+                variant="secondary"
+                icon={ExternalLink}
+                loading={links.busy}
+                onClick={links.openDashboard}
+              >
+                Open Stripe dashboard
+              </Button>
+            ) : null}
+          </>
+        ) : !canManage ? (
           <span className="text-small text-ink-secondary">
             Only the profile’s owner can connect Stripe or open its dashboard.
           </span>
@@ -76,7 +100,7 @@ export function StripeCard() {
             Commission on your courses: {profile ? formatBps(profile.commissionBps) : '—'}
           </span>
         ) : null}
-        {status && !enabled && status.detailsSubmitted ? (
+        {status && !enabled && !awaitingNameCheck && status.detailsSubmitted ? (
           <span className="text-small text-ink-secondary">Stripe is verifying your details.</span>
         ) : null}
       </div>

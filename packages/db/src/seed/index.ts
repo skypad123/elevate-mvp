@@ -17,8 +17,8 @@ export type SeedOptions = {
   /**
    * `admin-only` creates the super admin and nothing else. `demo` also creates a support agent,
    * the demo teachers (as approved personal profiles with no payout account, so their courses
-   * cannot be bought), a writer on the first of those profiles, the demo courses, two promo
-   * codes and a learner.
+   * cannot be bought), a writer on the first of those profiles, an approved company profile with
+   * a manager, the demo courses, two promo codes and a learner.
    */
   mode: 'demo' | 'admin-only'
   /** Null skips the thumbnail files; the media rows are still created. */
@@ -95,6 +95,77 @@ async function upsertTeacher(db: AnyDb, t: SeedTeacher) {
     .returning()
   if (!profile) throw new Error(`failed to create a profile for ${t.email}`)
   return { userId: user.id, profileId: profile.id }
+}
+
+/** The demo company: made up, with a UEN that has the right format and belongs to no one. */
+const DEMO_COMPANY = {
+  uen: '201912345K',
+  legalName: 'Kiln & Co Studio Pte. Ltd.',
+  displayName: 'Kiln & Co Studio',
+  headline: 'Studio ceramics classes, taught by a team of working potters',
+  bio: 'Kiln & Co is a teaching studio. Its potters run beginner and intermediate classes in wheel throwing, glazing and firing, and build their courses together.',
+  credentials:
+    'A registered studio since 2019. Four resident potters, each with more than five years of teaching.',
+  owner: { email: 'founder@example.com', name: 'Farah Founder' },
+  manager: { email: 'manager@example.com', name: 'Maya Manager' },
+}
+
+/**
+ * An approved corporate profile whose company Support has already verified, with one manager and
+ * no payout account. So it can be shown without a real company, and checkout never sends Stripe
+ * a made-up destination. Re-seeding refreshes its text.
+ */
+async function upsertDemoCompany(db: AnyDb, adminId: string): Promise<string> {
+  const owner = await upsertUser(db, DEMO_COMPANY.owner.email, DEMO_COMPANY.owner.name)
+  const manager = await upsertUser(db, DEMO_COMPANY.manager.email, DEMO_COMPANY.manager.name)
+  const details = {
+    displayName: DEMO_COMPANY.displayName,
+    headline: DEMO_COMPANY.headline,
+    bio: DEMO_COMPANY.bio,
+    credentials: DEMO_COMPANY.credentials,
+  }
+  const now = new Date()
+  let entity = await db.query.legalEntities.findFirst({ where: { uen: DEMO_COMPANY.uen } })
+  if (!entity) {
+    const [created] = await db
+      .insert(s.legalEntities)
+      .values({
+        uen: DEMO_COMPANY.uen,
+        legalName: DEMO_COMPANY.legalName,
+        entityType: 'private_limited',
+        checkStatus: 'verified',
+        checkedBy: adminId,
+        checkedAt: now,
+      })
+      .returning()
+    if (!created) throw new Error('failed to create the demo company')
+    entity = created
+  }
+  let profile = await db.query.profiles.findFirst({ where: { legalEntityId: entity.id } })
+  if (profile) {
+    await db.update(s.profiles).set(details).where(eq(s.profiles.id, profile.id))
+  } else {
+    const [created] = await db
+      .insert(s.profiles)
+      .values({
+        type: 'corporate',
+        ownerUserId: owner.id,
+        legalEntityId: entity.id,
+        ...details,
+        teachingSampleUrl: 'https://example.com/teaching-sample',
+        status: 'approved',
+        reviewedAt: now,
+        reviewedBy: adminId,
+      })
+      .returning()
+    if (!created) throw new Error('failed to create the demo company profile')
+    profile = created
+  }
+  await db
+    .insert(s.profileMemberships)
+    .values({ profileId: profile.id, userId: manager.id, role: 'manager', addedBy: owner.id })
+    .onConflictDoNothing()
+  return profile.id
 }
 
 async function ensureThumbnail(
@@ -281,6 +352,11 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
       .onConflictDoNothing()
     log(`writer@example.com is a writer on ${firstTeacher.displayName}`)
   }
+
+  await upsertDemoCompany(db, admin.id)
+  log(
+    `${DEMO_COMPANY.displayName}: a company profile owned by ${DEMO_COMPANY.owner.email}, with ${DEMO_COMPANY.manager.email} as a manager`,
+  )
 
   for (const course of seedCourses) {
     const owner = owners.get(course.teacherEmail)

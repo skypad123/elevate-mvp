@@ -1,8 +1,10 @@
 import {
   commissionSchema,
   grantRoleSchema,
+  nameCheckSchema,
   peopleQuerySchema,
   profilesQuerySchema,
+  recoverOwnerSchema,
   refundSchema,
   rejectSchema,
   reviewNoteSchema,
@@ -14,8 +16,10 @@ import type { Deps } from '../deps'
 import { validate } from '../lib/validate'
 import { type AppEnv, ensureUser, requireRole, uuidParam } from '../middleware/auth'
 import { AnalyticsService } from '../services/analytics.service'
+import { LegalEntitiesService } from '../services/legal-entities.service'
 import { PeopleService } from '../services/people.service'
 import { ProfilesService } from '../services/profiles.service'
+import { RecoveryService } from '../services/recovery.service'
 import { ReviewService } from '../services/review.service'
 import { TransactionsService } from '../services/transactions.service'
 
@@ -27,6 +31,8 @@ const auditQuerySchema = z.object({ cursor: z.string().optional() })
 export const supportRoutes = (deps: Deps) => {
   const people = new PeopleService(deps)
   const profiles = new ProfilesService(deps)
+  const entities = new LegalEntitiesService(deps)
+  const recovery = new RecoveryService(deps)
   const profileId = uuidParam('id', 'Profile')
   const review = new ReviewService(deps)
   const transactions = new TransactionsService(deps)
@@ -95,6 +101,40 @@ export const supportRoutes = (deps: Deps) => {
             c.req.valid('json').commissionBps,
           )
           return c.json({ profile }, 200)
+        },
+      )
+      // ── a company's payout account: Stripe's legal name against the company's ──
+      // Any Support staff can run this check, like the review. It is audited under their name.
+      .get('/profiles/:id/payout-account/name-check', profileId, async (c) => {
+        const nameCheck = await entities.nameCheck(c.req.param('id'))
+        return c.json({ nameCheck }, 200)
+      })
+      .post(
+        '/profiles/:id/payout-account/name-check',
+        profileId,
+        validate('json', nameCheckSchema),
+        async (c) => {
+          const nameCheck = await entities.decideNameCheck(
+            ensureUser(c.get('user')),
+            c.req.param('id'),
+            c.req.valid('json'),
+          )
+          return c.json({ nameCheck }, 200)
+        },
+      )
+      // ── owner recovery: the only way a profile's owner changes ──
+      .post(
+        '/profiles/:id/recover-owner',
+        requireRole('super_admin'),
+        profileId,
+        validate('json', recoverOwnerSchema),
+        async (c) => {
+          await recovery.recoverOwner(
+            ensureUser(c.get('user')),
+            c.req.param('id'),
+            c.req.valid('json'),
+          )
+          return c.json(await profiles.detail(c.req.param('id')), 200)
         },
       )
       // ── course review (approval is the only path to live) ──

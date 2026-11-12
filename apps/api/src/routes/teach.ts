@@ -1,6 +1,7 @@
 import {
   type Capability,
   changeRoleSchema,
+  corporateApplicationSchema,
   courseViewQuerySchema,
   createArtefactSchema,
   createCourseSchema,
@@ -78,6 +79,19 @@ export const teachRoutes = (deps: Deps) => {
         const profile = await profiles.apply(ensureUser(c.get('user')), c.req.valid('json'))
         return c.json({ profile }, 200)
       })
+      // A company applies. Anyone signed in can, whatever other profiles they have.
+      .post(
+        '/apply/corporate',
+        requireUser(),
+        validate('json', corporateApplicationSchema),
+        async (c) => {
+          const profile = await profiles.applyCorporate(
+            ensureUser(c.get('user')),
+            c.req.valid('json'),
+          )
+          return c.json({ profile }, 200)
+        },
+      )
       // The invitation page reads this before the invitee has signed in: the token is the proof.
       .get('/invitations/:token', invitationLimit, async (c) => {
         const invitation = await members.preview(c.req.param('token'))
@@ -98,6 +112,21 @@ export const teachRoutes = (deps: Deps) => {
         validate('json', updateProfileSchema),
         async (c) => {
           const profile = await profiles.updateProfile(
+            ensureUser(c.get('user')),
+            ensureActor(c.get('actor')),
+            c.req.valid('json'),
+          )
+          return c.json({ profile }, 200)
+        },
+      )
+      // Resubmitting a company's application. `profile.edit` lets the request in; the service
+      // lets only the owner through, and only while the profile is not approved.
+      .put(
+        '/profiles/:profileId/apply/corporate',
+        on('profile.edit'),
+        validate('json', corporateApplicationSchema),
+        async (c) => {
+          const profile = await profiles.reapplyCorporate(
             ensureUser(c.get('user')),
             ensureActor(c.get('actor')),
             c.req.valid('json'),

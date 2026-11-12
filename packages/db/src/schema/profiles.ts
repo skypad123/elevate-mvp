@@ -14,6 +14,8 @@ import {
 import { users } from './auth'
 import { citext, createdAt, id, ts, updatedAt } from './columns'
 import {
+  entityCheckStatusEnum,
+  entityTypeEnum,
   invitationStatusEnum,
   membershipRoleEnum,
   payoutAccountStatusEnum,
@@ -46,8 +48,10 @@ export const profiles = snakeCase.table(
       onDelete: 'set null',
     }),
     avatarMediaId: uuid().references((): AnyPgColumn => mediaAssets.id, { onDelete: 'set null' }),
-    /** Corporate profiles only. The `legal_entities` table and this column's foreign key come later. */
-    legalEntityId: uuid().unique(),
+    /** Corporate profiles only: the registered company behind the profile. */
+    legalEntityId: uuid()
+      .unique()
+      .references((): AnyPgColumn => legalEntities.id, { onDelete: 'restrict' }),
     status: profileStatusEnum().notNull().default('applied'),
     reviewNote: text(),
     /** Per-profile platform commission in basis points (1500 = 15%). Not a constant. */
@@ -64,8 +68,35 @@ export const profiles = snakeCase.table(
       .where(sql`${t.type} = 'personal'`),
     index().on(t.ownerUserId),
     check('profiles_commission_bps_range', sql`${t.commissionBps} between 0 and 10000`),
+    // A corporate profile is a registered company, and only a corporate profile has one.
+    check(
+      'profiles_corporate_has_legal_entity',
+      sql`(${t.type} = 'corporate') = (${t.legalEntityId} is not null)`,
+    ),
   ],
 )
+
+/**
+ * The registered company behind a corporate profile. One UEN backs at most one profile. Support
+ * checks the UEN and legal name against the registry document when it reviews the application.
+ */
+export const legalEntities = snakeCase.table('legal_entities', {
+  id: id(),
+  /** Stored trimmed and in upper case, as `normaliseUen` returns it. */
+  uen: text().notNull().unique(),
+  legalName: text().notNull(),
+  entityType: entityTypeEnum().notNull(),
+  /** The registry document the applicant uploaded. Empty only for seeded demo companies. */
+  registryDocumentMediaId: uuid().references((): AnyPgColumn => mediaAssets.id, {
+    onDelete: 'restrict',
+  }),
+  checkStatus: entityCheckStatusEnum().notNull().default('pending'),
+  checkedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+  checkedAt: ts(),
+  rejectionReason: text(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+})
 
 /**
  * One row per Stripe connected account. A profile has at most one for now; payments point at the

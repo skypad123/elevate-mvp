@@ -2,7 +2,7 @@
   "type": "base",
   "version": "9",
   "dialect": "postgres",
-  "id": "43ed5669-a999-485b-b224-c2853d1d214a",
+  "id": "a00cc368-b0f3-47c9-aed8-0f04e7bf394d",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -104,6 +104,40 @@
         "n|enum|public.enrollment_status",
         "e|enum|public.enrollment_status",
         "n|type|public.enrollment_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "entity_check_status"
+      ],
+      "writes": [
+        "s|enum|public.entity_check_status",
+        "n|enum|public.entity_check_status",
+        "e|enum|public.entity_check_status",
+        "n|type|public.entity_check_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "entity_type"
+      ],
+      "writes": [
+        "s|enum|public.entity_type",
+        "n|enum|public.entity_type",
+        "e|enum|public.entity_type",
+        "n|type|public.entity_type"
       ],
       "reads": [
         "n|sch|public"
@@ -752,6 +786,28 @@
         "n|enum|public.media_kind",
         "n|enum|public.media_provider",
         "n|enum|public.media_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "legal_entities"
+      ],
+      "writes": [
+        "s|tbl|public.legal_entities",
+        "n|tbl|public.legal_entities",
+        "e|tbl|public.legal_entities",
+        "n|rel|public.legal_entities",
+        "n|type|public.legal_entities",
+        "n|rel|public.legal_entities_pkey",
+        "n|rel|public.legal_entities_uen_key"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.entity_type",
+        "n|enum|public.entity_check_status"
       ]
     },
     {
@@ -2729,6 +2785,52 @@
       "statementTarget": [
         "table",
         "public",
+        "legal_entities"
+      ],
+      "writes": [
+        "s|fk|public.legal_entities.legal_entities_registry_document_media_id_media_assets_id_fkey",
+        "n|fk|public.legal_entities.legal_entities_registry_document_media_id_media_assets_id_fkey",
+        "e|fk|public.legal_entities.legal_entities_registry_document_media_id_media_assets_id_fkey",
+        "n|con|public.legal_entities.legal_entities_registry_document_media_id_media_assets_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.legal_entities",
+        "n|sch|public",
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.legal_entities.registry_document_media_id",
+        "n|col|public.media_assets.id",
+        "e|uniqueness|public.media_assets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "legal_entities"
+      ],
+      "writes": [
+        "s|fk|public.legal_entities.legal_entities_checked_by_users_id_fkey",
+        "n|fk|public.legal_entities.legal_entities_checked_by_users_id_fkey",
+        "e|fk|public.legal_entities.legal_entities_checked_by_users_id_fkey",
+        "n|con|public.legal_entities.legal_entities_checked_by_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.legal_entities",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.legal_entities.checked_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
         "payout_accounts"
       ],
       "writes": [
@@ -2975,6 +3077,29 @@
         "n|col|public.profiles.avatar_media_id",
         "n|col|public.media_assets.id",
         "e|uniqueness|public.media_assets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "profiles"
+      ],
+      "writes": [
+        "s|fk|public.profiles.profiles_legal_entity_id_legal_entities_id_fkey",
+        "n|fk|public.profiles.profiles_legal_entity_id_legal_entities_id_fkey",
+        "e|fk|public.profiles.profiles_legal_entity_id_legal_entities_id_fkey",
+        "n|con|public.profiles.profiles_legal_entity_id_legal_entities_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|tbl|public.legal_entities",
+        "n|sch|public",
+        "n|col|public.profiles.legal_entity_id",
+        "n|col|public.legal_entities.id",
+        "e|uniqueness|public.legal_entities.id"
       ]
     },
     {
@@ -3259,6 +3384,12 @@
     },
     {
       "schema": "public",
+      "name": "legal_entities",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
       "name": "payout_accounts",
       "isRlsEnabled": false,
       "entityType": "tables"
@@ -3358,6 +3489,25 @@
         "active",
         "refunded",
         "cancelled"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "entity_check_status",
+      "values": [
+        "pending",
+        "verified",
+        "rejected"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "entity_type",
+      "values": [
+        "private_limited",
+        "llp"
       ],
       "entityType": "enums"
     },
@@ -6187,6 +6337,149 @@
     },
     {
       "schema": "public",
+      "table": "legal_entities",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "uen",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "legal_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "entity_type",
+      "type": "entity_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "registry_document_media_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "check_status",
+      "type": "entity_check_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "checked_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "checked_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "rejection_reason",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
       "table": "payout_accounts",
       "name": "id",
       "type": "uuid",
@@ -8749,6 +9042,40 @@
     },
     {
       "schema": "public",
+      "table": "legal_entities",
+      "name": "legal_entities_registry_document_media_id_media_assets_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "registry_document_media_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "media_assets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "legal_entities",
+      "name": "legal_entities_checked_by_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "checked_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
       "table": "payout_accounts",
       "name": "payout_accounts_profile_id_profiles_id_fkey",
       "nameExplicit": false,
@@ -8932,6 +9259,23 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "profiles_legal_entity_id_legal_entities_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "legal_entity_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "legal_entities",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
       "entityType": "fks"
     },
     {
@@ -9219,6 +9563,16 @@
     },
     {
       "schema": "public",
+      "table": "legal_entities",
+      "name": "legal_entities_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
       "table": "payout_accounts",
       "name": "payout_accounts_pkey",
       "columns": [
@@ -9425,6 +9779,17 @@
     },
     {
       "schema": "public",
+      "table": "legal_entities",
+      "name": "legal_entities_uen_key",
+      "nameExplicit": false,
+      "columns": [
+        "uen"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
       "table": "payout_accounts",
       "name": "payout_accounts_profile_id_key",
       "nameExplicit": false,
@@ -9507,6 +9872,13 @@
       "table": "profiles",
       "name": "profiles_commission_bps_range",
       "value": "\"commission_bps\" between 0 and 10000",
+      "entityType": "checks"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "profiles_corporate_has_legal_entity",
+      "value": "(\"type\" = 'corporate') = (\"legal_entity_id\" is not null)",
       "entityType": "checks"
     },
     {

@@ -94,6 +94,8 @@ export interface PaymentsProvider {
   }): Promise<{ url: string }>
   createLoginLink(accountId: string): Promise<{ url: string }>
   retrieveAccount(accountId: string): Promise<ConnectedAccountStatus>
+  /** The connected account's page in the platform's Stripe dashboard, for Support. */
+  accountDashboardUrl(accountId: string): string
   createCheckoutSession(input: CheckoutSessionInput): Promise<{ id: string; url: string }>
   retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionResult>
   retrievePaymentDetails(paymentIntentId: string): Promise<PaymentDetails>
@@ -130,6 +132,9 @@ export class UnconfiguredPaymentsProvider implements PaymentsProvider {
     return this.fail()
   }
   async retrieveAccount(): Promise<never> {
+    return this.fail()
+  }
+  accountDashboardUrl(): never {
     return this.fail()
   }
   async createCheckoutSession(): Promise<never> {

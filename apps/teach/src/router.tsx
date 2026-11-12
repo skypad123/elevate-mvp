@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router'
 import { api } from './lib/api'
 import { ProfileProvider } from './lib/profile'
 import { ApplyPage } from './routes/apply'
+import { CorporateApplyPage, CorporateReapplyPage } from './routes/apply-corporate'
 import { CourseBuilder } from './routes/courses/builder'
 import { CourseChangesPage } from './routes/courses/changes'
 import { CoursesPage } from './routes/courses/list'
@@ -50,7 +51,10 @@ export const router = createBrowserRouter([
             <OnboardingLayout />
           </RequireAuth>
         ),
-        children: [{ path: 'apply', element: <ApplyPage /> }],
+        children: [
+          { path: 'apply', element: <ApplyPage /> },
+          { path: 'apply/company', element: <CorporateApplyPage /> },
+        ],
       },
       {
         path: 'p/:profileId',
@@ -63,6 +67,8 @@ export const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <Dashboard /> },
+          // A company's application, reopened by its owner until the profile is approved.
+          { path: 'apply', element: <CorporateReapplyPage /> },
           { path: 'courses', element: <CoursesPage /> },
           { path: 'courses/:id', element: <CourseBuilder /> },
           { path: 'courses/:id/changes', element: <CourseChangesPage /> },

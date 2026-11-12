@@ -62,10 +62,39 @@ describe('profiles', () => {
 
   it('lets one person own a corporate profile beside their personal one', async () => {
     const user = await t.ensureUser('hana@example.com')
-    const added = await refusal(
+    // a corporate profile is a registered company: the database refuses one without it,
+    // and refuses a personal profile that claims one
+    const bare = await refusal(
       t.db
         .insert(s.profiles)
         .values({ type: 'corporate', ownerUserId: user.id, displayName: 'Hana Studio Pte Ltd' }),
+    )
+    expect(bare).toContain('profiles_corporate_has_legal_entity')
+    const [entity] = await t.db
+      .insert(s.legalEntities)
+      .values({
+        uen: '202012345K',
+        legalName: 'Hana Studio Pte. Ltd.',
+        entityType: 'private_limited',
+      })
+      .returning()
+    const stranger = await t.ensureUser('not-a-company@example.com')
+    const mislabelled = await refusal(
+      t.db.insert(s.profiles).values({
+        type: 'personal',
+        ownerUserId: stranger.id,
+        displayName: 'Not a company',
+        legalEntityId: entity?.id,
+      }),
+    )
+    expect(mislabelled).toContain('profiles_corporate_has_legal_entity')
+    const added = await refusal(
+      t.db.insert(s.profiles).values({
+        type: 'corporate',
+        ownerUserId: user.id,
+        displayName: 'Hana Studio Pte Ltd',
+        legalEntityId: entity?.id,
+      }),
     )
     expect(added).toBeNull()
     const token = (await t.signIn('hana@example.com', 'teach')).token as string

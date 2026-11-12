@@ -76,6 +76,12 @@ export class StripePaymentsProvider implements PaymentsProvider {
     return accountStatus(account)
   }
 
+  /** A test-mode key leads to the test dashboard. */
+  accountDashboardUrl(accountId: string): string {
+    const test = /^(sk|rk)_test_/.test(this.config.secretKey)
+    return `https://dashboard.stripe.com/${test ? 'test/' : ''}connect/accounts/${accountId}`
+  }
+
   async createCheckoutSession(input: CheckoutSessionInput): Promise<{ id: string; url: string }> {
     const session = await this.stripe.checkout.sessions.create(
       {

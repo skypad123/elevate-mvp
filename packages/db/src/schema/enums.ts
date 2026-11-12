@@ -18,6 +18,14 @@ export const invitationStatusEnum = pgEnum('invitation_status', [
   'expired',
 ])
 export const changeSetStatusEnum = pgEnum('change_set_status', ['open', 'approved', 'discarded'])
+/** The legal forms a corporate profile can have. */
+export const entityTypeEnum = pgEnum('entity_type', ['private_limited', 'llp'])
+/** Support's check of a company against its registry document. */
+export const entityCheckStatusEnum = pgEnum('entity_check_status', [
+  'pending',
+  'verified',
+  'rejected',
+])
 export const courseStatusEnum = pgEnum('course_status', [
   'draft',
   'pending_review',

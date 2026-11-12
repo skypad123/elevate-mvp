@@ -13,7 +13,7 @@ import { errorMessage, fieldErrors, unwrap, usePortalAuth } from '@elevate/web-u
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { Link, Navigate, useNavigate } from 'react-router'
 import { api } from '../lib/api'
 import { teachKeys } from '../lib/keys'
 import { useProfileView } from '../lib/profile'
@@ -99,6 +99,16 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
           few minutes of you teaching. A human reviews every application, usually within two working
           days.
         </p>
+        {existing ? null : (
+          <p className="text-small text-ink-secondary">
+            This application is for a person teaching under their own name, a sole proprietor
+            included. Teaching as a private limited company or an LLP?{' '}
+            <Link to="/apply/company" className="font-semibold text-brand hover:underline">
+              Apply as a company instead
+            </Link>
+            .
+          </p>
+        )}
         {isResubmission && existing?.reviewNote ? (
           <div className="rounded-card border border-warning bg-warning-tint p-4 text-small text-ink">
             <p className="mb-1 flex items-center gap-2 font-semibold">

@@ -11,7 +11,13 @@ import {
 } from './courses'
 import { artefactProgress, certificates, quizAttempts } from './learning'
 import { mediaAssets } from './media'
-import { payoutAccounts, profileInvitations, profileMemberships, profiles } from './profiles'
+import {
+  legalEntities,
+  payoutAccounts,
+  profileInvitations,
+  profileMemberships,
+  profiles,
+} from './profiles'
 import { analyticsEvents, auditLog, webhookEvents } from './system'
 
 /**
@@ -25,6 +31,7 @@ const tables = {
   magicLinks,
   userRoles,
   profiles,
+  legalEntities,
   payoutAccounts,
   profileMemberships,
   profileInvitations,
@@ -92,6 +99,19 @@ export const relations = defineRelations(tables, (r) => ({
       from: r.profiles.id,
       to: r.profileInvitations.profileId,
     }),
+    /** Corporate profiles only. */
+    legalEntity: r.one.legalEntities({
+      from: r.profiles.legalEntityId,
+      to: r.legalEntities.id,
+    }),
+  },
+  legalEntities: {
+    profile: r.one.profiles({ from: r.legalEntities.id, to: r.profiles.legalEntityId }),
+    registryDocument: r.one.mediaAssets({
+      from: r.legalEntities.registryDocumentMediaId,
+      to: r.mediaAssets.id,
+    }),
+    checker: r.one.users({ from: r.legalEntities.checkedBy, to: r.users.id }),
   },
   profileMemberships: {
     profile: r.one.profiles({
@@ -117,6 +137,7 @@ export const relations = defineRelations(tables, (r) => ({
       to: r.profiles.id,
       optional: false,
     }),
+    nameVerifier: r.one.users({ from: r.payoutAccounts.nameVerifiedBy, to: r.users.id }),
   },
   mediaAssets: {
     uploader: r.one.users({ from: r.mediaAssets.uploaderId, to: r.users.id }),

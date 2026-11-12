@@ -6,36 +6,56 @@ import { useCurrentProfile } from '../lib/profile'
 import { profilePath } from '../lib/urls'
 
 const STATUS_NOTE = { applied: 'under review', rejected: 'not approved', approved: '' } as const
+const NEW_COMPANY = 'new-company'
 
-/** Shown when the user is on more than one profile; choosing one opens its dashboard. */
-function ProfileSwitcher() {
+/**
+ * The user's profiles, and the way to start a company profile. Choosing a profile opens its
+ * dashboard. `current` is the profile on screen; `staffLabel` names it when the user is platform
+ * staff acting on a profile that is not in their own list.
+ */
+export function ProfileSwitcher({
+  current,
+  staffLabel,
+  className,
+}: {
+  current?: string
+  staffLabel?: string
+  className?: string
+}) {
   const { user } = usePortalAuth()
-  const { profileId, displayName, actingAsStaff } = useCurrentProfile()
   const navigate = useNavigate()
   const profiles = user?.profiles ?? []
-  if (profiles.length < 2) return null
+  if (profiles.length === 0 && !staffLabel) return null
   return (
     <NativeSelect
       label="Profile"
       aria-label="Switch profile"
-      value={profileId}
-      wrapperClassName="mb-3"
-      onChange={(e) => navigate(profilePath(e.target.value))}
+      value={current ?? ''}
+      wrapperClassName={className}
+      onChange={(e) =>
+        navigate(e.target.value === NEW_COMPANY ? '/apply/company' : profilePath(e.target.value))
+      }
     >
-      {actingAsStaff ? <option value={profileId}>{displayName} (as staff)</option> : null}
+      {current ? null : (
+        <option value="" disabled>
+          Your profiles…
+        </option>
+      )}
+      {current && staffLabel ? <option value={current}>{staffLabel} (as staff)</option> : null}
       {profiles.map((p) => (
         <option key={p.id} value={p.id}>
           {p.displayName}
           {p.status === 'approved' ? '' : ` (${STATUS_NOTE[p.status]})`}
         </option>
       ))}
+      <option value={NEW_COMPANY}>+ Create a company profile…</option>
     </NativeSelect>
   )
 }
 
 export function TeachLayout() {
   const { user, signOut } = usePortalAuth()
-  const { path, displayName, actingAsStaff, profile, can } = useCurrentProfile()
+  const { path, profileId, displayName, actingAsStaff, profile, can } = useCurrentProfile()
   return (
     <PortalShell
       portal="Teach"
@@ -52,7 +72,11 @@ export function TeachLayout() {
       ]}
       footer={
         <>
-          <ProfileSwitcher />
+          <ProfileSwitcher
+            current={profileId}
+            staffLabel={actingAsStaff ? displayName : undefined}
+            className="mb-3"
+          />
           <div className="flex items-center gap-3 px-2 py-1">
             <Avatar name={displayName} url={profile?.avatarUrl ?? user?.avatarUrl} size="sm" />
             <div className="min-w-0 flex-1">

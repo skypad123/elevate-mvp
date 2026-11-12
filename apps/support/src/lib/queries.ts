@@ -1,6 +1,7 @@
 import type {
   AnalyticsSummary,
   AuditEntry,
+  NameCheckView,
   Page,
   PayoutLedgerRow,
   PersonDetail,
@@ -24,9 +25,10 @@ export const supportKeys = {
   person: (id: string) => ['support', 'person', id] as const,
 }
 
-export function usePeople(filter: PeopleFilter) {
+export function usePeople(filter: PeopleFilter, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: supportKeys.people(filter),
+    enabled: options.enabled ?? true,
     queryFn: async () => {
       const query: Record<string, string> = { limit: '50' }
       if (filter.q) query.q = filter.q
@@ -56,6 +58,7 @@ export const profileKeys = {
   all: ['support', 'profiles'] as const,
   list: (filter: ProfilesFilter) => ['support', 'profiles', 'list', filter] as const,
   detail: (id: string) => ['support', 'profiles', 'detail', id] as const,
+  nameCheck: (id: string) => ['support', 'profiles', 'name-check', id] as const,
 }
 
 export function useProfiles(filter: ProfilesFilter) {
@@ -82,6 +85,25 @@ export function useProfile(id: string) {
       (await unwrap(
         await api.support.profiles[':id'].$get({ param: { id } }),
       )) as SupportProfileDetail,
+  })
+}
+
+/**
+ * The legal name Stripe holds for a company's payout account, beside the company's own. It reads
+ * Stripe, so it runs only once the company has started Stripe onboarding.
+ */
+export function useNameCheck(profileId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: profileKeys.nameCheck(profileId),
+    enabled: enabled && !!profileId,
+    queryFn: async () =>
+      (
+        await unwrap(
+          await api.support.profiles[':id']['payout-account']['name-check'].$get({
+            param: { id: profileId },
+          }),
+        )
+      ).nameCheck as NameCheckView,
   })
 }
 

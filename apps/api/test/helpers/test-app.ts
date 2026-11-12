@@ -129,6 +129,8 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
         chargesEnabled: true,
         payoutsEnabled: true,
         activatedAt: clock,
+        // A company account is active only once Support has matched its legal name.
+        nameVerifiedAt: account.businessType === 'company' ? clock : null,
       })
       .where(eq(s.payoutAccounts.id, account.id))
       .returning()
@@ -151,12 +153,33 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
   ) {
     const user = await ensureUser(email)
     const status = options.status ?? 'approved'
+    const type = options.type ?? 'personal'
+    const displayName = options.displayName ?? 'Test Teacher'
+    // A corporate profile is a registered company: it comes with its legal entity, in the state
+    // Support's review would have left it in.
+    let legalEntityId: string | null = null
+    if (type === 'corporate') {
+      const [entity] = await db
+        .insert(s.legalEntities)
+        .values({
+          uen: `2019${String(++companyCounter).padStart(5, '0')}K`,
+          legalName: `${displayName} Pte. Ltd.`,
+          entityType: 'private_limited',
+          checkStatus:
+            status === 'approved' ? 'verified' : status === 'rejected' ? 'rejected' : 'pending',
+          checkedAt: status === 'applied' ? null : clock,
+        })
+        .returning()
+      if (!entity) throw new Error('failed to create legal entity')
+      legalEntityId = entity.id
+    }
     const [profile] = await db
       .insert(s.profiles)
       .values({
-        type: options.type ?? 'personal',
+        type,
         ownerUserId: user.id,
-        displayName: options.displayName ?? 'Test Teacher',
+        displayName,
+        legalEntityId,
         status,
         reviewedAt: status === 'applied' ? null : clock,
       })
@@ -185,6 +208,7 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
   }
 
   let courseCounter = 0
+  let companyCounter = 0
 
   /**
    * A course with two lessons, a text artefact in the first and a quiz in the second, written

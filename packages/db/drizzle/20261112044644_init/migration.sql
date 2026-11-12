@@ -8,6 +8,8 @@ CREATE TYPE "change_set_status" AS ENUM('open', 'approved', 'discarded');--> sta
 CREATE TYPE "course_status" AS ENUM('draft', 'pending_review', 'live', 'rejected');--> statement-breakpoint
 CREATE TYPE "enrollment_mode" AS ENUM('self_directed', 'class_based');--> statement-breakpoint
 CREATE TYPE "enrollment_status" AS ENUM('pending_payment', 'active', 'refunded', 'cancelled');--> statement-breakpoint
+CREATE TYPE "entity_check_status" AS ENUM('pending', 'verified', 'rejected');--> statement-breakpoint
+CREATE TYPE "entity_type" AS ENUM('private_limited', 'llp');--> statement-breakpoint
 CREATE TYPE "identity_provider" AS ENUM('email', 'singpass');--> statement-breakpoint
 CREATE TYPE "invitation_status" AS ENUM('pending', 'awaiting_confirmation', 'accepted', 'revoked', 'expired');--> statement-breakpoint
 CREATE TYPE "media_kind" AS ENUM('video', 'audio', 'image', 'document');--> statement-breakpoint
@@ -296,6 +298,20 @@ CREATE TABLE "media_assets" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "legal_entities" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+	"uen" text NOT NULL UNIQUE,
+	"legal_name" text NOT NULL,
+	"entity_type" "entity_type" NOT NULL,
+	"registry_document_media_id" uuid,
+	"check_status" "entity_check_status" DEFAULT 'pending'::"entity_check_status" NOT NULL,
+	"checked_by" uuid,
+	"checked_at" timestamp with time zone,
+	"rejection_reason" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "payout_accounts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 	"profile_id" uuid NOT NULL UNIQUE,
@@ -353,7 +369,8 @@ CREATE TABLE "profiles" (
 	"reviewed_at" timestamp with time zone,
 	"reviewed_by" uuid,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "profiles_commission_bps_range" CHECK ("commission_bps" between 0 and 10000)
+	CONSTRAINT "profiles_commission_bps_range" CHECK ("commission_bps" between 0 and 10000),
+	CONSTRAINT "profiles_corporate_has_legal_entity" CHECK (("type" = 'corporate') = ("legal_entity_id" is not null))
 );
 --> statement-breakpoint
 CREATE TABLE "analytics_events" (
@@ -470,6 +487,8 @@ ALTER TABLE "quiz_attempts" ADD CONSTRAINT "quiz_attempts_enrollment_id_enrollme
 ALTER TABLE "quiz_attempts" ADD CONSTRAINT "quiz_attempts_quiz_id_quizzes_id_fkey" FOREIGN KEY ("quiz_id") REFERENCES "quizzes"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "media_assets" ADD CONSTRAINT "media_assets_uploader_id_users_id_fkey" FOREIGN KEY ("uploader_id") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "media_assets" ADD CONSTRAINT "media_assets_profile_id_profiles_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE RESTRICT;--> statement-breakpoint
+ALTER TABLE "legal_entities" ADD CONSTRAINT "legal_entities_registry_document_media_id_media_assets_id_fkey" FOREIGN KEY ("registry_document_media_id") REFERENCES "media_assets"("id") ON DELETE RESTRICT;--> statement-breakpoint
+ALTER TABLE "legal_entities" ADD CONSTRAINT "legal_entities_checked_by_users_id_fkey" FOREIGN KEY ("checked_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "payout_accounts" ADD CONSTRAINT "payout_accounts_profile_id_profiles_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE RESTRICT;--> statement-breakpoint
 ALTER TABLE "payout_accounts" ADD CONSTRAINT "payout_accounts_name_verified_by_users_id_fkey" FOREIGN KEY ("name_verified_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "profile_invitations" ADD CONSTRAINT "profile_invitations_profile_id_profiles_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE CASCADE;--> statement-breakpoint
@@ -481,6 +500,7 @@ ALTER TABLE "profile_memberships" ADD CONSTRAINT "profile_memberships_added_by_u
 ALTER TABLE "profiles" ADD CONSTRAINT "profiles_owner_user_id_users_id_fkey" FOREIGN KEY ("owner_user_id") REFERENCES "users"("id") ON DELETE RESTRICT;--> statement-breakpoint
 ALTER TABLE "profiles" ADD CONSTRAINT "profiles_teaching_sample_media_id_media_assets_id_fkey" FOREIGN KEY ("teaching_sample_media_id") REFERENCES "media_assets"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "profiles" ADD CONSTRAINT "profiles_avatar_media_id_media_assets_id_fkey" FOREIGN KEY ("avatar_media_id") REFERENCES "media_assets"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "profiles" ADD CONSTRAINT "profiles_legal_entity_id_legal_entities_id_fkey" FOREIGN KEY ("legal_entity_id") REFERENCES "legal_entities"("id") ON DELETE RESTRICT;--> statement-breakpoint
 ALTER TABLE "profiles" ADD CONSTRAINT "profiles_reviewed_by_users_id_fkey" FOREIGN KEY ("reviewed_by") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "analytics_events" ADD CONSTRAINT "analytics_events_user_id_users_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_actor_id_users_id_fkey" FOREIGN KEY ("actor_id") REFERENCES "users"("id") ON DELETE SET NULL;--> statement-breakpoint

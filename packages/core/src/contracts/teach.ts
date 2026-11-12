@@ -2,23 +2,60 @@ import { z } from 'zod'
 import { courseCategorySchema } from '../domain/categories'
 import { quizDefinitionSchema } from '../domain/quiz'
 import { richTextDocSchema } from '../domain/richtext'
+import { ENTITY_TYPES, type EntityType, isValidUen, normaliseUen, UEN_EXAMPLE } from '../domain/uen'
 import { emailSchema, uuidSchema } from './common'
+
+/** What every application says about the teaching: the same for a person and for a company. */
+const teachingFields = {
+  displayName: z.string().trim().min(2).max(80),
+  headline: z.string().trim().min(5).max(120),
+  bio: z.string().trim().min(50).max(3000),
+  credentials: z.string().trim().min(10).max(3000),
+  teachingSampleUrl: z.string().url().max(2048).optional(),
+  teachingSampleMediaId: uuidSchema.optional(),
+}
+const NEEDS_SAMPLE = 'Share a teaching sample: upload a video or paste a link'
 
 /** The application for a personal profile: one person teaching under their own name. */
 export const personalApplicationSchema = z
-  .object({
-    displayName: z.string().trim().min(2).max(80),
-    headline: z.string().trim().min(5).max(120),
-    bio: z.string().trim().min(50).max(3000),
-    credentials: z.string().trim().min(10).max(3000),
-    teachingSampleUrl: z.string().url().max(2048).optional(),
-    teachingSampleMediaId: uuidSchema.optional(),
-  })
+  .object(teachingFields)
   .refine((v) => v.teachingSampleUrl || v.teachingSampleMediaId, {
-    message: 'Share a teaching sample: upload a video or paste a link',
+    message: NEEDS_SAMPLE,
     path: ['teachingSampleUrl'],
   })
 export type PersonalApplication = z.infer<typeof personalApplicationSchema>
+
+export const entityTypeSchema = z.enum(ENTITY_TYPES)
+
+/**
+ * The application for a corporate profile: a registered company. Beside the teaching fields it
+ * names the company (UEN, legal name, legal form) and carries its registry document, which
+ * Support compares them with. The UEN is checked for format only (`domain/uen.ts`).
+ */
+export const corporateApplicationSchema = z
+  .object({
+    uen: z.string().max(40).transform(normaliseUen),
+    legalName: z.string().trim().min(2).max(200),
+    entityType: entityTypeSchema,
+    /** An uploaded `document`: the company's business profile from the registry. */
+    registryDocumentMediaId: uuidSchema,
+    ...teachingFields,
+  })
+  .superRefine((v, ctx) => {
+    if (!isValidUen(v.uen, v.entityType)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['uen'],
+        message: `That is not the UEN of this kind of company. It looks like ${UEN_EXAMPLE[v.entityType]}.`,
+      })
+    }
+    if (!v.teachingSampleUrl && !v.teachingSampleMediaId) {
+      ctx.addIssue({ code: 'custom', path: ['teachingSampleUrl'], message: NEEDS_SAMPLE })
+    }
+  })
+export type CorporateApplication = z.infer<typeof corporateApplicationSchema>
+/** What a client sends: the UEN as typed, before it is trimmed and upper-cased. */
+export type CorporateApplicationInput = z.input<typeof corporateApplicationSchema>
 
 export const createCourseSchema = z.object({
   title: z.string().trim().min(3).max(120),
@@ -141,21 +178,46 @@ export type InvitationAccepted = {
 
 export type PayoutAccountStatus = 'onboarding' | 'active'
 
-/** A profile's Stripe payout account. `active` means it can be paid. */
+export type StripeBusinessType = 'individual' | 'company'
+
+/**
+ * A profile's Stripe payout account. `active` means it can be paid. A `company` account is
+ * active only once Stripe allows charges and Support has recorded that Stripe's legal name for it
+ * matches the company (`nameVerified`); an `individual` account needs no name check.
+ */
 export type PayoutView = {
   status: PayoutAccountStatus
+  businessType: StripeBusinessType
   detailsSubmitted: boolean
   chargesEnabled: boolean
   payoutsEnabled: boolean
+  nameVerified: boolean
+  /** The account has been active at some point, even if it is not now. */
+  activated: boolean
 }
 
 /** What the Stripe page shows; `connected` is false until the profile has a Stripe account. */
 export type StripeStatusView = {
   connected: boolean
   status: PayoutAccountStatus | null
+  businessType: StripeBusinessType | null
   detailsSubmitted: boolean
   chargesEnabled: boolean
   payoutsEnabled: boolean
+  nameVerified: boolean
+}
+
+export type EntityCheckStatus = 'pending' | 'verified' | 'rejected'
+
+/** The registered company behind a corporate profile, as the people on the profile see it. */
+export type LegalEntityView = {
+  uen: string
+  legalName: string
+  entityType: EntityType
+  checkStatus: EntityCheckStatus
+  rejectionReason: string | null
+  /** The uploaded registry document. Its file is for Support, and for the applicant until review. */
+  registryDocumentMediaId: string | null
 }
 
 export type ProfileView = {
@@ -174,6 +236,8 @@ export type ProfileView = {
   commissionBps: number
   /** Null until the profile starts Stripe onboarding. */
   payout: PayoutView | null
+  /** Corporate profiles only. */
+  legalEntity: LegalEntityView | null
   owner: { id: string; email: string; name: string | null }
   /** True when the caller is platform staff acting on this profile, not its owner or a member. */
   actingAsStaff: boolean

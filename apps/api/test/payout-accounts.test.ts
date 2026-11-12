@@ -368,10 +368,12 @@ describe('onboarding and activation', () => {
       },
     })
     expect(hook.body.outcome).toBe('applied')
+    // the account goes back to onboarding, and keeps the time it first became active
     const after = await t.db.query.payoutAccounts.findFirst({ where: { id: account?.id } })
-    expect(after).toMatchObject({ status: 'active', chargesEnabled: false })
+    expect(after).toMatchObject({ status: 'onboarding', chargesEnabled: false })
+    expect(after?.activatedAt?.getTime()).toBe(account?.activatedAt?.getTime())
     const view = await t.api('GET', onNew('/profile'), { token: newOwner })
-    expect(view.body.profile.payout).toMatchObject({ status: 'active', chargesEnabled: false })
+    expect(view.body.profile.payout).toMatchObject({ status: 'onboarding', chargesEnabled: false })
     const courses = await t.db.query.courses.findMany({ where: { profileId: newProfileId } })
     const buyer = (await t.signIn('too-late@example.com')).token as string
     const start = await t.api('POST', `/api/checkout/courses/${courses[0]?.id}`, {
@@ -379,6 +381,12 @@ describe('onboarding and activation', () => {
       body: {},
     })
     expect(start.body.error.code).toBe('teacher_not_payable')
+
+    // when Stripe allows charges again, the account is active again with no one's help
+    await t.stripeWebhook(t.payments.enableAccount(account?.stripeAccountId as string))
+    const restored = await t.db.query.payoutAccounts.findFirst({ where: { id: account?.id } })
+    expect(restored).toMatchObject({ status: 'active', chargesEnabled: true })
+    expect(restored?.activatedAt?.getTime()).toBe(account?.activatedAt?.getTime())
   })
 
   it('keeps a company account onboarding until its name has been checked', async () => {

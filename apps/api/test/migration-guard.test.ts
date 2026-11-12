@@ -75,4 +75,14 @@ describe('init migration', () => {
       /CREATE UNIQUE INDEX "profiles_one_personal_per_owner" ON "profiles" \("owner_user_id"\) WHERE "type" = 'personal'/,
     )
   })
+
+  it('backs every corporate profile, and only those, with one registered company', () => {
+    expect(foreignKeys.get('profiles.legal_entity_id')).toBe('legal_entities')
+    // one company backs one profile, and one UEN is one company
+    expect(createTable('profiles')).toContain('"legal_entity_id" uuid UNIQUE')
+    expect(createTable('legal_entities')).toContain('"uen" text NOT NULL UNIQUE')
+    expect(createTable('profiles')).toContain(
+      `CONSTRAINT "profiles_corporate_has_legal_entity" CHECK (("type" = 'corporate') = ("legal_entity_id" is not null))`,
+    )
+  })
 })

@@ -14,19 +14,42 @@ type AccountFlags = { detailsSubmitted: boolean; chargesEnabled: boolean; payout
 const NOT_CONNECTED: StripeStatusView = {
   connected: false,
   status: null,
+  businessType: null,
   detailsSubmitted: false,
   chargesEnabled: false,
   payoutsEnabled: false,
+  nameVerified: false,
 }
 
 function statusView(account: PayoutAccountRow): StripeStatusView {
   return {
     connected: !!account.stripeAccountId,
     status: account.status,
+    businessType: account.businessType,
     detailsSubmitted: account.detailsSubmitted,
     chargesEnabled: account.chargesEnabled,
     payoutsEnabled: account.payoutsEnabled,
+    nameVerified: !!account.nameVerifiedAt,
   }
+}
+
+/**
+ * Whether a payout account can be paid, from what Stripe says and what Support has checked.
+ *
+ * - An individual account is `active` while Stripe allows charges.
+ * - A company account is `active` while Stripe allows charges and Support has recorded that the
+ *   legal name Stripe holds matches the company Elevate approved.
+ *
+ * Anything else is `onboarding`. It is a pure function of the two inputs, so the order in which
+ * they arrive does not matter, and an account goes back to `onboarding` if either is withdrawn.
+ */
+export function payoutStatus(account: {
+  businessType: PayoutAccountRow['businessType']
+  chargesEnabled: boolean
+  nameVerifiedAt: Date | null
+}): PayoutAccountRow['status'] {
+  const nameOk = account.businessType === 'individual' || account.nameVerifiedAt !== null
+  return account.chargesEnabled && nameOk ? 'active' : 'onboarding'
 }
 
 /** Stripe Connect for a profile's payout account: creation, onboarding links, status sync. */
@@ -141,27 +164,33 @@ export class ConnectService {
   }
 
   /**
-   * The one place an account's Stripe flags are stored and its status decided. The webhook and
-   * the status poll both end here, so they cannot disagree.
-   *
-   * An individual account becomes `active` the first time Stripe enables charges. A company
-   * account stays `onboarding` until Support has recorded that its legal name matches.
+   * The one place an account's Stripe flags are stored and its status decided (`payoutStatus`).
+   * The webhook, the status poll and Support's name check all end here, so none of them can
+   * activate an account the others would not, and a company account cannot become payable early
+   * by any path. `activatedAt` keeps the first time the account became active.
    */
   async applyAccountState(
     account: PayoutAccountRow,
     flags: AccountFlags,
+    nameCheck?: { verifiedBy: string | null; verifiedAt: Date | null },
   ): Promise<PayoutAccountRow> {
-    const activate =
-      account.status === 'onboarding' &&
-      flags.chargesEnabled &&
-      (account.businessType === 'individual' || !!account.nameVerifiedAt)
+    const nameVerifiedAt = nameCheck ? nameCheck.verifiedAt : account.nameVerifiedAt
+    const status = payoutStatus({
+      businessType: account.businessType,
+      chargesEnabled: flags.chargesEnabled,
+      nameVerifiedAt,
+    })
     const [updated] = await this.deps.db
       .update(s.payoutAccounts)
       .set({
         detailsSubmitted: flags.detailsSubmitted,
         chargesEnabled: flags.chargesEnabled,
         payoutsEnabled: flags.payoutsEnabled,
-        ...(activate ? { status: 'active' as const, activatedAt: this.deps.now() } : {}),
+        status,
+        ...(nameCheck
+          ? { nameVerifiedBy: nameCheck.verifiedBy, nameVerifiedAt: nameCheck.verifiedAt }
+          : {}),
+        ...(status === 'active' && !account.activatedAt ? { activatedAt: this.deps.now() } : {}),
       })
       .where(eq(s.payoutAccounts.id, account.id))
       .returning()

@@ -73,6 +73,34 @@ export class FakePaymentsProvider implements PaymentsProvider {
     if (!account) throw new Error(`no such account ${accountId}`)
     return account
   }
+  accountDashboardUrl(accountId: string): string {
+    return `https://dashboard.fake-stripe.test/connect/accounts/${accountId}`
+  }
+  /** The legal name the company gave Stripe during onboarding; real Stripe reports it for companies. */
+  setLegalName(accountId: string, legalName: string | null): void {
+    const account = this.accounts.get(accountId)
+    if (!account) throw new Error(`no such account ${accountId}`)
+    this.accounts.set(accountId, { ...account, legalName })
+  }
+  /** Simulates Stripe withdrawing charges from an account; returns the account.updated event. */
+  disableAccount(accountId: string): PaymentsWebhookEvent {
+    const account = this.accounts.get(accountId)
+    if (!account) throw new Error(`no such account ${accountId}`)
+    this.accounts.set(accountId, { ...account, chargesEnabled: false, payoutsEnabled: false })
+    return {
+      id: `evt_acct_${accountId}_${++this.counter}`,
+      type: 'account.updated',
+      account: accountId,
+      data: {
+        object: {
+          id: accountId,
+          details_submitted: account.detailsSubmitted,
+          charges_enabled: false,
+          payouts_enabled: false,
+        },
+      },
+    }
+  }
   /** Simulates the teacher finishing Connect onboarding; returns the account.updated event. */
   enableAccount(accountId: string): PaymentsWebhookEvent {
     const existing = this.accounts.get(accountId)

@@ -15,6 +15,8 @@ import { createTestApp, type TestApp } from './helpers/test-app'
  * - `details`: the course's own details. `course.editDraft`, or `course.editLive` on a live
  *   course; they are not part of a change set.
  * - `membership`: leaving. It needs no capability, only a membership, and has its own test.
+ * - `owner`: resubmitting a company's application. `profile.edit` lets the request in, and then
+ *   only the owner may do it.
  */
 type Status = 'draft' | 'rejected' | 'pending_review' | 'live'
 type Fixture = Awaited<ReturnType<TestApp['createCourse']>> & {
@@ -27,7 +29,7 @@ type Route = {
   method: string
   /** As registered, after `/teach/profiles/:profileId/`. */
   pattern: string
-  capability: Capability | 'content' | 'details' | 'membership'
+  capability: Capability | 'content' | 'details' | 'membership' | 'owner'
   path: (f: Fixture) => string
   body?: (f: Fixture) => unknown
 }
@@ -55,6 +57,24 @@ const ROUTES: Route[] = [
     capability: 'profile.edit',
     path: () => '/profile',
     body: () => ({ headline: 'A headline that is long enough' }),
+  },
+  {
+    // 409 for the owner of a personal or an approved profile: there is nothing to resubmit.
+    method: 'PUT',
+    pattern: 'apply/corporate',
+    capability: 'owner',
+    path: () => '/apply/corporate',
+    body: () => ({
+      uen: '201812345K',
+      legalName: 'Resubmitted Pte. Ltd.',
+      entityType: 'private_limited',
+      registryDocumentMediaId: '00000000-0000-4000-8000-000000000000',
+      displayName: 'Resubmitted',
+      headline: 'A headline that is long enough',
+      bio: 'A biography that is comfortably longer than the fifty characters the form asks for.',
+      credentials: 'Credentials of sufficient length.',
+      teachingSampleUrl: 'https://example.com/sample',
+    }),
   },
   {
     method: 'GET',
@@ -287,6 +307,7 @@ function allowed(actor: Actor, route: Route, status: Status = 'draft'): boolean 
   if (route.capability === 'details') {
     return can(actor, status === 'live' ? 'course.editLive' : 'course.editDraft')
   }
+  if (route.capability === 'owner') return actor.role === 'owner' && can(actor, 'profile.edit')
   return can(actor, route.capability)
 }
 
@@ -422,7 +443,12 @@ describe('the role table, route by route', () => {
     it(`gives a manager everything but Stripe links and managers, on a ${status} course`, async () => {
       const refused = await checkAgainstTable(MANAGER, 'manager@example.com', company, status)
       expect(refused).toEqual(
-        [...STRIPE_LINKS, 'POST invitations/:id/confirm', 'PATCH members/:userId'].sort(),
+        [
+          ...STRIPE_LINKS,
+          'PUT apply/corporate',
+          'POST invitations/:id/confirm',
+          'PATCH members/:userId',
+        ].sort(),
       )
     })
 
@@ -432,6 +458,7 @@ describe('the role table, route by route', () => {
       expect(refused).toEqual(
         [
           'PATCH profile',
+          'PUT apply/corporate',
           ...STRIPE_LINKS,
           ...EARNINGS,
           ...PUBLISHING,
@@ -447,7 +474,14 @@ describe('the role table, route by route', () => {
     it(`gives staff exactly the staff row, on a ${status} course`, async () => {
       const refused = await checkAgainstTable(STAFF, 'root@example.com', approved, status)
       expect(refused).toEqual(
-        [...STRIPE_LINKS, 'POST courses', ...PUBLISHING, ...MEMBER_ROUTES, ...REVIEW_ROUTES].sort(),
+        [
+          'PUT apply/corporate',
+          ...STRIPE_LINKS,
+          'POST courses',
+          ...PUBLISHING,
+          ...MEMBER_ROUTES,
+          ...REVIEW_ROUTES,
+        ].sort(),
       )
     })
   }
@@ -463,6 +497,7 @@ describe('the role table, route by route', () => {
       [
         'GET profile',
         'PATCH profile',
+        'PUT apply/corporate',
         'GET stripe/status',
         'GET courses',
         'GET courses/:id',

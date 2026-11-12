@@ -32,11 +32,19 @@ export function StripeReturn() {
                 title: 'Stripe connected',
                 description: 'Learners can now pay for your courses.',
               }
-            : {
-                tone: 'info',
-                title: 'Almost there',
-                description: 'Stripe still needs a few details before payments are enabled.',
-              },
+            : stripe.businessType === 'company' && stripe.chargesEnabled
+              ? {
+                  // A company is paid only once Elevate has matched the legal name as well.
+                  tone: 'info',
+                  title: 'Stripe is set up',
+                  description:
+                    'Elevate now checks the legal name on the account. We will email you when your courses can be bought.',
+                }
+              : {
+                  tone: 'info',
+                  title: 'Almost there',
+                  description: 'Stripe still needs a few details before payments are enabled.',
+                },
         )
       } catch (error) {
         toast({

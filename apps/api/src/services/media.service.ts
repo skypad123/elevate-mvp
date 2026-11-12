@@ -212,15 +212,31 @@ export class MediaService {
    * profile may read it, and someone who has left it may not, even if they uploaded the file. An
    * asset with no profile (an avatar, a teaching sample) belongs to whoever uploaded it. Staff
    * may read any asset, because support agents review teaching samples and course media.
+   *
+   * A company's registry document is the exception among uploads with no profile: once it is on
+   * an application, its uploader can read it only while that application is waiting for review.
+   * After the decision it is for Support alone. It can name the company's officers, and the
+   * person who uploaded it may no longer be the profile's owner.
    */
   async getOwnedAsset(user: SessionUser, assetId: string): Promise<MediaAssetRow> {
-    const asset = await this.deps.db.query.mediaAssets.findFirst({ where: { id: assetId } })
+    const { db } = this.deps
+    const asset = await db.query.mediaAssets.findFirst({ where: { id: assetId } })
     if (!asset) throw errors.notFound('Asset')
-    const allowed =
-      hasRole(user, 'support_agent') ||
-      (asset.profileId === null
-        ? asset.uploaderId === user.id
-        : (await loadActor(this.deps, user, asset.profileId)) !== null)
+    if (hasRole(user, 'support_agent')) return asset
+    let allowed: boolean
+    if (asset.profileId !== null) {
+      allowed = (await loadActor(this.deps, user, asset.profileId)) !== null
+    } else {
+      allowed = asset.uploaderId === user.id
+      if (allowed && asset.kind === 'document') {
+        const entity = await db.query.legalEntities.findFirst({
+          where: { registryDocumentMediaId: asset.id },
+          columns: { id: true },
+          with: { profile: { columns: { status: true } } },
+        })
+        if (entity) allowed = entity.profile?.status === 'applied'
+      }
+    }
     if (!allowed) throw errors.forbidden()
     return asset
   }

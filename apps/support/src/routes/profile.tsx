@@ -33,6 +33,8 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { api } from '../lib/api'
 import { profileKeys, useProfile } from '../lib/queries'
 import { teachUrl } from '../lib/urls'
+import { CompanyCard, NameCheckCard } from './profile-company'
+import { OwnerRecovery } from './profile-recovery'
 
 export function Profile() {
   const { id = '' } = useParams()
@@ -49,9 +51,12 @@ export function Profile() {
   return <ProfileView detail={query.data} />
 }
 
-/** One teaching profile: its application, owner, courses, payout accounts and earnings. */
+/**
+ * One teaching profile: its application, owner, courses, payout accounts and earnings. A corporate
+ * profile also shows the company behind it and the legal-name check on its Stripe account.
+ */
 function ProfileView({ detail }: { detail: SupportProfileDetail }) {
-  const { profile, courses, payoutAccounts, earnings } = detail
+  const { profile, courses, payoutAccounts, legalEntity, earnings } = detail
   const { hasRole } = usePortalAuth()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -163,6 +168,14 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
+          {legalEntity ? (
+            <>
+              <CompanyCard entity={legalEntity} />
+              {profile.status === 'approved' ? (
+                <NameCheckCard profileId={profile.id} account={payoutAccounts[0]} />
+              ) : null}
+            </>
+          ) : null}
           <Card as="section">
             <CardHeader
               title="Application"
@@ -249,10 +262,17 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
             />
             <Link
               to={`/people/${profile.owner.id}`}
-              className="mt-3 inline-block text-small font-semibold text-brand hover:underline"
+              className="mt-3 block text-small font-semibold text-brand hover:underline"
             >
               Open this person
             </Link>
+            {isSuperAdmin ? (
+              <OwnerRecovery detail={detail} />
+            ) : (
+              <p className="mt-3 text-caption text-ink-tertiary">
+                Only super admins can recover an owner who can no longer sign in.
+              </p>
+            )}
           </Card>
           <Card as="section">
             <CardHeader
@@ -261,8 +281,8 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
             />
             {payoutAccounts.length === 0 ? (
               <p className="text-small text-ink-tertiary">
-                None yet. The owner has not started Stripe onboarding, so the profile’s courses
-                cannot be bought.
+                None yet. The owner has not started Stripe onboarding
+                {legalEntity ? ' for the company' : ''}, so the profile’s courses cannot be bought.
               </p>
             ) : (
               payoutAccounts.map((account) => (
@@ -291,7 +311,21 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
                     },
                     { label: 'Charges', value: account.chargesEnabled ? 'Enabled' : 'Not enabled' },
                     { label: 'Payouts', value: account.payoutsEnabled ? 'Enabled' : 'Not enabled' },
-                    { label: 'Active since', value: formatDate(account.activatedAt) },
+                    // A company account also needs the legal-name check before it is active.
+                    ...(account.businessType === 'company'
+                      ? [
+                          {
+                            label: 'Legal name',
+                            value: account.nameVerifiedAt
+                              ? `Matched ${formatDate(account.nameVerifiedAt)}`
+                              : 'Not checked yet',
+                          },
+                        ]
+                      : []),
+                    {
+                      label: account.status === 'active' ? 'Active since' : 'First active',
+                      value: formatDate(account.activatedAt),
+                    },
                   ]}
                 />
               ))
@@ -334,7 +368,11 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
         open={dialog === 'approve'}
         onOpenChange={(o) => !o && setDialog(null)}
         title="Approve this profile?"
-        description="Its owner can connect Stripe and build courses straight away. They get an email."
+        description={
+          legalEntity
+            ? `Approving records that you checked ${legalEntity.legalName} (UEN ${legalEntity.uen}) against its business profile. Its owner can then connect the company’s Stripe account, and gets an email.`
+            : 'Its owner can connect Stripe and build courses straight away. They get an email.'
+        }
         footer={
           <>
             <Button variant="ghost" onClick={() => setDialog(null)}>

@@ -25,17 +25,26 @@ export type PeopleQuery = {
   limit: number
 }
 
+type ProfileColumns = Pick<typeof s.profiles.$inferSelect, 'id' | 'type' | 'displayName' | 'status'>
+
 type UserWithRelations = typeof s.users.$inferSelect & {
   roles: (typeof s.userRoles.$inferSelect)[]
-  ownedProfiles: Pick<typeof s.profiles.$inferSelect, 'id' | 'type' | 'displayName' | 'status'>[]
+  ownedProfiles: ProfileColumns[]
+  memberships: Array<
+    Pick<typeof s.profileMemberships.$inferSelect, 'role'> & { profile: ProfileColumns }
+  >
 }
 
-/** The relations a person is listed with. Memberships join `ownedProfiles` when they exist. */
+const PROFILE_COLUMNS = { id: true, type: true, displayName: true, status: true } as const
+
+/** The relations a person is listed with: staff roles, and every profile they own or are on. */
 const PERSON_RELATIONS = {
   roles: true,
-  ownedProfiles: {
-    columns: { id: true, type: true, displayName: true, status: true },
-    orderBy: { appliedAt: 'asc' },
+  ownedProfiles: { columns: PROFILE_COLUMNS, orderBy: { appliedAt: 'asc' } },
+  memberships: {
+    columns: { role: true },
+    with: { profile: { columns: PROFILE_COLUMNS } },
+    orderBy: { createdAt: 'asc' },
   },
 } as const
 
@@ -66,7 +75,11 @@ export function personSummary(user: UserWithRelations): PersonSummary {
     avatarUrl: user.avatarUrl,
     roles: user.roles.map((r) => r.role),
     createdAt: user.createdAt.toISOString(),
-    profiles: user.ownedProfiles.map((p) => profileSummary(p, 'owner')),
+    // Owned profiles first, then the ones the person is a manager or writer of.
+    profiles: [
+      ...user.ownedProfiles.map((p) => profileSummary(p, 'owner')),
+      ...user.memberships.map((m) => profileSummary(m.profile, m.role)),
+    ],
   }
 }
 

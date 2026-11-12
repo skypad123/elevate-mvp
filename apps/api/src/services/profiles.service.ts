@@ -1,5 +1,6 @@
 import {
   ANALYTICS_EVENTS,
+  type CorporateApplication,
   type Page,
   type PersonalApplication,
   type ProfileSummary,
@@ -19,17 +20,26 @@ import type { ProfileActor, SessionUser } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
 import { CoursesService } from './courses.service'
 import { EarningsService } from './earnings.service'
+import { LegalEntitiesService, legalEntityView } from './legal-entities.service'
 import { MediaService } from './media.service'
 
 type ProfileRow = typeof s.profiles.$inferSelect
 type PayoutAccountRow = typeof s.payoutAccounts.$inferSelect
 type MediaAssetRow = typeof s.mediaAssets.$inferSelect
+type LegalEntityRow = typeof s.legalEntities.$inferSelect
 
 type ProfileWithRelations = ProfileRow & {
   owner: typeof s.users.$inferSelect
   payoutAccount: PayoutAccountRow | null
   avatar: MediaAssetRow | null
+  legalEntity: LegalEntityRow | null
 }
+
+/** The teaching part of an application: the same fields for a person and for a company. */
+type TeachingFields = Pick<
+  PersonalApplication,
+  'displayName' | 'headline' | 'bio' | 'credentials' | 'teachingSampleUrl' | 'teachingSampleMediaId'
+>
 
 export type ProfilesQuery = {
   q?: string
@@ -56,7 +66,10 @@ function decodeCursor(cursor: string): { appliedAt: Date; id: string } | null {
   }
 }
 
-function payoutAccountView(account: PayoutAccountRow): SupportPayoutAccount {
+function payoutAccountView(
+  account: PayoutAccountRow,
+  nameVerifiedBy: string | null,
+): SupportPayoutAccount {
   return {
     id: account.id,
     stripeAccountId: account.stripeAccountId,
@@ -66,6 +79,8 @@ function payoutAccountView(account: PayoutAccountRow): SupportPayoutAccount {
     chargesEnabled: account.chargesEnabled,
     payoutsEnabled: account.payoutsEnabled,
     activatedAt: account.activatedAt?.toISOString() ?? null,
+    nameVerifiedAt: account.nameVerifiedAt?.toISOString() ?? null,
+    nameVerifiedBy,
   }
 }
 
@@ -91,16 +106,18 @@ export class ProfilesService {
   private readonly media: MediaService
   private readonly courses: CoursesService
   private readonly earnings: EarningsService
+  private readonly entities: LegalEntitiesService
   constructor(private readonly deps: Deps) {
     this.media = new MediaService(deps)
     this.courses = new CoursesService(deps)
     this.earnings = new EarningsService(deps)
+    this.entities = new LegalEntitiesService(deps)
   }
 
   private async load(profileId: string): Promise<ProfileWithRelations> {
     const profile = await this.deps.db.query.profiles.findFirst({
       where: { id: profileId },
-      with: { owner: true, payoutAccount: true, avatar: true },
+      with: { owner: true, payoutAccount: true, avatar: true, legalEntity: true },
     })
     if (!profile) throw errors.notFound('Profile')
     return profile
@@ -128,11 +145,15 @@ export class ProfilesService {
       payout: account
         ? {
             status: account.status,
+            businessType: account.businessType,
             detailsSubmitted: account.detailsSubmitted,
             chargesEnabled: account.chargesEnabled,
             payoutsEnabled: account.payoutsEnabled,
+            nameVerified: !!account.nameVerifiedAt,
+            activated: !!account.activatedAt,
           }
         : null,
+      legalEntity: profile.legalEntity ? legalEntityView(profile.legalEntity) : null,
       owner: { id: profile.owner.id, email: profile.owner.email, name: profile.owner.name },
       actingAsStaff,
       appliedAt: profile.appliedAt.toISOString(),
@@ -162,24 +183,7 @@ export class ProfilesService {
     })
     if (existing?.status === 'approved')
       throw errors.conflict('profile_exists', 'You already have an approved teaching profile')
-    if (input.teachingSampleMediaId) {
-      const asset = await this.media.getOwnedReadyAsset(user, input.teachingSampleMediaId)
-      if (asset.kind !== 'video' && asset.kind !== 'document')
-        throw errors.badRequest('wrong_kind', 'Teaching samples must be a video or a PDF')
-    }
-    const values = {
-      displayName: input.displayName,
-      headline: input.headline,
-      bio: input.bio,
-      credentials: input.credentials,
-      teachingSampleUrl: input.teachingSampleUrl ?? null,
-      teachingSampleMediaId: input.teachingSampleMediaId ?? null,
-      status: 'applied' as const,
-      reviewNote: null,
-      reviewedAt: null,
-      reviewedBy: null,
-      appliedAt: this.deps.now(),
-    }
+    const values = await this.applicationValues(user, input)
     let profileId: string
     if (existing) {
       await db.update(s.profiles).set(values).where(eq(s.profiles.id, existing.id))
@@ -218,6 +222,154 @@ export class ProfilesService {
       }),
     )
     return this.toView(await this.load(profileId), false)
+  }
+
+  /** What an application writes to the profile: the teaching fields, and "waiting for review". */
+  private async applicationValues(user: SessionUser, input: TeachingFields) {
+    if (input.teachingSampleMediaId) {
+      const asset = await this.media.getOwnedReadyAsset(user, input.teachingSampleMediaId)
+      if (asset.kind !== 'video' && asset.kind !== 'document')
+        throw errors.badRequest('wrong_kind', 'Teaching samples must be a video or a PDF')
+    }
+    return {
+      displayName: input.displayName,
+      headline: input.headline,
+      bio: input.bio,
+      credentials: input.credentials,
+      teachingSampleUrl: input.teachingSampleUrl ?? null,
+      teachingSampleMediaId: input.teachingSampleMediaId ?? null,
+      status: 'applied' as const,
+      reviewNote: null,
+      reviewedAt: null,
+      reviewedBy: null,
+      appliedAt: this.deps.now(),
+    }
+  }
+
+  private async sendCorporateReceived(
+    user: SessionUser,
+    profileId: string,
+    input: CorporateApplication,
+  ): Promise<void> {
+    const { env, mailer } = this.deps
+    await mailer.send(
+      simpleEmail({
+        to: user.email,
+        title: `We received the Elevate Teach application for ${input.legalName}`,
+        paragraphs: [
+          `Thanks. Our team reviews every application by hand, usually within two working days. For a company we also compare the UEN (${input.uen}) and the legal name with the registry document you uploaded.`,
+          'We will email you as soon as there is a decision. After approval you connect the company’s Stripe account, and we check that its legal name matches before courses can be bought.',
+        ],
+        cta: { href: `${env.TEACH_URL}/p/${profileId}`, label: 'View application' },
+      }),
+    )
+  }
+
+  /**
+   * A company applies: the profile (`corporate`, `applied`) and its legal entity (`pending`) are
+   * created together, with the registry document linked. A UEN that any profile already holds,
+   * whatever that profile's status, is refused.
+   */
+  async applyCorporate(user: SessionUser, input: CorporateApplication): Promise<ProfileView> {
+    const { db, env } = this.deps
+    const values = await this.applicationValues(user, input)
+    await this.entities.assertUenFree(input.uen)
+    await this.entities.assertRegistryDocument(user, input.registryDocumentMediaId)
+
+    const profileId = await db.transaction(async (tx) => {
+      // Two applications with one UEN at the same moment: the unique index lets one through.
+      const [entity] = await tx
+        .insert(s.legalEntities)
+        .values({
+          uen: input.uen,
+          legalName: input.legalName,
+          entityType: input.entityType,
+          registryDocumentMediaId: input.registryDocumentMediaId,
+        })
+        .onConflictDoNothing()
+        .returning()
+      if (!entity) {
+        throw errors.conflict(
+          'uen_in_use',
+          'A company with this UEN already has a profile on Elevate. Contact Elevate Support if that is your company.',
+        )
+      }
+      const [profile] = await tx
+        .insert(s.profiles)
+        .values({
+          type: 'corporate',
+          ownerUserId: user.id,
+          legalEntityId: entity.id,
+          commissionBps: env.DEFAULT_COMMISSION_BPS,
+          ...values,
+        })
+        .returning()
+      if (!profile) throw new Error('failed to save application')
+      return profile.id
+    })
+
+    await trackEvent(this.deps, {
+      userId: user.id,
+      name: ANALYTICS_EVENTS.teacherApplied,
+      properties: { reapply: false, profileId, type: 'corporate' },
+    })
+    await this.sendCorporateReceived(user, profileId, input)
+    return this.toView(await this.load(profileId), false)
+  }
+
+  /**
+   * The owner of a corporate profile that is not approved resubmits its application. The profile
+   * and its legal entity are updated in place and go back to `applied` and `pending`, so the
+   * application returns to the review queue. The UEN can change only to one no other profile
+   * holds. An earlier rejection reason stays in the audit log.
+   */
+  async reapplyCorporate(
+    user: SessionUser,
+    actor: ProfileActor,
+    input: CorporateApplication,
+  ): Promise<ProfileView> {
+    const { db } = this.deps
+    if (actor.role !== 'owner') {
+      throw errors.forbidden('Only the owner of this profile can resubmit its application')
+    }
+    const profile = await this.load(actor.profileId)
+    const entity = profile.legalEntity
+    if (profile.type !== 'corporate' || !entity) {
+      throw errors.conflict('not_corporate', 'This is not a company profile')
+    }
+    if (profile.status === 'approved') {
+      throw errors.conflict('already_approved', 'This company profile is already approved')
+    }
+    const values = await this.applicationValues(user, input)
+    await this.entities.assertUenFree(input.uen, entity.id)
+    if (input.registryDocumentMediaId !== entity.registryDocumentMediaId) {
+      await this.entities.assertRegistryDocument(user, input.registryDocumentMediaId)
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(s.legalEntities)
+        .set({
+          uen: input.uen,
+          legalName: input.legalName,
+          entityType: input.entityType,
+          registryDocumentMediaId: input.registryDocumentMediaId,
+          checkStatus: 'pending',
+          checkedBy: null,
+          checkedAt: null,
+          rejectionReason: null,
+        })
+        .where(eq(s.legalEntities.id, entity.id))
+      await tx.update(s.profiles).set(values).where(eq(s.profiles.id, profile.id))
+    })
+
+    await trackEvent(this.deps, {
+      userId: user.id,
+      name: ANALYTICS_EVENTS.teacherApplied,
+      properties: { reapply: true, profileId: profile.id, type: 'corporate' },
+    })
+    await this.sendCorporateReceived(user, profile.id, input)
+    return this.getProfile(actor)
   }
 
   async updateProfile(
@@ -281,6 +433,18 @@ export class ProfilesService {
                 ),
               ),
           ),
+          // a company is also found by its UEN or its legal name
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(s.legalEntities)
+              .where(
+                and(
+                  eq(s.legalEntities.id, profile.legalEntityId),
+                  or(ilike(s.legalEntities.uen, like), ilike(s.legalEntities.legalName, like)),
+                ),
+              ),
+          ),
         )
         if (match) conditions.push(match)
       }
@@ -297,7 +461,7 @@ export class ProfilesService {
         ...(query.type ? { type: query.type } : {}),
         RAW: (profile) => and(...conditionsFor(profile)) ?? EmptyFilter,
       },
-      with: { owner: true, payoutAccount: true },
+      with: { owner: true, payoutAccount: true, legalEntity: true },
       orderBy: { appliedAt: 'desc', id: 'desc' },
       limit: query.limit + 1,
     })
@@ -312,6 +476,8 @@ export class ProfilesService {
         ownerName: p.owner.name,
         commissionBps: p.commissionBps,
         payable: isPayable(p.payoutAccount),
+        uen: p.legalEntity?.uen ?? null,
+        legalName: p.legalEntity?.legalName ?? null,
         appliedAt: p.appliedAt.toISOString(),
       }),
     )
@@ -321,10 +487,20 @@ export class ProfilesService {
 
   async detail(profileId: string): Promise<SupportProfileDetail> {
     const profile = await this.load(profileId)
+    const account = profile.payoutAccount
+    const verifier = account?.nameVerifiedBy
+      ? await this.deps.db.query.users.findFirst({
+          where: { id: account.nameVerifiedBy },
+          columns: { email: true },
+        })
+      : null
     return {
       profile: await this.toView(profile, false),
       courses: await this.courses.listSummaries({ profileId }),
-      payoutAccounts: profile.payoutAccount ? [payoutAccountView(profile.payoutAccount)] : [],
+      payoutAccounts: account ? [payoutAccountView(account, verifier?.email ?? null)] : [],
+      legalEntity: profile.legalEntity
+        ? await this.entities.supportView(profile.legalEntity)
+        : null,
       earnings: await this.earnings.totalsForProfile(profileId),
     }
   }
@@ -334,22 +510,42 @@ export class ProfilesService {
     const profile = await this.load(profileId)
     if (profile.status === 'approved')
       throw errors.conflict('already_approved', 'This profile is already approved')
-    await db
-      .update(s.profiles)
-      .set({
-        status: 'approved',
-        reviewNote: note ?? null,
-        reviewedAt: this.deps.now(),
-        reviewedBy: staff.id,
-      })
-      .where(eq(s.profiles.id, profileId))
+    const now = this.deps.now()
+    const entity = profile.legalEntity
+    // One review covers the teaching and, for a company, the company: approving the profile
+    // records that its UEN and legal name were checked against the registry document.
+    await db.transaction(async (tx) => {
+      await tx
+        .update(s.profiles)
+        .set({
+          status: 'approved',
+          reviewNote: note ?? null,
+          reviewedAt: now,
+          reviewedBy: staff.id,
+        })
+        .where(eq(s.profiles.id, profileId))
+      if (entity) {
+        await tx
+          .update(s.legalEntities)
+          .set({
+            checkStatus: 'verified',
+            checkedBy: staff.id,
+            checkedAt: now,
+            rejectionReason: null,
+          })
+          .where(eq(s.legalEntities.id, entity.id))
+      }
+    })
     await recordAudit(this.deps, {
       actorId: staff.id,
       action: 'profile.approve',
       entityType: 'profile',
       entityId: profileId,
       profileId,
-      metadata: { note: note ?? null },
+      metadata: {
+        note: note ?? null,
+        ...(entity ? { uen: entity.uen, legalName: entity.legalName } : {}),
+      },
     })
     await trackEvent(this.deps, {
       userId: profile.ownerUserId,
@@ -362,7 +558,9 @@ export class ProfilesService {
         title: 'Welcome to Elevate Teach',
         paragraphs: [
           `Your application is approved, ${profile.displayName}.`,
-          'Next: connect your Stripe account so learners can pay you, then build your first course. Courses go live after a quick review by our team.',
+          entity
+            ? `Next: connect a Stripe account in the name of ${entity.legalName}, the company we approved. When Stripe has finished, we check that the legal name on that account matches the company, and then you can build courses and learners can pay for them.`
+            : 'Next: connect your Stripe account so learners can pay you, then build your first course. Courses go live after a quick review by our team.',
         ],
         cta: { href: `${env.TEACH_URL}/p/${profileId}`, label: 'Open Elevate Teach' },
       }),
@@ -375,15 +573,25 @@ export class ProfilesService {
     const profile = await this.load(profileId)
     if (profile.status === 'approved')
       throw errors.conflict('already_approved', 'An approved profile cannot be rejected')
-    await db
-      .update(s.profiles)
-      .set({
-        status: 'rejected',
-        reviewNote: reason,
-        reviewedAt: this.deps.now(),
-        reviewedBy: staff.id,
-      })
-      .where(eq(s.profiles.id, profileId))
+    const now = this.deps.now()
+    const entity = profile.legalEntity
+    await db.transaction(async (tx) => {
+      await tx
+        .update(s.profiles)
+        .set({ status: 'rejected', reviewNote: reason, reviewedAt: now, reviewedBy: staff.id })
+        .where(eq(s.profiles.id, profileId))
+      if (entity) {
+        await tx
+          .update(s.legalEntities)
+          .set({
+            checkStatus: 'rejected',
+            checkedBy: staff.id,
+            checkedAt: now,
+            rejectionReason: reason,
+          })
+          .where(eq(s.legalEntities.id, entity.id))
+      }
+    })
     await recordAudit(this.deps, {
       actorId: staff.id,
       action: 'profile.reject',
