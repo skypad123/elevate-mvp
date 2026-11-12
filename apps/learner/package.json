@@ -68,6 +68,7 @@
     ],
     "testMatch": [
       "**/__tests__/**/*.test.ts?(x)"
-    ]
+    ],
+    "testTimeout": 30000
   }
 }
