@@ -34,8 +34,9 @@ const getServerScheme = (): ColorScheme => 'light'
 
 /**
  * Applies `data-theme` and `lang` to <html>. `system` removes the attribute so the
- * `prefers-color-scheme` rules in tokens.css take over. The index.html pre-paint script does the
- * same before React loads; this keeps it in sync afterwards.
+ * `prefers-color-scheme` rules in tokens.css take over. The pre-paint script
+ * (`public/preferences-init.js` in each portal) does the same before React loads; this keeps it
+ * in sync afterwards.
  */
 function applyToDocument(preferences: Preferences) {
   const root = document.documentElement
@@ -75,14 +76,18 @@ export function PreferencesProvider({
     setPreferences((prev) => (prev[key] === value ? prev : { ...prev, [key]: value }))
   }, [])
 
+  // `t` changes only with the language, so an effect or callback that depends on it is not re-run
+  // by a theme change.
+  const t = useMemo(() => createTranslator(preferences.locale), [preferences.locale])
+
   const value = useMemo<PreferencesContextValue>(
     () => ({
       preferences,
       setPreference,
       resolvedScheme: preferences.theme === 'system' ? systemScheme : preferences.theme,
-      t: createTranslator(preferences.locale),
+      t,
     }),
-    [preferences, setPreference, systemScheme],
+    [preferences, setPreference, systemScheme, t],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

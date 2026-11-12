@@ -2,16 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <script>
-      // Apply the stored theme/language before first paint so there is no flash.
-      // Key and shape mirror PREFERENCES_STORAGE_KEY / preferencesSchema in @elevate/core.
-      try {
-        const p = JSON.parse(localStorage.getItem('elevate.preferences') || '{}')
-        if (p.theme === 'light' || p.theme === 'dark')
-          document.documentElement.setAttribute('data-theme', p.theme)
-        if (typeof p.locale === 'string') document.documentElement.lang = p.locale
-      } catch {}
-    </script>
+    <!-- Applies the stored theme and language before first paint. A file, not inline: the sites
+         send `script-src 'self'`. -->
+    <script vite-ignore src="/preferences-init.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#F5C400" />
     <title>Elevate Support</title>

@@ -1,6 +1,7 @@
 import type { InvitationAccepted, InvitationStatus } from '@elevate/core'
 import { Badge, Button, Card, EmptyState, formatDate, Logo, Skeleton } from '@elevate/web-ui'
 import { errorMessage, usePortalAuth } from '@elevate/web-ui/portal'
+import { PreferencesButton } from '@elevate/web-ui/preferences'
 import { MailCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -66,7 +67,11 @@ export function InvitationPage() {
     <div className="min-h-full bg-canvas">
       <header className="mx-auto flex w-full max-w-xl items-center justify-between px-4 py-5">
         <Logo size="sm" suffix="Teach" />
-        {user ? <span className="text-small text-ink-secondary">{user.email}</span> : null}
+        <div className="flex items-center gap-3">
+          {user ? <span className="text-small text-ink-secondary">{user.email}</span> : null}
+          {/* An invitee may not be signed in, and has no Settings page yet. */}
+          <PreferencesButton />
+        </div>
       </header>
       <main className="mx-auto w-full max-w-xl px-4 pb-16">
         {preview.isPending ? (
@@ -128,7 +133,7 @@ export function InvitationPage() {
                   Not you?{' '}
                   <button
                     type="button"
-                    className="font-semibold text-brand hover:underline"
+                    className="font-semibold text-brand-fg hover:underline"
                     onClick={() => void signOut()}
                   >
                     Sign out

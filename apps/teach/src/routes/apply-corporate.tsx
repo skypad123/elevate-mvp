@@ -165,7 +165,7 @@ function CompanyApplicationForm({ existing }: { existing: ProfileView | null }) 
         {!isResubmission ? (
           <p className="text-small text-ink-secondary">
             Teaching under your own name, or as a sole proprietor?{' '}
-            <Link to="/apply" className="font-semibold text-brand hover:underline">
+            <Link to="/apply" className="font-semibold text-brand-fg hover:underline">
               Apply as a person instead
             </Link>
             .

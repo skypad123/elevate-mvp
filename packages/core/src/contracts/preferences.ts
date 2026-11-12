@@ -30,7 +30,8 @@ export const defaultPreferences: Preferences = preferencesSchema.parse({})
 
 /**
  * Storage key on every platform (localStorage on web, AsyncStorage on native).
- * Mirrored literally in the portals' index.html pre-paint scripts; keep them in sync.
+ * Mirrored literally in the portals' pre-paint scripts (`public/preferences-init.js`); keep them
+ * in sync.
  */
 export const PREFERENCES_STORAGE_KEY = 'elevate.preferences'
 

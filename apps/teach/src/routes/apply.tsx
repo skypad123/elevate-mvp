@@ -103,7 +103,7 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
           <p className="text-small text-ink-secondary">
             This application is for a person teaching under their own name, a sole proprietor
             included. Teaching as a private limited company or an LLP?{' '}
-            <Link to="/apply/company" className="font-semibold text-brand hover:underline">
+            <Link to="/apply/company" className="font-semibold text-brand-fg hover:underline">
               Apply as a company instead
             </Link>
             .

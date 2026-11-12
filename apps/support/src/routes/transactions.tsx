@@ -237,7 +237,7 @@ function PayoutLedger() {
             <TD>
               <Link
                 to={`/profiles/${row.profileId}`}
-                className="font-semibold text-ink hover:text-brand hover:underline"
+                className="font-semibold text-ink hover:text-brand-fg hover:underline"
               >
                 {row.profileName}
               </Link>

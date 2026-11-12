@@ -209,7 +209,7 @@ function NameComparison({ profileId, check }: { profileId: string; check: NameCh
               href={check.dashboardUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"
+              className="inline-flex items-center gap-1 font-semibold text-brand-fg hover:underline"
             >
               <span className="font-mono font-normal text-ink-tertiary">
                 {check.stripeAccountId}

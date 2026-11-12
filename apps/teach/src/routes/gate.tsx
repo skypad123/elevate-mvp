@@ -1,5 +1,6 @@
 import { Button, Logo } from '@elevate/web-ui'
 import { FullPageSpinner, usePortalAuth } from '@elevate/web-ui/portal'
+import { PreferencesButton } from '@elevate/web-ui/preferences'
 import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation, useParams } from 'react-router'
 import { lastProfileId, useCurrentProfile } from '../lib/profile'
@@ -67,6 +68,8 @@ export function OnboardingLayout({ children }: { children?: ReactNode }) {
           {/* Someone with another profile is not stuck on this one while it is being set up. */}
           <ProfileSwitcher current={profileId} className="w-56" />
           <span className="hidden pb-2 sm:inline">{user?.email}</span>
+          {/* Settings is out of reach until a profile is approved; language and theme are not. */}
+          <PreferencesButton />
           <Button variant="ghost" size="sm" onClick={signOut}>
             Sign out
           </Button>

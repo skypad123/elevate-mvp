@@ -200,7 +200,7 @@ function ReviewCourseView({ course }: { course: CourseView }) {
                   value: (
                     <Link
                       to={`/profiles/${course.profile.id}`}
-                      className="font-semibold text-brand hover:underline"
+                      className="font-semibold text-brand-fg hover:underline"
                     >
                       {course.profile.displayName}
                     </Link>

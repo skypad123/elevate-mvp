@@ -1,13 +1,15 @@
 import { supportedLocales, type ThemePreference, themePreferenceSchema } from '@elevate/core'
 import { localeNames } from '@elevate/i18n'
 import type { LucideIcon } from 'lucide-react'
-import { Monitor, Moon, Sun } from 'lucide-react'
-import { type ReactNode, useId } from 'react'
+import { Languages, Monitor, Moon, Sun } from 'lucide-react'
+import { type ReactNode, useId, useState } from 'react'
+import { Button } from '../components/Button'
 import { Card, CardHeader } from '../components/Card'
+import { Dialog } from '../components/Dialog'
 import { NativeSelect } from '../components/Input'
 import { SegmentedControl } from '../components/SegmentedControl'
 import { cn } from '../lib/cn'
-import { usePreferences } from './PreferencesProvider'
+import { usePreferences, useT } from './PreferencesProvider'
 
 /** One labelled preference: text on the left, control on the right (stacked when narrow). */
 export function PreferenceRow({
@@ -45,15 +47,15 @@ export function PreferenceRow({
 const themeIcons: Record<ThemePreference, LucideIcon> = { system: Monitor, light: Sun, dark: Moon }
 
 /**
- * The Preferences section shown in every portal's Settings. Add a `PreferenceRow` here when a
- * new field joins `preferencesSchema`; the options below are derived from the schema so a new
- * enum member only needs an i18n key.
+ * The preference rows on their own. Add a `PreferenceRow` here when a new field joins
+ * `preferencesSchema`; the options below are derived from the schema so a new enum member only
+ * needs an i18n key. The rows lay themselves out by container width, so render them inside an
+ * `@container` element.
  */
-export function PreferencesCard({ className }: { className?: string }) {
+export function PreferenceRows() {
   const { preferences, setPreference, t } = usePreferences()
   return (
-    <Card as="section" className={cn('@container', className)}>
-      <CardHeader title={t('prefs.title')} description={t('prefs.description')} />
+    <>
       <PreferenceRow
         label={t('prefs.appearance')}
         description={t('prefs.appearance.description')}
@@ -90,6 +92,66 @@ export function PreferencesCard({ className }: { className?: string }) {
           </NativeSelect>
         )}
       />
+    </>
+  )
+}
+
+/** The Preferences section shown in every portal's Settings. */
+export function PreferencesCard({ className }: { className?: string }) {
+  const t = useT()
+  return (
+    <Card as="section" className={cn('@container', className)}>
+      <CardHeader title={t('prefs.title')} description={t('prefs.description')} />
+      <PreferenceRows />
     </Card>
+  )
+}
+
+/** The same rows in a dialog, for a page that has no Settings page to hold the card. */
+export function PreferencesDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const t = useT()
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t('prefs.title')}
+      description={t('prefs.description')}
+    >
+      <div className="@container">
+        <PreferenceRows />
+      </div>
+    </Dialog>
+  )
+}
+
+/**
+ * A header button that opens the preferences dialog. It is for pages shown before someone can
+ * reach Settings (Teach's application and set-up pages, an invitation link), so they can still
+ * pick a language and a theme. The icon is the usual sign for "language", for a reader who cannot
+ * read the label.
+ */
+export function PreferencesButton({ className }: { className?: string }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={t('prefs.title')}
+        title={t('prefs.title')}
+        className={className}
+        onClick={() => setOpen(true)}
+      >
+        <Languages className="size-4" />
+      </Button>
+      <PreferencesDialog open={open} onOpenChange={setOpen} />
+    </>
   )
 }

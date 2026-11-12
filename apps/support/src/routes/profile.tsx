@@ -205,7 +205,7 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
                 href={profile.teachingSampleUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-2 text-small font-semibold text-brand hover:underline"
+                className="mt-3 inline-flex items-center gap-2 text-small font-semibold text-brand-fg hover:underline"
               >
                 {profile.teachingSampleUrl} <ExternalLink className="size-3.5" />
               </a>
@@ -262,7 +262,7 @@ function ProfileView({ detail }: { detail: SupportProfileDetail }) {
             />
             <Link
               to={`/people/${profile.owner.id}`}
-              className="mt-3 block text-small font-semibold text-brand hover:underline"
+              className="mt-3 block text-small font-semibold text-brand-fg hover:underline"
             >
               Open this person
             </Link>
