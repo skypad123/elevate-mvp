@@ -32,8 +32,14 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 - Brand colour as text/icon is `text-brand-fg`; as a fill it is `bg-brand` + `text-brand-ink`.
   Never `text-brand` (Support's yellow fails contrast as text). See `docs/adr/008-*`.
 - New user preference = a field with a `.default()` in `packages/core/src/contracts/preferences.ts`
-  plus a row in `PreferencesCard` (web) and the learner Profile card. New UI string in a translated
-  area = a key in `packages/i18n/src/messages/en.ts` and `zh.ts`.
+  plus a row in `PreferenceRows` (web) and the learner Profile card.
+- Translated pages (navigation, Settings/Preferences/Profile, and the teaching-profile screens of
+  Teach and Support) have no English literals: a new string there is a key in that page's area,
+  `packages/i18n/src/messages/areas/<area>.en.ts` and `<area>.zh.ts`. A message is a whole sentence;
+  enum labels, plurals, sentences with links, dates, lists and error text (`useErrorMessage()`)
+  follow the patterns in `docs/adr/008-*`. Other pages are English until one is translated whole.
+- No inline `<script>` in a portal's `index.html`: the deployed sites send `script-src 'self'`.
+  The pre-paint theme script is `public/preferences-init.js`.
 - Learner unit tests use jest-expo (`npm -w @elevate/learner test`, files under `src/**/__tests__`); the
   AsyncStorage jest mock is wired in `apps/learner/jest.setup.ts`. Device flows live in `.maestro/` (manual).
 - Teaching is not a platform role. A teacher is whoever owns (or belongs to) a teaching profile;
