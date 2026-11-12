@@ -16,7 +16,7 @@ import {
 import { fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
 import { PreferencesCard, useErrorMessage, useFormatDate, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { api } from '../lib/api'
 import { teachKeys } from '../lib/keys'
@@ -44,7 +44,8 @@ function MembershipCard() {
       // The profile is gone from the user's list once the session is read again.
       await refreshUser()
       toast({ tone: 'success', title: t('membership.leave.done', { name: displayName }) })
-      navigate('/', { replace: true })
+      // The home page opens another profile, or the start page, which says they left this one.
+      navigate('/', { replace: true, state: { left: displayName } })
     } catch (error) {
       toast({
         tone: 'danger',
@@ -98,13 +99,18 @@ export function SettingsPage() {
   const [upload, setUpload] = useState<MediaAssetView | null>(null)
   const canEdit = can('profile.edit')
 
+  // Fill the form once per profile. Saving the picture puts a new profile in the cache, and
+  // refilling then would throw away whatever is being typed in the text fields.
+  const filledFor = useRef<string | null>(null)
   useEffect(() => {
-    if (profile)
+    if (profile && filledFor.current !== profile.id) {
+      filledFor.current = profile.id
       setForm({
         displayName: profile.displayName,
         headline: profile.headline ?? '',
         bio: profile.bio ?? '',
       })
+    }
   }, [profile])
 
   /** Sends a change to the profile and puts the answer in the cache every screen reads from. */
@@ -172,6 +178,11 @@ export function SettingsPage() {
         <div className="space-y-6">
           <form onSubmit={save}>
             <Card as="section" className="space-y-5">
+              {canEdit ? null : (
+                <p className="rounded-control bg-surface-muted px-3 py-2 text-small text-ink-secondary">
+                  {t('settings.teach.readOnly')}
+                </p>
+              )}
               <Input
                 label={t('profileField.displayName')}
                 value={form.displayName}
@@ -197,11 +208,13 @@ export function SettingsPage() {
                 disabled={!canEdit}
                 required
               />
-              <div className="flex justify-end">
-                <Button type="submit" loading={busy} disabled={!canEdit}>
-                  {t('settings.teach.save')}
-                </Button>
-              </div>
+              {canEdit ? (
+                <div className="flex justify-end">
+                  <Button type="submit" loading={busy}>
+                    {t('settings.teach.save')}
+                  </Button>
+                </div>
+              ) : null}
             </Card>
           </form>
           <Card as="section" className="space-y-4">

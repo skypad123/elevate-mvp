@@ -15,6 +15,7 @@ import { PendingPage } from './pending'
  */
 export function HomeRedirect() {
   const { user, status } = usePortalAuth()
+  const { state } = useLocation()
   if (status === 'loading') return <FullPageSpinner />
   const profiles = user?.profiles ?? []
   const last = lastProfileId()
@@ -22,7 +23,7 @@ export function HomeRedirect() {
     profiles.find((p) => p.id === last) ??
     profiles.find((p) => p.status === 'approved') ??
     profiles[0]
-  return <Navigate to={target ? profilePath(target.id) : '/start'} replace />
+  return <Navigate to={target ? profilePath(target.id) : '/start'} replace state={state} />
 }
 
 /**

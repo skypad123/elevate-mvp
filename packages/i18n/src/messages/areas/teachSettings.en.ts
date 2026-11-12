@@ -45,4 +45,8 @@ export const teachSettingsEn = {
   'account.signedInAs': 'Signed in as',
   // The address of the profile's owner
   'account.owner': 'Owner',
+
+  // Above the profile form, for someone who can read it but not change it (a writer, staff)
+  'settings.teach.readOnly':
+    'Only the owner or a manager can change what learners see about this profile.',
 } as const

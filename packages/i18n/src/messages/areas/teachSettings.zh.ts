@@ -27,4 +27,6 @@ export const teachSettingsZh = {
 
   'account.signedInAs': '当前登录账户',
   'account.owner': '所有者',
+
+  'settings.teach.readOnly': '只有所有者或管理员可以修改学员看到的教学档案信息。',
 } satisfies Record<keyof typeof teachSettingsEn, string>

@@ -7,12 +7,12 @@ import {
   EmptyState,
   formatBps,
   PageHeader,
+  Skeleton,
   StatCard,
-  statusLabel,
   statusTone,
 } from '@elevate/web-ui'
 import { usePortalAuth } from '@elevate/web-ui/portal'
-import { useT } from '@elevate/web-ui/preferences'
+import { useErrorMessage, useT } from '@elevate/web-ui/preferences'
 import { ArrowRight, BookOpen, CreditCard, ExternalLink, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router'
 import { useCourses } from '../lib/courses'
@@ -110,42 +110,69 @@ export function StripeCard() {
 export function Dashboard() {
   const { user } = usePortalAuth()
   const { displayName, path, can } = useCurrentProfile()
+  const t = useT()
+  const errorMessage = useErrorMessage()
   const courses = useCourses()
   const seesMoney = can('earnings.read')
+  const reviews = can('changeSet.review')
+  const creates = can('course.create')
   const earnings = useEarnings(seesMoney)
   const list = courses.data ?? []
   const live = list.filter((c) => c.status === 'live').length
-  const waiting = list.filter((c) => c.pendingChanges).length
+  const waiting = list.filter((c) => c.pendingChanges)
   return (
     <>
-      <PageHeader eyebrow="Dashboard" title={`Welcome, ${displayName}`} description={user?.email} />
+      <PageHeader
+        eyebrow={t('nav.dashboard')}
+        title={t('dashboard.welcome', { name: displayName })}
+        description={user?.email}
+      />
+      {/* The people who approve a writer's edits learn about them here, not by opening each course. */}
+      {reviews && waiting.length > 0 ? (
+        <Card as="section" className="mb-6 border-warning">
+          <CardHeader
+            title={t('dashboard.review.title')}
+            description={t('dashboard.review.description')}
+          />
+          <ul className="divide-y divide-border">
+            {waiting.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-3 py-3">
+                <span className="min-w-0 truncate font-semibold text-ink">{c.title}</span>
+                <Button asChild variant="secondary" size="sm" iconRight={ArrowRight}>
+                  <Link to={path(`/courses/${c.id}/changes`)}>{t('dashboard.review.action')}</Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
       <div className="grid gap-6 md:grid-cols-3">
         <StatCard
-          label="Live courses"
+          label={t('dashboard.stat.live')}
           value={courses.isPending ? '—' : String(live)}
-          hint="Approved and on sale"
+          hint={t('dashboard.stat.live.hint')}
         />
         {seesMoney ? (
           <>
             <StatCard
-              label="Sales"
+              label={t('dashboard.stat.sales')}
               value={earnings.data ? String(earnings.data.totals.paymentCount) : '—'}
-              hint="Paid enrolments across your courses"
+              hint={t('dashboard.stat.sales.hint')}
             />
             <Link to={path('/earnings')} className="block">
               <StatCard
-                label="Net earnings"
+                label={t('dashboard.stat.net')}
                 value={earnings.data ? formatSgd(earnings.data.totals.netCents) : '—'}
-                hint="After Stripe fees and commission · see earnings"
+                hint={t('dashboard.stat.net.hint')}
                 className="h-full transition-colors hover:border-brand"
               />
             </Link>
           </>
         ) : (
           <StatCard
-            label="Changes waiting"
-            value={courses.isPending ? '—' : String(waiting)}
-            hint="Live courses with edits that need approval"
+            label={t('dashboard.stat.waiting')}
+            value={courses.isPending ? '—' : String(waiting.length)}
+            hint={t('dashboard.stat.waiting.hint')}
           />
         )}
       </div>
@@ -153,19 +180,38 @@ export function Dashboard() {
         <StripeCard />
         <Card as="section">
           <CardHeader
-            title="Courses"
-            description="Author a course, then submit it for review."
+            title={t('nav.courses')}
+            description={
+              creates
+                ? t('dashboard.courses.description')
+                : t('dashboard.courses.description.writer')
+            }
             action={<ShieldCheck className="size-5 text-brand-fg" />}
           />
-          {list.length === 0 ? (
+          {courses.isPending ? (
+            <Skeleton className="h-32 w-full" />
+          ) : courses.isError ? (
+            <EmptyState
+              tone="danger"
+              title={t('dashboard.courses.loadFailed')}
+              body={errorMessage(courses.error)}
+              className="py-8"
+            />
+          ) : list.length === 0 ? (
             <EmptyState
               icon={BookOpen}
-              title="No courses yet"
-              body="Create a course, add lessons and content, then submit it for review."
+              title={t('dashboard.courses.empty.title')}
+              body={
+                creates
+                  ? t('dashboard.courses.empty.body')
+                  : t('dashboard.courses.empty.body.writer')
+              }
               action={
-                <Link to={path('/courses')}>
-                  <Button variant="secondary">Go to courses</Button>
-                </Link>
+                creates ? (
+                  <Button asChild variant="secondary">
+                    <Link to={path('/courses')}>{t('dashboard.courses.open')}</Link>
+                  </Button>
+                ) : undefined
               }
               className="py-8"
             />
@@ -179,7 +225,10 @@ export function Dashboard() {
                   >
                     <span className="min-w-0 truncate font-semibold">{c.title}</span>
                     <span className="flex shrink-0 items-center gap-2">
-                      <Badge tone={statusTone[c.status]}>{statusLabel(c.status)}</Badge>
+                      {c.pendingChanges ? (
+                        <Badge tone="warning">{t('dashboard.courses.changesWaiting')}</Badge>
+                      ) : null}
+                      <Badge tone={statusTone[c.status]}>{t(`status.course.${c.status}`)}</Badge>
                       <ArrowRight className="size-4 text-ink-tertiary" />
                     </span>
                   </Link>
@@ -188,7 +237,7 @@ export function Dashboard() {
               {list.length > 5 ? (
                 <li className="pt-3">
                   <Link to={path('/courses')} className="text-small font-semibold text-brand-fg">
-                    All {list.length} courses
+                    {t('dashboard.courses.all', { count: list.length })}
                   </Link>
                 </li>
               ) : null}

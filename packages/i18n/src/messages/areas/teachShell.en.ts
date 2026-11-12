@@ -52,4 +52,34 @@ export const teachShellEn = {
   'start.invited.title': 'Invited to a profile?',
   'start.invited.body':
     'Open the link in the invitation email. If you accepted it from another address, the profile’s owner has to confirm first; you will get an email when they do.',
+
+  // The dashboard of a profile. {name} is the profile's display name.
+  'dashboard.welcome': 'Welcome, {name}',
+  'dashboard.stat.live': 'Live courses',
+  'dashboard.stat.live.hint': 'Approved and on sale',
+  'dashboard.stat.sales': 'Sales',
+  'dashboard.stat.sales.hint': 'Paid enrolments across your courses',
+  'dashboard.stat.net': 'Net earnings',
+  'dashboard.stat.net.hint': 'After Stripe fees and commission · see earnings',
+  'dashboard.stat.waiting': 'Changes waiting',
+  'dashboard.stat.waiting.hint': 'Live courses with edits that need approval',
+  // A card for the owner and managers, listing live courses with a writer's edits to approve
+  'dashboard.review.title': 'Waiting for your approval',
+  'dashboard.review.description':
+    'A writer changed these live courses. Learners see the changes once you approve them.',
+  'dashboard.review.action': 'Review changes',
+  'dashboard.courses.description': 'Author a course, then submit it for review.',
+  // The same card for someone who cannot create courses (a writer)
+  'dashboard.courses.description.writer':
+    'Edit this profile’s courses. Changes to a live course wait for approval.',
+  'dashboard.courses.loadFailed': 'Could not load courses',
+  'dashboard.courses.empty.title': 'No courses yet',
+  'dashboard.courses.empty.body':
+    'Create a course, add lessons and content, then submit it for review.',
+  'dashboard.courses.empty.body.writer':
+    'This profile has no courses yet. The owner or a manager creates them.',
+  'dashboard.courses.open': 'Go to courses',
+  'dashboard.courses.all': 'All {count} courses',
+  // Badge on a course with a writer's edits waiting
+  'dashboard.courses.changesWaiting': 'Changes waiting',
 } as const
