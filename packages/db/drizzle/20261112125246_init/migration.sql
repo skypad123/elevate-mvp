@@ -173,6 +173,7 @@ CREATE TABLE "course_change_sets" (
 	"opened_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"opened_at_snapshot" timestamp with time zone NOT NULL,
 	"opened_prerequisites" jsonb DEFAULT '[]' NOT NULL,
+	"opened_fingerprints" jsonb DEFAULT '{}' NOT NULL,
 	"resolutions" jsonb DEFAULT '[]' NOT NULL,
 	"decided_by" uuid,
 	"decided_at" timestamp with time zone

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   type ChangeSetChoice,
   type ChangeSetConflict,
@@ -76,6 +76,28 @@ const sameQuiz = (a: QuizRow, b: QuizRow) =>
   a.timeLimitMinutes === b.timeLimitMinutes &&
   sameJson(a.questionsJson, b.questionsJson)
 
+// Fingerprints of a draft row, taken when the change set opens and again when it is read. The
+// same fields as above, plus an artefact's lesson, so a draft the writer moved is not "untouched".
+// Both readings come from the database, so JSON columns serialise in the same key order.
+const digest = (fields: unknown[]) =>
+  createHash('sha256').update(JSON.stringify(fields)).digest('hex').slice(0, 32)
+const lessonPrint = (l: LessonRow) => digest([l.title, l.summary, l.position])
+const artefactPrint = (a: ArtefactRow) =>
+  digest([
+    a.lessonId,
+    a.type,
+    a.title,
+    a.position,
+    a.mediaAssetId,
+    a.durationSeconds,
+    a.contentJson ?? null,
+  ])
+const quizPrint = (q: QuizRow) =>
+  digest([q.passMarkPercent, q.maxAttempts, q.timeLimitMinutes, q.questionsJson ?? null])
+/** A draft lesson's prerequisites, as the draft lesson IDs they point at. */
+const linksPrint = (prerequisiteDraftIds: string[]) => digest([...prerequisiteDraftIds].sort())
+const linksKey = (draftLessonId: string) => `links:${draftLessonId}`
+
 function groupBy<T>(rows: Iterable<T>, key: (row: T) => string): Map<string, T[]> {
   const groups = new Map<string, T[]>()
   for (const row of rows) {
@@ -120,6 +142,32 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
     return q.removed || !artefact || artefactRemoved(artefact)
   }
 
+  /**
+   * Untouched: a copied draft the writer has not changed since the change set opened. A live edit
+   * or deletion of it is the owner's alone, so it is not a clash, and approval leaves the live row
+   * as the owner left it.
+   */
+  const prints = changeSet.openedFingerprints
+  const lessonUntouched = (l: LessonRow) =>
+    l.copiedFromLive && !l.removed && prints[l.id] === lessonPrint(l)
+  const artefactUntouched = (a: ArtefactRow) =>
+    a.copiedFromLive && !a.removed && prints[a.id] === artefactPrint(a)
+  const quizUntouched = (q: QuizRow) =>
+    q.copiedFromLive && !q.removed && prints[q.id] === quizPrint(q)
+  const linksUntouched = (l: LessonRow) =>
+    l.copiedFromLive &&
+    prints[linksKey(l.id)] ===
+      linksPrint((draftLinksOf.get(l.id) ?? []).map((link) => link.prerequisiteLessonId))
+  /** The draft and everything under it are copies the writer left as they were. */
+  const artefactTreeUntouched = (a: ArtefactRow) => {
+    const quiz = draftQuizOf.get(a.id)
+    return artefactUntouched(a) && (!quiz || quizUntouched(quiz))
+  }
+  const lessonTreeUntouched = (l: LessonRow) =>
+    lessonUntouched(l) &&
+    linksUntouched(l) &&
+    (draftArtefactsOf.get(l.id) ?? []).every(artefactTreeUntouched)
+
   /** The live ID a draft lesson stands for: its source, or its own ID if it is new. */
   const targetOf = (l: LessonRow) => (l.copiedFromLive && l.sourceId ? l.sourceId : l.id)
   const draftPrerequisites = (lessonId: string) =>
@@ -158,6 +206,8 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
     if (lesson.sourceId === null) {
       // The writer removed it and the live row is gone too: both agree, nothing to decide.
       if (lesson.removed) continue
+      // The owner deleted a lesson the writer left alone, with all under it: the deletion stands.
+      if (lessonTreeUntouched(lesson)) continue
       const added = (draftArtefactsOf.get(lesson.id) ?? []).filter(
         (a) => !a.copiedFromLive && !a.removed,
       )
@@ -174,7 +224,7 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
       if (latest > snapshot) {
         conflict('edited', 'lesson', lesson, lesson.title, new Date(latest).toISOString())
       }
-    } else if (changedSince(current) && !sameLesson(lesson, current)) {
+    } else if (changedSince(current) && !sameLesson(lesson, current) && !lessonUntouched(lesson)) {
       conflict('edited', 'lesson', lesson, lesson.title, current.updatedAt.toISOString())
     }
   }
@@ -185,7 +235,9 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
     // Under a lesson that was removed or deleted, the lesson's own decision covers it.
     if (!lesson || lesson.removed || isGone(lesson)) continue
     if (artefact.sourceId === null) {
-      if (!artefact.removed) conflict('deleted', 'artefact', artefact, artefact.title, 'deleted')
+      if (!artefact.removed && !artefactTreeUntouched(artefact)) {
+        conflict('deleted', 'artefact', artefact, artefact.title, 'deleted')
+      }
       continue
     }
     const current = live.artefacts.get(artefact.sourceId)
@@ -196,7 +248,11 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
       if (latest > snapshot) {
         conflict('edited', 'artefact', artefact, artefact.title, new Date(latest).toISOString())
       }
-    } else if (changedSince(current) && !sameArtefact(artefact, current)) {
+    } else if (
+      changedSince(current) &&
+      !sameArtefact(artefact, current) &&
+      !artefactUntouched(artefact)
+    ) {
       conflict('edited', 'artefact', artefact, artefact.title, current.updatedAt.toISOString())
     }
   }
@@ -211,12 +267,14 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
     // `id` stays the draft quiz row, which is what a choice refers to.
     const shown = { id: quiz.id, sourceId: artefact.sourceId, draftId: artefact.id }
     if (quiz.sourceId === null) {
-      if (!quiz.removed) conflict('deleted', 'quiz', shown, artefact.title, 'deleted')
+      if (!quiz.removed && !quizUntouched(quiz)) {
+        conflict('deleted', 'quiz', shown, artefact.title, 'deleted')
+      }
       continue
     }
     const current = live.quizzes.get(quiz.sourceId)
     if (!current || !changedSince(current)) continue
-    if (quiz.removed || !sameQuiz(quiz, current)) {
+    if (quiz.removed || (!sameQuiz(quiz, current) && !quizUntouched(quiz))) {
       conflict('edited', 'quiz', shown, artefact.title, current.updatedAt.toISOString())
     }
   }
@@ -229,6 +287,8 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
       .map((link) => link.prerequisiteId)
       .filter((id) => live.lessons.has(id))
     if (sameSet(now, opened)) continue
+    // The writer did not change this lesson's prerequisites: the owner's stand.
+    if (linksUntouched(lesson)) continue
     if (sameSet(draftPrerequisites(lesson.id), now)) continue
     conflict('prerequisites', null, lesson, lesson.title, [...now].sort().join(',') || 'none')
   }
@@ -256,9 +316,11 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
       item('lesson', lesson, 'removed', lesson.title)
     } else {
       const current = live.lessons.get(lesson.sourceId as string)
-      if (current && !sameLesson(lesson, current)) item('lesson', lesson, 'edited', lesson.title)
+      if (current && !sameLesson(lesson, current) && !lessonUntouched(lesson)) {
+        item('lesson', lesson, 'edited', lesson.title)
+      }
     }
-    if (lesson.removed) continue
+    if (lesson.removed || linksUntouched(lesson)) continue
     const before = lesson.copiedFromLive ? livePrerequisites(lesson.sourceId as string) : []
     if (!sameSet(draftPrerequisites(lesson.id), before)) {
       item('prerequisites', lesson, lesson.copiedFromLive ? 'edited' : 'added', lesson.title)
@@ -274,7 +336,7 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
       item('artefact', artefact, 'removed', artefact.title)
     } else {
       const current = live.artefacts.get(artefact.sourceId as string)
-      if (current && !sameArtefact(artefact, current)) {
+      if (current && !sameArtefact(artefact, current) && !artefactUntouched(artefact)) {
         item('artefact', artefact, 'edited', artefact.title)
       }
     }
@@ -288,7 +350,9 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
       if (artefact.copiedFromLive) item('quiz', artefact, 'added', artefact.title)
     } else {
       const current = live.quizzes.get(quiz.sourceId as string)
-      if (current && !sameQuiz(quiz, current)) item('quiz', artefact, 'edited', artefact.title)
+      if (current && !sameQuiz(quiz, current) && !quizUntouched(quiz)) {
+        item('quiz', artefact, 'edited', artefact.title)
+      }
     }
   }
 
@@ -301,6 +365,10 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
     draftQuizOf,
     draftLinksOf,
     artefactRemoved,
+    lessonUntouched,
+    artefactUntouched,
+    quizUntouched,
+    linksUntouched,
   }
 }
 
@@ -416,6 +484,30 @@ export class ChangeSetsService {
             )
         : []
 
+      // The draft IDs, and each draft's fingerprint as it is copied.
+      const lessonCopy = new Map(lessons.map((l) => [l.id, randomUUID()]))
+      const artefactCopy = new Map(artefacts.map((a) => [a.id, randomUUID()]))
+      const quizCopy = new Map(quizzes.map((q) => [q.id, randomUUID()]))
+      // A link whose other end is not in this course's live lessons has nothing to point at.
+      const linkCopies = links.flatMap((link) => {
+        const lessonId = lessonCopy.get(link.lessonId)
+        const prerequisiteLessonId = lessonCopy.get(link.prerequisiteLessonId)
+        return lessonId && prerequisiteLessonId ? [{ lessonId, prerequisiteLessonId }] : []
+      })
+      const prints: Record<string, string> = {}
+      for (const l of lessons) {
+        const copy = lessonCopy.get(l.id) as string
+        prints[copy] = lessonPrint(l)
+        prints[linksKey(copy)] = linksPrint(
+          linkCopies.filter((x) => x.lessonId === copy).map((x) => x.prerequisiteLessonId),
+        )
+      }
+      for (const a of artefacts) {
+        const lessonId = lessonCopy.get(a.lessonId) as string
+        prints[artefactCopy.get(a.id) as string] = artefactPrint({ ...a, lessonId })
+      }
+      for (const q of quizzes) prints[quizCopy.get(q.id) as string] = quizPrint(q)
+
       // `updated_at` is written from the real clock, so this is compared with it and not with
       // the app clock that tests control.
       const stamps = [...lessons, ...artefacts, ...quizzes].map((row) => row.updatedAt.getTime())
@@ -430,13 +522,12 @@ export class ChangeSetsService {
             lessonId: link.lessonId,
             prerequisiteId: link.prerequisiteLessonId,
           })),
+          openedFingerprints: prints,
         })
         .returning()
       if (!changeSet) throw new Error('failed to open a change set')
 
       const draft = { changeSetId: changeSet.id, copiedFromLive: true }
-      const lessonCopy = new Map(lessons.map((l) => [l.id, randomUUID()]))
-      const artefactCopy = new Map(artefacts.map((a) => [a.id, randomUUID()]))
       if (lessons.length) {
         await tx.insert(s.lessons).values(
           lessons.map((l) => ({
@@ -463,21 +554,17 @@ export class ChangeSetsService {
           quizzes.map((q) => ({
             ...q,
             ...draft,
-            id: randomUUID(),
+            id: quizCopy.get(q.id) as string,
             sourceId: q.id,
             artefactId: artefactCopy.get(q.artefactId) as string,
           })),
         )
       }
-      // A link whose other end is not in this course's live lessons has nothing to point at.
-      const linkCopies = links.flatMap((link) => {
-        const lessonId = lessonCopy.get(link.lessonId)
-        const prerequisiteLessonId = lessonCopy.get(link.prerequisiteLessonId)
-        return lessonId && prerequisiteLessonId
-          ? [{ lessonId, prerequisiteLessonId, changeSetId: changeSet.id }]
-          : []
-      })
-      if (linkCopies.length) await tx.insert(s.lessonPrerequisites).values(linkCopies)
+      if (linkCopies.length) {
+        await tx
+          .insert(s.lessonPrerequisites)
+          .values(linkCopies.map((link) => ({ ...link, changeSetId: changeSet.id })))
+      }
       return { changeSet, created: true }
     })
 
@@ -685,8 +772,9 @@ export class ChangeSetsService {
       }
 
       // 5. Update live rows from their copied drafts, parents first. The drafts are not changed.
+      // A draft the writer left untouched leaves its live row as the owner has it now.
       for (const d of draft.lessons) {
-        if (!lessonActive(d) || isNew(d) || leaveAlone.has(d.id)) continue
+        if (!lessonActive(d) || isNew(d) || leaveAlone.has(d.id) || a.lessonUntouched(d)) continue
         const current = live.lessons.get(d.sourceId as string)
         if (!current || sameLesson(d, current)) continue
         await tx
@@ -695,7 +783,9 @@ export class ChangeSetsService {
           .where(eq(s.lessons.id, current.id))
       }
       for (const d of draft.artefacts) {
-        if (!artefactActive(d) || isNew(d) || leaveAlone.has(d.id)) continue
+        if (!artefactActive(d) || isNew(d) || leaveAlone.has(d.id) || a.artefactUntouched(d)) {
+          continue
+        }
         const current = live.artefacts.get(d.sourceId as string)
         const lesson = a.draftLesson.get(d.lessonId)
         if (!current || !lesson || sameArtefact(d, current)) continue
@@ -713,7 +803,7 @@ export class ChangeSetsService {
           .where(eq(s.artefacts.id, current.id))
       }
       for (const d of draft.quizzes) {
-        if (!quizActive(d) || isNew(d) || leaveAlone.has(d.id)) continue
+        if (!quizActive(d) || isNew(d) || leaveAlone.has(d.id) || a.quizUntouched(d)) continue
         const current = live.quizzes.get(d.sourceId as string)
         if (!current || sameQuiz(d, current)) continue
         await tx
@@ -766,6 +856,12 @@ export class ChangeSetsService {
         const lessonId = liveIdOf(d)
         if (!isNew(d)) {
           if (keepLinks.has(lessonId)) continue
+          // Prerequisites the writer did not change keep the owner's live links, unless one of
+          // them points at a lesson that comes back as a new row, which only the draft can name.
+          const links = a.draftLinksOf.get(d.id) ?? []
+          if (a.linksUntouched(d) && !links.some((l) => adopted.has(l.prerequisiteLessonId))) {
+            continue
+          }
           await tx
             .delete(s.lessonPrerequisites)
             .where(

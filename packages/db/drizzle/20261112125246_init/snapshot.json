@@ -2,7 +2,7 @@
   "type": "base",
   "version": "9",
   "dialect": "postgres",
-  "id": "a00cc368-b0f3-47c9-aed8-0f04e7bf394d",
+  "id": "a4748bbd-0527-4d42-a3b3-0e80826eaa51",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -5122,6 +5122,19 @@
       "notNull": true,
       "dimensions": 0,
       "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "course_change_sets",
+      "name": "opened_fingerprints",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
       "generated": null,
       "identity": null,
       "entityType": "columns"

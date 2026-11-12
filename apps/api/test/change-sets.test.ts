@@ -827,7 +827,76 @@ describe('conflicts with edits made to the live course', () => {
     expect(live.lessons[2]).toMatchObject({ id: mine.id, prerequisiteIds: [c.lessonA] })
   })
 
-  it('reports prerequisites that changed on both sides, and applies all of a change set or none of it', async () => {
+  it('does not count an owner edit or deletion of something the writer left alone', async () => {
+    const c = await liveCourse()
+    // the writer renames the first lesson only
+    await t.api('PATCH', teach(`/lessons/${c.lessonA}`), {
+      token: writer,
+      body: { title: "The writer's title" },
+    })
+    // the owner renames the second lesson and its quiz artefact, changes the quiz, and deletes
+    // the first lesson's text artefact: none of which the writer touched
+    await t.api('PATCH', teach(`/lessons/${c.lessonB}`), {
+      token: owner,
+      body: { title: "The owner's second lesson" },
+    })
+    await t.api('PATCH', teach(`/artefacts/${c.quizArtefactId}`), {
+      token: owner,
+      body: { title: "The owner's quiz" },
+    })
+    const quiz = await t.api('PUT', teach(`/artefacts/${c.quizArtefactId}/quiz`), {
+      token: owner,
+      body: { passMarkPercent: 80, questions: [question('q1', "The owner's question?")] },
+    })
+    expect(quiz.status).toBe(200)
+    await t.api('DELETE', teach(`/artefacts/${c.textArtefactId}`), { token: owner })
+
+    const changeSet = await changeSetOf(c.courseId)
+    expect(changeSet.conflicts).toEqual([])
+    // only the writer's own edit is waiting; the owner's are not undone by the older copies
+    expect(changeSet.items).toMatchObject([{ kind: 'lesson', liveId: c.lessonA, change: 'edited' }])
+    expect(changeSet.items).toHaveLength(1)
+
+    const approved = await approve(c.courseId)
+    expect(approved.status).toBe(200)
+    const live = approved.body.course as Course
+    expect(titles(live)).toEqual(["The writer's title", "The owner's second lesson"])
+    expect(live.lessons[0]?.artefacts).toEqual([])
+    expect(live.lessons[1]?.artefacts).toMatchObject([
+      { id: c.quizArtefactId, title: "The owner's quiz" },
+    ])
+    const liveQuiz = await t.db.query.quizzes.findFirst({ where: { id: c.quizId } })
+    expect(liveQuiz?.passMarkPercent).toBe(80)
+    expect(await draftCount(c.courseId)).toBe(0)
+  })
+
+  it('lets an owner delete a lesson the writer left alone, and still asks once the writer edits under it', async () => {
+    const quiet = await liveCourse()
+    await t.api('PATCH', teach(`/lessons/${quiet.lessonA}`), {
+      token: writer,
+      body: { title: "The writer's title" },
+    })
+    await t.api('DELETE', teach(`/lessons/${quiet.lessonB}`), { token: owner })
+    expect((await changeSetOf(quiet.courseId)).conflicts).toEqual([])
+    const approved = await approve(quiet.courseId)
+    expect(approved.status).toBe(200)
+    expect(titles(approved.body.course as Course)).toEqual(["The writer's title"])
+    expect(await draftCount(quiet.courseId)).toBe(0)
+
+    // the writer edits the quiz artefact under the second lesson, then the owner deletes it
+    const busy = await liveCourse()
+    const res = await t.api('PATCH', teach(`/artefacts/${busy.quizArtefactId}`), {
+      token: writer,
+      body: { title: "The writer's quiz" },
+    })
+    expect(res.status).toBe(200)
+    await t.api('DELETE', teach(`/lessons/${busy.lessonB}`), { token: owner })
+    expect((await changeSetOf(busy.courseId)).conflicts).toMatchObject([
+      { kind: 'deleted', item: 'lesson', liveId: null },
+    ])
+  })
+
+  it('keeps the owner prerequisites on a lesson the writer did not touch, and applies all of a change set or none of it', async () => {
     const c = await liveCourse()
     // the writer makes the first lesson need the second
     await t.api('PUT', teach(`/lessons/${c.lessonA}/prerequisites`), {
@@ -855,15 +924,10 @@ describe('conflicts with edits made to the live course', () => {
       body: { prerequisiteIds: [third.id] },
     })
 
-    const conflicts = (await changeSetOf(c.courseId)).conflicts as Conflict[]
-    expect(conflicts).toMatchObject([
-      { kind: 'prerequisites', item: null, id: c.lessonB, liveId: c.lessonB, seen: third.id },
-    ])
-    // Keeping the live links on the second lesson gives: first needs second (the writer), second
-    // needs third and third needs first (the owner). That is a loop, so nothing is applied.
-    await resolve(c.courseId, [
-      { kind: 'prerequisites', id: c.lessonB, keep: 'live', seen: third.id },
-    ])
+    // the writer never changed the second lesson's prerequisites, so the owner's are not a clash
+    expect((await changeSetOf(c.courseId)).conflicts).toEqual([])
+    // Together: first needs second (the writer), second needs third and third needs first (the
+    // owner). That is a loop, so nothing is applied.
     const looped = await approve(c.courseId)
     expect(looped.status).toBe(422)
     expect(looped.body.error.code).toBe('prerequisite_cycle')
@@ -872,10 +936,11 @@ describe('conflicts with edits made to the live course', () => {
     expect(untouched.changeSet).not.toBeNull()
     expect(await draftCount(c.courseId)).toBeGreaterThan(0)
 
-    // Taking the draft's links for the second lesson (none) breaks the loop.
-    await resolve(c.courseId, [
-      { kind: 'prerequisites', id: c.lessonB, keep: 'draft', seen: third.id },
-    ])
+    // The owner takes the second lesson's prerequisite off again, which breaks the loop.
+    await t.api('PUT', teach(`/lessons/${c.lessonB}/prerequisites`), {
+      token: owner,
+      body: { prerequisiteIds: [] },
+    })
     const approved = await approve(c.courseId)
     expect(approved.status).toBe(200)
     const live = approved.body.course as Course
@@ -883,6 +948,44 @@ describe('conflicts with edits made to the live course', () => {
       'Renamed by the writer': [c.lessonB],
       'Second lesson': [],
       'Third lesson': [c.lessonA],
+    })
+  })
+
+  it('reports prerequisites that changed on both sides, and applies the choice made', async () => {
+    const c = await liveCourse()
+    // the writer makes the second lesson need the first
+    await t.api('PUT', teach(`/lessons/${c.lessonB}/prerequisites`), {
+      token: writer,
+      body: { prerequisiteIds: [c.lessonA] },
+    })
+    // the owner adds a third lesson and makes the second need that instead
+    const added = await t.api('POST', teach(`/courses/${c.courseId}/lessons`), {
+      token: owner,
+      body: { title: 'Third lesson' },
+    })
+    const third = (added.body.course as Course).lessons.find(
+      (l) => l.title === 'Third lesson',
+    ) as Lesson
+    await t.api('PUT', teach(`/lessons/${c.lessonB}/prerequisites`), {
+      token: owner,
+      body: { prerequisiteIds: [third.id] },
+    })
+
+    const conflicts = (await changeSetOf(c.courseId)).conflicts as Conflict[]
+    expect(conflicts).toMatchObject([
+      { kind: 'prerequisites', item: null, id: c.lessonB, liveId: c.lessonB, seen: third.id },
+    ])
+    expect((await approve(c.courseId)).status).toBe(409)
+    await resolve(c.courseId, [
+      { kind: 'prerequisites', id: c.lessonB, keep: 'draft', seen: third.id },
+    ])
+    const approved = await approve(c.courseId)
+    expect(approved.status).toBe(200)
+    const live = approved.body.course as Course
+    expect(Object.fromEntries(live.lessons.map((l) => [l.title, l.prerequisiteIds]))).toEqual({
+      'First lesson': [],
+      'Second lesson': [c.lessonA],
+      'Third lesson': [],
     })
   })
 })

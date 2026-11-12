@@ -76,6 +76,12 @@ export const courseChangeSets = snakeCase.table(
     openedAtSnapshot: ts().notNull(),
     /** The live prerequisite links when the copy was made, by live lesson ID. */
     openedPrerequisites: jsonb().$type<PrerequisiteLink[]>().notNull().default(sql`'[]'::jsonb`),
+    /**
+     * A fingerprint of each draft row as it was copied, by draft ID, and of each draft lesson's
+     * prerequisites under `links:<draft lesson ID>`. A draft whose fingerprint still matches is one
+     * the writer did not change, so a live edit to it is not a clash.
+     */
+    openedFingerprints: jsonb().$type<Record<string, string>>().notNull().default(sql`'{}'::jsonb`),
     /** The approver's choice for each conflict, kept until approval. */
     resolutions: jsonb().$type<ChangeSetChoice[]>().notNull().default(sql`'[]'::jsonb`),
     decidedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
