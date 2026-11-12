@@ -2,8 +2,12 @@ import { pgEnum } from 'drizzle-orm/pg-core'
 
 export const identityProviderEnum = pgEnum('identity_provider', ['email', 'singpass'])
 export const audienceEnum = pgEnum('audience', ['learner', 'teach', 'support'])
-export const userRoleEnum = pgEnum('user_role', ['teacher', 'support_agent', 'super_admin'])
-export const teacherStatusEnum = pgEnum('teacher_status', ['applied', 'approved', 'rejected'])
+/** Platform staff roles. Teaching is not a role: it comes from owning or belonging to a profile. */
+export const userRoleEnum = pgEnum('user_role', ['support_agent', 'super_admin'])
+export const profileStatusEnum = pgEnum('profile_status', ['applied', 'approved', 'rejected'])
+export const profileTypeEnum = pgEnum('profile_type', ['personal', 'corporate'])
+export const payoutAccountStatusEnum = pgEnum('payout_account_status', ['onboarding', 'active'])
+export const stripeBusinessTypeEnum = pgEnum('stripe_business_type', ['individual', 'company'])
 export const courseStatusEnum = pgEnum('course_status', [
   'draft',
   'pending_review',

@@ -14,7 +14,7 @@ export const catalogRoutes = (deps: Deps) => {
       c.json(await catalog.list(c.req.valid('query')), 200),
     )
     .get('/courses/:slug', async (c) => {
-      const course = await catalog.detail(c.req.param('slug'), c.get('user')?.id ?? null)
+      const course = await catalog.detail(c.req.param('slug'), c.get('user'))
       return c.json({ course }, 200)
     })
 }

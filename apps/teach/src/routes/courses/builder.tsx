@@ -20,6 +20,7 @@ import { DetailsForm } from '../../components/details-form'
 import { PrerequisitesEditor } from '../../components/prerequisites-editor'
 import { ReviewPanel } from '../../components/review-panel'
 import { useCourse } from '../../lib/courses'
+import { useCurrentProfile } from '../../lib/profile'
 import { SaveIndicator, SaveTrackerProvider } from '../../lib/save-tracker'
 
 type Tab = 'curriculum' | 'map' | 'details' | 'review'
@@ -27,6 +28,7 @@ const TABS: Tab[] = ['curriculum', 'map', 'details', 'review']
 
 export function CourseBuilder() {
   const { id = '' } = useParams()
+  const { path } = useCurrentProfile()
   const course = useCourse(id)
   const [params, setParams] = useSearchParams()
   const tab = (TABS.find((t) => t === params.get('tab')) ?? 'curriculum') as Tab
@@ -43,7 +45,7 @@ export function CourseBuilder() {
   return (
     <SaveTrackerProvider>
       <Link
-        to="/courses"
+        to={path('/courses')}
         className="mb-4 inline-flex items-center gap-1 text-small text-ink-secondary hover:text-ink"
       >
         <ArrowLeft className="size-4" /> Courses

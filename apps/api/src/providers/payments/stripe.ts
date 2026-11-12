@@ -1,12 +1,14 @@
 import Stripe from 'stripe'
-import type {
-  CheckoutSessionInput,
-  CheckoutSessionResult,
-  ConnectedAccountStatus,
-  PaymentDetails,
-  PaymentsProvider,
-  PaymentsWebhookEvent,
-  RefundResult,
+import {
+  type CheckoutSessionInput,
+  type CheckoutSessionResult,
+  type ConnectedAccountInput,
+  type ConnectedAccountStatus,
+  checkoutIdempotencyKey,
+  type PaymentDetails,
+  type PaymentsProvider,
+  type PaymentsWebhookEvent,
+  type RefundResult,
 } from './types'
 
 export type StripeConfig = {
@@ -27,11 +29,7 @@ export class StripePaymentsProvider implements PaymentsProvider {
   }
 
   /** Express-equivalent account via controller properties (Stripe marks `type: 'express'` as legacy). */
-  async createConnectedAccount(input: {
-    email: string
-    userId: string
-    displayName: string
-  }): Promise<{ accountId: string }> {
+  async createConnectedAccount(input: ConnectedAccountInput): Promise<{ accountId: string }> {
     const account = await this.stripe.accounts.create({
       country: this.config.country,
       email: input.email,
@@ -41,12 +39,15 @@ export class StripePaymentsProvider implements PaymentsProvider {
         losses: { payments: 'application' },
       },
       capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
-      business_type: 'individual',
+      business_type: input.businessType,
       business_profile: {
         product_description: 'Online courses sold through Elevate',
         name: input.displayName,
       },
-      metadata: { elevateUserId: input.userId },
+      metadata: {
+        elevateProfileId: input.profileId,
+        elevatePayoutAccountId: input.payoutAccountId,
+      },
     })
     return { accountId: account.id }
   }
@@ -104,7 +105,7 @@ export class StripePaymentsProvider implements PaymentsProvider {
         cancel_url: input.cancelUrl,
         expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       },
-      { idempotencyKey: `checkout:${input.enrollmentId}:${input.amountCents}` },
+      { idempotencyKey: checkoutIdempotencyKey(input) },
     )
     if (!session.url) throw new Error('Stripe did not return a Checkout URL')
     return { id: session.id, url: session.url }
@@ -208,12 +209,16 @@ export class StripePaymentsProvider implements PaymentsProvider {
 }
 
 export function accountStatus(
-  account: Pick<Stripe.Account, 'id' | 'details_submitted' | 'charges_enabled' | 'payouts_enabled'>,
+  account: Pick<
+    Stripe.Account,
+    'id' | 'details_submitted' | 'charges_enabled' | 'payouts_enabled' | 'company'
+  >,
 ): ConnectedAccountStatus {
   return {
     accountId: account.id,
     detailsSubmitted: !!account.details_submitted,
     chargesEnabled: !!account.charges_enabled,
     payoutsEnabled: !!account.payouts_enabled,
+    legalName: account.company?.name ?? null,
   }
 }

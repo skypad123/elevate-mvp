@@ -7,7 +7,6 @@ import { createTestApp, type TestApp } from './helpers/test-app'
 let t: TestApp
 let learner: string
 let sourdoughId: string
-let sourdoughTeacherId: string
 
 const stripePost = (event: unknown) =>
   t.app.request('/api/webhooks/stripe', {
@@ -18,24 +17,14 @@ const stripePost = (event: unknown) =>
 
 beforeAll(async () => {
   t = await createTestApp()
-  await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', storageDir: null })
+  await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', mode: 'demo', storage: null })
   learner = (await t.signIn('buyer@example.com')).token as string
   const course = await t.db.query.courses.findFirst({
     where: { slug: 'sourdough-from-scratch' },
   })
   sourdoughId = course?.id as string
-  sourdoughTeacherId = course?.teacherId as string
-  // the teacher must be payable: give them a fake connected account with charges enabled
-  const { accountId } = await t.payments.createConnectedAccount({
-    email: 'daniel@example.com',
-    userId: sourdoughTeacherId,
-    displayName: 'Daniel',
-  })
-  t.payments.enableAccount(accountId)
-  await t.db
-    .update(s.teacherProfiles)
-    .set({ stripeAccountId: accountId, stripeChargesEnabled: true, stripeDetailsSubmitted: true })
-    .where(eq(s.teacherProfiles.userId, sourdoughTeacherId))
+  // the course's profile must be payable: give it an active payout account with charges enabled
+  await t.makePayable(course?.profileId as string)
 })
 afterAll(async () => {
   await t.close()

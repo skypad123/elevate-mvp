@@ -4,7 +4,8 @@ import { quizDefinitionSchema } from '../domain/quiz'
 import { richTextDocSchema } from '../domain/richtext'
 import { uuidSchema } from './common'
 
-export const teacherApplicationSchema = z
+/** The application for a personal profile: one person teaching under their own name. */
+export const personalApplicationSchema = z
   .object({
     displayName: z.string().trim().min(2).max(80),
     headline: z.string().trim().min(5).max(120),
@@ -17,7 +18,7 @@ export const teacherApplicationSchema = z
     message: 'Share a teaching sample: upload a video or paste a link',
     path: ['teachingSampleUrl'],
   })
-export type TeacherApplication = z.infer<typeof teacherApplicationSchema>
+export type PersonalApplication = z.infer<typeof personalApplicationSchema>
 
 export const createCourseSchema = z.object({
   title: z.string().trim().min(3).max(120),
@@ -31,9 +32,12 @@ export const updateCourseSchema = z.object({
   descriptionJson: richTextDocSchema.nullable().optional(),
   category: courseCategorySchema.optional(),
   thumbnailMediaId: uuidSchema.nullable().optional(),
-  priceCents: z.number().int().min(0).max(1_000_000).optional(),
 })
 export type UpdateCourse = z.infer<typeof updateCourseSchema>
+
+/** Price has its own route, so a role can edit a course's details without being able to price it. */
+export const setPriceSchema = z.object({ priceCents: z.number().int().min(0).max(1_000_000) })
+export type SetPrice = z.infer<typeof setPriceSchema>
 
 export const createLessonSchema = z.object({
   title: z.string().trim().min(1).max(120),
@@ -60,39 +64,60 @@ export const updateArtefactSchema = z.object({
 
 export const upsertQuizSchema = quizDefinitionSchema
 
-export const updateTeacherProfileSchema = z.object({
+export const updateProfileSchema = z.object({
   displayName: z.string().trim().min(2).max(80).optional(),
   headline: z.string().trim().min(5).max(120).optional(),
   bio: z.string().trim().min(50).max(3000).optional(),
+  /** An uploaded image; `null` removes the avatar. */
+  avatarMediaId: uuidSchema.nullable().optional(),
 })
-export type UpdateTeacherProfile = z.infer<typeof updateTeacherProfileSchema>
+export type UpdateProfile = z.infer<typeof updateProfileSchema>
 
-export type TeacherStripeView = {
-  connected: boolean
+export type PayoutAccountStatus = 'onboarding' | 'active'
+
+/** A profile's Stripe payout account. `active` means it can be paid. */
+export type PayoutView = {
+  status: PayoutAccountStatus
   detailsSubmitted: boolean
   chargesEnabled: boolean
   payoutsEnabled: boolean
 }
 
-export type TeacherProfileView = {
-  userId: string
-  email: string
+/** What the Stripe page shows; `connected` is false until the profile has a Stripe account. */
+export type StripeStatusView = {
+  connected: boolean
+  status: PayoutAccountStatus | null
+  detailsSubmitted: boolean
+  chargesEnabled: boolean
+  payoutsEnabled: boolean
+}
+
+export type ProfileView = {
+  id: string
+  type: ProfileType
+  status: ProfileStatus
   displayName: string
   headline: string | null
   bio: string | null
   credentials: string | null
   teachingSampleUrl: string | null
   teachingSampleMediaId: string | null
-  status: 'applied' | 'approved' | 'rejected'
+  avatarMediaId: string | null
+  avatarUrl: string | null
   reviewNote: string | null
   commissionBps: number
-  stripe: TeacherStripeView
+  /** Null until the profile starts Stripe onboarding. */
+  payout: PayoutView | null
+  owner: { id: string; email: string; name: string | null }
+  /** True when the caller is platform staff acting on this profile, not its owner or a member. */
+  actingAsStaff: boolean
   appliedAt: string
   reviewedAt: string | null
 }
 
 // ── Course builder views ─────────────────────────────────────────────────────
 import type { SubmissionCheck } from '../domain/course-validation'
+import type { ProfileStatus, ProfileType } from '../domain/permissions'
 import type { QuizDefinition } from '../domain/quiz'
 import type { RichTextDoc } from '../domain/richtext'
 import type { MediaAssetView } from './media'
@@ -134,7 +159,8 @@ export type CourseView = {
   status: CourseStatus
   rejectionReason: string | null
   thumbnail: MediaAssetView | null
-  teacher: { id: string; displayName: string; email: string; stripeChargesEnabled: boolean }
+  /** `payable`: the profile has an active payout account that can take charges. */
+  profile: { id: string; displayName: string; ownerEmail: string; payable: boolean }
   lessons: LessonView[]
   checklist: SubmissionCheck
   enrolCount: number
@@ -156,8 +182,9 @@ export type CourseSummary = {
   lessonCount: number
   artefactCount: number
   enrolCount: number
-  teacherName: string
-  teacherEmail: string
+  profileId: string
+  profileName: string
+  ownerEmail: string
   submittedAt: string | null
   updatedAt: string
 }

@@ -1,11 +1,9 @@
-import { schema as s } from '@elevate/db'
-import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
 let t: TestApp
 let teacher: string
-let teacherId: string
+let profileId: string
 let agent: string
 let courseId: string
 let lessonA: string
@@ -14,13 +12,9 @@ let lessonC: string
 
 beforeAll(async () => {
   t = await createTestApp()
-  const signed = await t.signIn('builder@example.com', 'teach')
-  teacher = signed.token as string
-  teacherId = signed.body.user.id
-  await t.db
-    .insert(s.teacherProfiles)
-    .values({ userId: teacherId, displayName: 'Builder', status: 'approved' })
-  await t.grantRole('builder@example.com', 'teacher')
+  const { profile } = await t.createProfile('builder@example.com', { displayName: 'Builder' })
+  profileId = profile.id
+  teacher = (await t.signIn('builder@example.com', 'teach')).token as string
   await t.grantRole('reviewer@example.com', 'support_agent')
   agent = (await t.signIn('reviewer@example.com', 'support')).token as string
 })
@@ -28,11 +22,13 @@ afterAll(async () => {
   await t.close()
 })
 
-const course = () => t.api('GET', `/api/teach/courses/${courseId}`, { token: teacher })
+/** Every Teach route for this teacher sits under their profile. */
+const teach = (path: string) => `/api/teach/profiles/${profileId}${path}`
+const course = () => t.api('GET', teach(`/courses/${courseId}`), { token: teacher })
 
 describe('course builder', () => {
   it('creates a draft course with a unique slug', async () => {
-    const a = await t.api('POST', '/api/teach/courses', {
+    const a = await t.api('POST', teach('/courses'), {
       token: teacher,
       body: { title: 'Sourdough from Scratch', category: 'food-drink' },
     })
@@ -40,16 +36,16 @@ describe('course builder', () => {
     expect(a.body.course.slug).toBe('sourdough-from-scratch')
     expect(a.body.course.status).toBe('draft')
     courseId = a.body.course.id
-    const b = await t.api('POST', '/api/teach/courses', {
+    const b = await t.api('POST', teach('/courses'), {
       token: teacher,
       body: { title: 'Sourdough from Scratch', category: 'food-drink' },
     })
     expect(b.body.course.slug).toBe('sourdough-from-scratch-2')
-    const list = await t.api('GET', '/api/teach/courses', { token: teacher })
+    const list = await t.api('GET', teach('/courses'), { token: teacher })
     expect(list.body.items).toHaveLength(2)
     expect(
       (
-        await t.api('POST', '/api/teach/courses', {
+        await t.api('POST', teach('/courses'), {
           token: teacher,
           body: { title: 'x', category: 'nope' },
         })
@@ -59,7 +55,7 @@ describe('course builder', () => {
 
   it('builds lessons and artefacts, reorders, and sets a valid prerequisite graph', async () => {
     for (const title of ['Starter', 'Mixing', 'Baking']) {
-      const r = await t.api('POST', `/api/teach/courses/${courseId}/lessons`, {
+      const r = await t.api('POST', teach(`/courses/${courseId}/lessons`), {
         token: teacher,
         body: { title },
       })
@@ -69,7 +65,7 @@ describe('course builder', () => {
     ;[lessonA, lessonB, lessonC] = view.lessons.map((l: { id: string }) => l.id)
     expect(view.lessons.map((l: { position: number }) => l.position)).toEqual([0, 1, 2])
 
-    const reordered = await t.api('PUT', `/api/teach/courses/${courseId}/lessons/order`, {
+    const reordered = await t.api('PUT', teach(`/courses/${courseId}/lessons/order`), {
       token: teacher,
       body: { ids: [lessonC, lessonA, lessonB] },
     })
@@ -78,20 +74,20 @@ describe('course builder', () => {
       'Starter',
       'Mixing',
     ])
-    await t.api('PUT', `/api/teach/courses/${courseId}/lessons/order`, {
+    await t.api('PUT', teach(`/courses/${courseId}/lessons/order`), {
       token: teacher,
       body: { ids: [lessonA, lessonB, lessonC] },
     })
     expect(
       (
-        await t.api('PUT', `/api/teach/courses/${courseId}/lessons/order`, {
+        await t.api('PUT', teach(`/courses/${courseId}/lessons/order`), {
           token: teacher,
           body: { ids: [lessonA, lessonB] },
         })
       ).status,
     ).toBe(400)
 
-    const text = await t.api('POST', `/api/teach/lessons/${lessonA}/artefacts`, {
+    const text = await t.api('POST', teach(`/lessons/${lessonA}/artefacts`), {
       token: teacher,
       body: { type: 'text', title: 'Why starters work' },
     })
@@ -102,7 +98,7 @@ describe('course builder', () => {
         { type: 'paragraph', content: [{ type: 'text', text: 'Wild yeast and bacteria.' }] },
       ],
     }
-    const saved = await t.api('PATCH', `/api/teach/artefacts/${artefactId}`, {
+    const saved = await t.api('PATCH', teach(`/artefacts/${artefactId}`), {
       token: teacher,
       body: { contentJson: content },
     })
@@ -111,19 +107,19 @@ describe('course builder', () => {
     )
     expect(
       (
-        await t.api('PATCH', `/api/teach/artefacts/${artefactId}`, {
+        await t.api('PATCH', teach(`/artefacts/${artefactId}`), {
           token: teacher,
           body: { contentJson: { type: 'doc', content: [{ type: 'table' }] } },
         })
       ).status,
     ).toBe(400)
 
-    const quiz = await t.api('POST', `/api/teach/lessons/${lessonC}/artefacts`, {
+    const quiz = await t.api('POST', teach(`/lessons/${lessonC}/artefacts`), {
       token: teacher,
       body: { type: 'quiz', title: 'Final check' },
     })
     const quizArtefactId = quiz.body.course.lessons[2].artefacts[0].id
-    const bad = await t.api('PUT', `/api/teach/artefacts/${quizArtefactId}/quiz`, {
+    const bad = await t.api('PUT', teach(`/artefacts/${quizArtefactId}/quiz`), {
       token: teacher,
       body: {
         passMarkPercent: 70,
@@ -140,7 +136,7 @@ describe('course builder', () => {
       },
     })
     expect(bad.status).toBe(400)
-    const good = await t.api('PUT', `/api/teach/artefacts/${quizArtefactId}/quiz`, {
+    const good = await t.api('PUT', teach(`/artefacts/${quizArtefactId}/quiz`), {
       token: teacher,
       body: {
         passMarkPercent: 70,
@@ -162,7 +158,7 @@ describe('course builder', () => {
     // Baking requires Mixing, Mixing requires Starter
     expect(
       (
-        await t.api('PUT', `/api/teach/lessons/${lessonB}/prerequisites`, {
+        await t.api('PUT', teach(`/lessons/${lessonB}/prerequisites`), {
           token: teacher,
           body: { prerequisiteIds: [lessonA] },
         })
@@ -170,14 +166,14 @@ describe('course builder', () => {
     ).toBe(200)
     expect(
       (
-        await t.api('PUT', `/api/teach/lessons/${lessonC}/prerequisites`, {
+        await t.api('PUT', teach(`/lessons/${lessonC}/prerequisites`), {
           token: teacher,
           body: { prerequisiteIds: [lessonB] },
         })
       ).status,
     ).toBe(200)
     // Starter requiring Baking would close a loop
-    const cycle = await t.api('PUT', `/api/teach/lessons/${lessonA}/prerequisites`, {
+    const cycle = await t.api('PUT', teach(`/lessons/${lessonA}/prerequisites`), {
       token: teacher,
       body: { prerequisiteIds: [lessonC] },
     })
@@ -188,7 +184,7 @@ describe('course builder', () => {
   })
 
   it('refuses submission until the checklist passes, then locks editing while under review', async () => {
-    const early = await t.api('POST', `/api/teach/courses/${courseId}/submit`, { token: teacher })
+    const early = await t.api('POST', teach(`/courses/${courseId}/submit`), { token: teacher })
     expect(early.status).toBe(422)
     const codes = early.body.error.details.map((p: { code: string }) => p.code)
     expect(codes).toEqual(
@@ -205,7 +201,7 @@ describe('course builder', () => {
     })
     await t.storage.put(row?.storageKey as string, new Uint8Array([1]), 'image/png')
     await t.api('POST', `/api/media/assets/${upload.body.asset.id}/complete`, { token: teacher })
-    const patched = await t.api('PATCH', `/api/teach/courses/${courseId}`, {
+    const patched = await t.api('PATCH', teach(`/courses/${courseId}`), {
       token: teacher,
       body: {
         summary:
@@ -219,18 +215,29 @@ describe('course builder', () => {
             },
           ],
         },
-        priceCents: 8900,
         thumbnailMediaId: upload.body.asset.id,
       },
     })
     expect(patched.status).toBe(200)
     expect(patched.body.course.thumbnail.url).toContain('/api/files/public/')
-    const textB = await t.api('POST', `/api/teach/lessons/${lessonB}/artefacts`, {
+    // price is set through its own route, and the general update ignores it
+    const ignored = await t.api('PATCH', teach(`/courses/${courseId}`), {
+      token: teacher,
+      body: { priceCents: 100 },
+    })
+    expect(ignored.body.course.priceCents).toBe(0)
+    const priced = await t.api('PUT', teach(`/courses/${courseId}/price`), {
+      token: teacher,
+      body: { priceCents: 8900 },
+    })
+    expect(priced.status).toBe(200)
+    expect(priced.body.course.priceCents).toBe(8900)
+    const textB = await t.api('POST', teach(`/lessons/${lessonB}/artefacts`), {
       token: teacher,
       body: { type: 'text', title: 'Folding' },
     })
     const bId = textB.body.course.lessons[1].artefacts[0].id
-    await t.api('PATCH', `/api/teach/artefacts/${bId}`, {
+    await t.api('PATCH', teach(`/artefacts/${bId}`), {
       token: teacher,
       body: {
         contentJson: {
@@ -241,27 +248,24 @@ describe('course builder', () => {
         },
       },
     })
-    await t.db
-      .update(s.teacherProfiles)
-      .set({ stripeChargesEnabled: true, stripeAccountId: 'acct_test' })
-      .where(eq(s.teacherProfiles.userId, teacherId))
+    await t.makePayable(profileId)
 
     const ready = (await course()).body.course
     expect(ready.checklist.ok).toBe(true)
-    const submitted = await t.api('POST', `/api/teach/courses/${courseId}/submit`, {
+    const submitted = await t.api('POST', teach(`/courses/${courseId}/submit`), {
       token: teacher,
     })
     expect(submitted.status).toBe(200)
     expect(submitted.body.course.status).toBe('pending_review')
 
-    const locked = await t.api('PATCH', `/api/teach/courses/${courseId}`, {
+    const locked = await t.api('PATCH', teach(`/courses/${courseId}`), {
       token: teacher,
       body: { title: 'Changed' },
     })
     expect(locked.status).toBe(409)
-    expect(
-      (await t.api('DELETE', `/api/teach/courses/${courseId}`, { token: teacher })).status,
-    ).toBe(409)
+    expect((await t.api('DELETE', teach(`/courses/${courseId}`), { token: teacher })).status).toBe(
+      409,
+    )
   })
 
   it('Support sees the queue, approval is the only path to live, rejection returns it to the teacher', async () => {
@@ -272,7 +276,11 @@ describe('course builder', () => {
 
     const preview = await t.api('GET', `/api/support/courses/${courseId}`, { token: agent })
     expect(preview.body.course.lessons).toHaveLength(3)
-    expect(preview.body.course.teacher.email).toBe('builder@example.com')
+    expect(preview.body.course.profile).toMatchObject({
+      id: profileId,
+      ownerEmail: 'builder@example.com',
+      payable: true,
+    })
 
     const rejected = await t.api('POST', `/api/support/courses/${courseId}/reject`, {
       token: agent,
@@ -285,14 +293,14 @@ describe('course builder', () => {
     // teacher can edit again and resubmit
     expect(
       (
-        await t.api('PATCH', `/api/teach/courses/${courseId}`, {
+        await t.api('PATCH', teach(`/courses/${courseId}`), {
           token: teacher,
           body: { title: 'Sourdough from Scratch, Second Pass' },
         })
       ).status,
     ).toBe(200)
     expect(
-      (await t.api('POST', `/api/teach/courses/${courseId}/submit`, { token: teacher })).body.course
+      (await t.api('POST', teach(`/courses/${courseId}/submit`), { token: teacher })).body.course
         .status,
     ).toBe('pending_review')
 

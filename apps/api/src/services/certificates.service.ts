@@ -47,7 +47,7 @@ export class CertificatesService {
     if (existing) return this.view(existing)
     const enrollment = await db.query.enrollments.findFirst({
       where: { id: enrollmentId },
-      with: { user: true, course: { with: { teacher: { with: { teacherProfile: true } } } } },
+      with: { user: true, course: { with: { profile: true } } },
     })
     if (!enrollment) throw errors.notFound('Enrollment')
     if (!enrollment.completedAt)
@@ -56,10 +56,7 @@ export class CertificatesService {
     const token = certificateToken()
     const issuedAt = this.deps.now()
     const learnerName = displayName(enrollment.user)
-    const teacherName =
-      enrollment.course.teacher.teacherProfile?.displayName ??
-      enrollment.course.teacher.name ??
-      'Elevate teacher'
+    const teacherName = enrollment.course.profile.displayName
     const pdf = await renderCertificatePdf(
       {
         learnerName,

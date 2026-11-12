@@ -10,40 +10,24 @@ import {
   StatCard,
   statusLabel,
   statusTone,
-  useToast,
 } from '@elevate/web-ui'
-import { errorMessage, usePortalAuth } from '@elevate/web-ui/portal'
+import { usePortalAuth } from '@elevate/web-ui/portal'
 import { ArrowRight, BookOpen, CreditCard, ExternalLink, ShieldCheck } from 'lucide-react'
-import { useState } from 'react'
 import { Link } from 'react-router'
 import { useCourses } from '../lib/courses'
-import {
-  openStripeDashboard,
-  startStripeOnboarding,
-  useEarnings,
-  useStripeStatus,
-  useTeacherProfile,
-} from '../lib/queries'
+import { useCurrentProfile } from '../lib/profile'
+import { useEarnings, useStripeLinks, useStripeStatus } from '../lib/queries'
 
+/** The profile's payout account. Anyone on the profile sees its state; only the owner manages it. */
 export function StripeCard() {
-  const { data: profile } = useTeacherProfile()
-  const stripe = useStripeStatus(!!profile)
-  const { toast } = useToast()
-  const [busy, setBusy] = useState(false)
+  const { profile, can } = useCurrentProfile()
+  const stripe = useStripeStatus()
+  const links = useStripeLinks()
   const status = stripe.data
+  const canManage = can('stripe.links')
 
-  async function run(action: () => Promise<void>) {
-    setBusy(true)
-    try {
-      await action()
-    } catch (error) {
-      toast({ tone: 'danger', title: 'Stripe', description: errorMessage(error) })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const enabled = !!status?.chargesEnabled
+  // Payable: the account is active on our side and Stripe allows charges.
+  const enabled = status?.status === 'active' && status.chargesEnabled
   return (
     <Card as="section">
       <CardHeader
@@ -64,30 +48,34 @@ export function StripeCard() {
         }
       />
       <div className="flex flex-wrap items-center gap-3">
-        {enabled ? (
-          <>
-            <Button
-              variant="secondary"
-              icon={ExternalLink}
-              loading={busy}
-              onClick={() => run(openStripeDashboard)}
-            >
-              Open Stripe dashboard
-            </Button>
-            <span className="text-small text-ink-tertiary">
-              Commission on your courses: {profile ? formatBps(profile.commissionBps) : '—'}
-            </span>
-          </>
+        {!canManage ? (
+          <span className="text-small text-ink-secondary">
+            Only the profile’s owner can connect Stripe or open its dashboard.
+          </span>
+        ) : enabled ? (
+          <Button
+            variant="secondary"
+            icon={ExternalLink}
+            loading={links.busy}
+            onClick={links.openDashboard}
+          >
+            Open Stripe dashboard
+          </Button>
         ) : (
           <Button
             variant="accent"
             icon={CreditCard}
-            loading={busy || stripe.isPending}
-            onClick={() => run(startStripeOnboarding)}
+            loading={links.busy || stripe.isPending}
+            onClick={links.connect}
           >
             {status?.connected ? 'Finish Stripe onboarding' : 'Connect Stripe'}
           </Button>
         )}
+        {enabled ? (
+          <span className="text-small text-ink-tertiary">
+            Commission on your courses: {profile ? formatBps(profile.commissionBps) : '—'}
+          </span>
+        ) : null}
         {status && !enabled && status.detailsSubmitted ? (
           <span className="text-small text-ink-secondary">Stripe is verifying your details.</span>
         ) : null}
@@ -98,18 +86,14 @@ export function StripeCard() {
 
 export function Dashboard() {
   const { user } = usePortalAuth()
-  const { data: profile } = useTeacherProfile()
+  const { displayName, path, can } = useCurrentProfile()
   const courses = useCourses()
-  const earnings = useEarnings(!!profile)
+  const earnings = useEarnings(can('earnings.read'))
   const list = courses.data ?? []
   const live = list.filter((c) => c.status === 'live').length
   return (
     <>
-      <PageHeader
-        eyebrow="Dashboard"
-        title={profile ? `Welcome, ${profile.displayName}` : 'Welcome'}
-        description={user?.email}
-      />
+      <PageHeader eyebrow="Dashboard" title={`Welcome, ${displayName}`} description={user?.email} />
       <div className="grid gap-6 md:grid-cols-3">
         <StatCard
           label="Live courses"
@@ -121,7 +105,7 @@ export function Dashboard() {
           value={earnings.data ? String(earnings.data.totals.paymentCount) : '—'}
           hint="Paid enrolments across your courses"
         />
-        <Link to="/earnings" className="block">
+        <Link to={path('/earnings')} className="block">
           <StatCard
             label="Net earnings"
             value={earnings.data ? formatSgd(earnings.data.totals.netCents) : '—'}
@@ -144,7 +128,7 @@ export function Dashboard() {
               title="No courses yet"
               body="Create a course, add lessons and content, then submit it for review."
               action={
-                <Link to="/courses">
+                <Link to={path('/courses')}>
                   <Button variant="secondary">Go to courses</Button>
                 </Link>
               }
@@ -155,7 +139,7 @@ export function Dashboard() {
               {list.slice(0, 5).map((c) => (
                 <li key={c.id}>
                   <Link
-                    to={`/courses/${c.id}`}
+                    to={path(`/courses/${c.id}`)}
                     className="flex items-center justify-between gap-3 py-3 hover:text-brand"
                   >
                     <span className="min-w-0 truncate font-semibold">{c.title}</span>
@@ -168,7 +152,7 @@ export function Dashboard() {
               ))}
               {list.length > 5 ? (
                 <li className="pt-3">
-                  <Link to="/courses" className="text-small font-semibold text-brand">
+                  <Link to={path('/courses')} className="text-small font-semibold text-brand">
                     All {list.length} courses
                   </Link>
                 </li>

@@ -48,7 +48,7 @@ export class LearningService {
         course: {
           with: {
             thumbnail: true,
-            teacher: { with: { teacherProfile: true } },
+            profile: true,
             lessons: {
               orderBy: { position: 'asc', createdAt: 'asc' },
               with: {
@@ -115,10 +115,7 @@ export class LearningService {
         slug: enrollment.course.slug,
         title: enrollment.course.title,
         thumbnailUrl: await this.media.publicUrl(enrollment.course.thumbnail),
-        teacherName:
-          enrollment.course.teacher.teacherProfile?.displayName ??
-          enrollment.course.teacher.name ??
-          'Elevate teacher',
+        teacherName: enrollment.course.profile.displayName,
       },
       lessons: enrollment.course.lessons.map((l) => {
         const state = byLesson.get(l.id)

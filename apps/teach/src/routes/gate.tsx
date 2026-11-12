@@ -1,28 +1,45 @@
 import { Button, Logo } from '@elevate/web-ui'
 import { FullPageSpinner, usePortalAuth } from '@elevate/web-ui/portal'
 import type { ReactNode } from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router'
+import { Navigate, Outlet } from 'react-router'
+import { lastProfileId, useCurrentProfile } from '../lib/profile'
+import { profilePath } from '../lib/urls'
+import { TeachLayout } from './layout'
+import { PendingPage } from './pending'
 
 /**
- * Routes teachers by application state: no application → /apply, pending or rejected → /pending,
- * approved → the portal.
+ * `/` has no page of its own. It opens the profile last used in this browser if the user is still
+ * on it, else their first approved profile, else their first profile, else the application form.
  */
-export function TeachGate({ children }: { children: ReactNode }) {
+export function HomeRedirect() {
   const { user, status } = usePortalAuth()
-  const location = useLocation()
   if (status === 'loading') return <FullPageSpinner />
-  const teacher = user?.teacher ?? null
-  const onApply = location.pathname === '/apply'
-  const onPending = location.pathname === '/pending'
-  if (!teacher) return onApply ? children : <Navigate to="/apply" replace />
-  if (teacher.status === 'approved')
-    return onApply || onPending ? <Navigate to="/" replace /> : children
-  if (onApply || onPending) return <>{children}</>
-  return <Navigate to="/pending" replace />
+  const profiles = user?.profiles ?? []
+  const last = lastProfileId()
+  const target =
+    profiles.find((p) => p.id === last) ??
+    profiles.find((p) => p.status === 'approved') ??
+    profiles[0]
+  return <Navigate to={target ? profilePath(target.id) : '/apply'} replace />
 }
 
-/** Centered single-column layout used before a teacher is approved. */
-export function OnboardingLayout() {
+/**
+ * Every page under `/p/:profileId`. A profile that Support has not approved yet shows its
+ * application status instead of the portal, whichever page was asked for.
+ */
+export function ProfileGate() {
+  const { status } = useCurrentProfile()
+  if (status !== 'approved')
+    return (
+      <OnboardingLayout>
+        <PendingPage />
+      </OnboardingLayout>
+    )
+  return <TeachLayout />
+}
+
+/** Centered single-column layout used before a profile is approved. */
+export function OnboardingLayout({ children }: { children?: ReactNode }) {
   const { user, signOut } = usePortalAuth()
   return (
     <div className="min-h-full bg-canvas">
@@ -35,9 +52,7 @@ export function OnboardingLayout() {
           </Button>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-3xl px-4 pb-16">
-        <Outlet />
-      </main>
+      <main className="mx-auto w-full max-w-3xl px-4 pb-16">{children ?? <Outlet />}</main>
     </div>
   )
 }

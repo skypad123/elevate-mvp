@@ -1,17 +1,20 @@
 import { RequireAuth, RouteError, SignInPage, VerifyPage } from '@elevate/web-ui/portal'
 import { createBrowserRouter } from 'react-router'
 import { api } from './lib/api'
+import { ProfileProvider } from './lib/profile'
 import { ApplyPage } from './routes/apply'
 import { CourseBuilder } from './routes/courses/builder'
 import { CoursesPage } from './routes/courses/list'
 import { Dashboard } from './routes/dashboard'
 import { CourseEarningsPage, EarningsPage } from './routes/earnings'
-import { OnboardingLayout, TeachGate } from './routes/gate'
-import { TeachLayout } from './routes/layout'
-import { PendingPage } from './routes/pending'
+import { HomeRedirect, OnboardingLayout, ProfileGate } from './routes/gate'
 import { SettingsPage } from './routes/settings'
 import { StripeRefresh, StripeReturn } from './routes/stripe'
 
+/**
+ * Two pages sit outside a profile: the home redirect and the application form. Everything else
+ * is under `/p/:profileId`, so the profile a page acts on is always in its URL.
+ */
 export const router = createBrowserRouter([
   {
     errorElement: <RouteError />,
@@ -29,24 +32,28 @@ export const router = createBrowserRouter([
       },
       { path: '/verify', element: <VerifyPage api={api} /> },
       {
+        index: true,
         element: (
           <RequireAuth>
-            <TeachGate>
-              <OnboardingLayout />
-            </TeachGate>
+            <HomeRedirect />
           </RequireAuth>
         ),
-        children: [
-          { path: 'apply', element: <ApplyPage /> },
-          { path: 'pending', element: <PendingPage /> },
-        ],
       },
       {
         element: (
           <RequireAuth>
-            <TeachGate>
-              <TeachLayout />
-            </TeachGate>
+            <OnboardingLayout />
+          </RequireAuth>
+        ),
+        children: [{ path: 'apply', element: <ApplyPage /> }],
+      },
+      {
+        path: 'p/:profileId',
+        element: (
+          <RequireAuth>
+            <ProfileProvider>
+              <ProfileGate />
+            </ProfileProvider>
           </RequireAuth>
         ),
         children: [

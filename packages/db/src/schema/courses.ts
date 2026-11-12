@@ -14,14 +14,15 @@ import { users } from './auth'
 import { createdAt, id, ts, updatedAt } from './columns'
 import { artefactTypeEnum, courseStatusEnum } from './enums'
 import { mediaAssets } from './media'
+import { profiles } from './profiles'
 
 export const courses = snakeCase.table(
   'courses',
   {
     id: id(),
-    teacherId: uuid()
+    profileId: uuid()
       .notNull()
-      .references(() => users.id, { onDelete: 'restrict' }),
+      .references(() => profiles.id, { onDelete: 'restrict' }),
     title: text().notNull(),
     slug: text().notNull().unique(),
     summary: text(),
@@ -45,11 +46,10 @@ export const courses = snakeCase.table(
     updatedAt: updatedAt(),
   },
   (t) => [
-    index().on(t.teacherId),
+    index().on(t.profileId),
     index().on(t.status, t.publishedAt),
     index().on(t.status, t.enrolCount),
-    // Expression pinned to the applied migration; see the note in ./index.ts.
-    check('courses_price_cents_non_negative', sql.raw('"courses"."price_cents" >= 0')),
+    check('courses_price_cents_non_negative', sql`${t.priceCents} >= 0`),
   ],
 )
 
@@ -82,12 +82,7 @@ export const lessonPrerequisites = snakeCase.table(
   },
   (t) => [
     primaryKey({ columns: [t.lessonId, t.prerequisiteLessonId] }),
-    check(
-      'lesson_prerequisites_not_self',
-      sql.raw(
-        '"lesson_prerequisites"."lesson_id" <> "lesson_prerequisites"."prerequisite_lesson_id"',
-      ),
-    ),
+    check('lesson_prerequisites_not_self', sql`${t.lessonId} <> ${t.prerequisiteLessonId}`),
   ],
 )
 
@@ -116,7 +111,7 @@ export const quizzes = snakeCase.table('quizzes', {
   id: id(),
   artefactId: uuid()
     .notNull()
-    .unique('quizzes_artefactId_unique')
+    .unique()
     .references(() => artefacts.id, { onDelete: 'cascade' }),
   passMarkPercent: integer().notNull().default(70),
   maxAttempts: integer().notNull().default(1),

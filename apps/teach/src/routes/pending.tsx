@@ -1,14 +1,26 @@
 import { Badge, Button, Card, Eyebrow } from '@elevate/web-ui'
 import { usePortalAuth } from '@elevate/web-ui/portal'
+import { useQueryClient } from '@tanstack/react-query'
 import { Clock, MailCheck, XCircle } from 'lucide-react'
 import { Link } from 'react-router'
-import { useTeacherProfile } from '../lib/queries'
+import { teachKeys } from '../lib/keys'
+import { useCurrentProfile } from '../lib/profile'
 
+/** What a profile shows until Support approves it: its application status. */
 export function PendingPage() {
   const { refreshUser } = usePortalAuth()
-  const { data: profile, isPending } = useTeacherProfile()
-  if (isPending || !profile) return null
+  const { profile, profileId, actingAsStaff } = useCurrentProfile()
+  const queryClient = useQueryClient()
+  if (!profile) return null
   const rejected = profile.status === 'rejected'
+  // The application form edits the signed-in user's own personal profile.
+  const canEdit = !actingAsStaff && profile.type === 'personal'
+
+  async function checkStatus() {
+    await refreshUser()
+    await queryClient.invalidateQueries({ queryKey: teachKeys.profile(profileId) })
+  }
+
   return (
     <div className="space-y-6 animate-rise">
       <Card as="section" className="space-y-4">
@@ -31,28 +43,32 @@ export function PendingPage() {
         {rejected ? (
           <>
             <p className="text-body text-ink-secondary">
-              The team could not approve your application as submitted. Their note:
+              The team could not approve the application as submitted. Their note:
             </p>
             <blockquote className="rounded-card border-l-4 border-warning bg-warning-tint p-4 text-body text-ink">
               {profile.reviewNote}
             </blockquote>
-            <Link to="/apply">
-              <Button variant="accent">Edit and resubmit</Button>
-            </Link>
+            {canEdit ? (
+              <Link to="/apply">
+                <Button variant="accent">Edit and resubmit</Button>
+              </Link>
+            ) : null}
           </>
         ) : (
           <>
             <p className="text-body text-ink-secondary">
-              Thanks, {profile.displayName}. A member of the Elevate team is reading your
-              application. You will get an email at{' '}
-              <strong className="text-ink">{profile.email}</strong> when it has been reviewed,
+              Thanks, {profile.displayName}. A member of the Elevate team is reading the
+              application. An email goes to{' '}
+              <strong className="text-ink">{profile.owner.email}</strong> when it has been reviewed,
               usually within two working days.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Link to="/apply">
-                <Button variant="secondary">Edit application</Button>
-              </Link>
-              <Button variant="ghost" icon={MailCheck} onClick={() => refreshUser()}>
+              {canEdit ? (
+                <Link to="/apply">
+                  <Button variant="secondary">Edit application</Button>
+                </Link>
+              ) : null}
+              <Button variant="ghost" icon={MailCheck} onClick={checkStatus}>
                 Check status
               </Button>
             </div>

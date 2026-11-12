@@ -59,7 +59,7 @@ export const certificates = snakeCase.table('certificates', {
   id: id(),
   enrollmentId: uuid()
     .notNull()
-    .unique('certificates_enrollmentId_unique')
+    .unique()
     .references(() => enrollments.id, { onDelete: 'cascade' }),
   /** Public, unguessable token used in /c/{token}. */
   token: text().notNull().unique(),

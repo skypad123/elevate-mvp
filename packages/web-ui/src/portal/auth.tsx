@@ -41,16 +41,23 @@ export function PortalAuthProvider({
   const queryClient = useQueryClient()
 
   const refreshUser = useCallback(async () => {
-    if (!tokenStore.get()) {
+    const token = tokenStore.get()
+    if (!token) {
       setUser(null)
       setStatus('signed_out')
       return
     }
+    // A sign-in can replace the token while this request is in flight (the verify page signs in
+    // while the first refresh is still running). Its answer would then be about the previous
+    // user, so it is dropped.
+    const superseded = () => tokenStore.get() !== token
     try {
       const { user: me } = await unwrap(await api.auth.me.$get())
+      if (superseded()) return
       setUser(me)
       setStatus('signed_in')
     } catch (error) {
+      if (superseded()) return
       if (error instanceof ApiError && error.status === 401) {
         tokenStore.clear()
         setUser(null)

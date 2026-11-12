@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import type { CreateUpload, MediaAssetView, PlaybackInfo, UploadInstructions } from '@elevate/core'
+import {
+  type CreateUpload,
+  can,
+  type MediaAssetView,
+  type PlaybackInfo,
+  type UploadInstructions,
+} from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { eq } from 'drizzle-orm'
 import type { Deps } from '../deps'
@@ -7,6 +13,7 @@ import { errors } from '../lib/errors'
 import { hasRole, type SessionUser } from '../middleware/auth'
 import { extensionFor, isPublicKey } from '../providers/storage'
 import { patchForVideoEvent, type VideoWebhookEvent, videoEventRef } from '../providers/video'
+import { loadActor } from './auth.service'
 
 type MediaAssetRow = typeof s.mediaAssets.$inferSelect
 
@@ -24,8 +31,19 @@ export class MediaService {
       : `${input.kind}/${user.id}/${id}.${ext}`
   }
 
+  /**
+   * With `profileId` the file becomes that profile's course media, which everyone on the profile
+   * can then use; the caller needs `media.upload` there. Without it the file is the caller's own
+   * (an avatar, a teaching sample).
+   */
   async createUpload(user: SessionUser, input: CreateUpload): Promise<UploadInstructions> {
     const { db, storage, video, env } = this.deps
+    const profileId = input.profileId ?? null
+    if (profileId) {
+      const actor = await loadActor(this.deps, user, profileId)
+      if (!actor) throw errors.notFound('Profile')
+      if (!can(actor, 'media.upload')) throw errors.forbidden()
+    }
     const id = randomUUID()
     const storageKey = this.keyFor(user, id, input)
 
@@ -42,7 +60,8 @@ export class MediaService {
         .insert(s.mediaAssets)
         .values({
           id,
-          ownerId: user.id,
+          uploaderId: user.id,
+          profileId,
           kind: 'video',
           provider,
           status: 'pending',
@@ -61,7 +80,8 @@ export class MediaService {
       .insert(s.mediaAssets)
       .values({
         id,
-        ownerId: user.id,
+        uploaderId: user.id,
+        profileId,
         kind: input.kind,
         provider: storage.driver === 's3' ? 's3' : 'local',
         status: 'pending',
@@ -119,7 +139,7 @@ export class MediaService {
     return this.toView(updated)
   }
 
-  /** Owner or staff view; for processing video assets, polls the provider as a webhook fallback. */
+  /** For whoever may use the asset; for processing video assets, polls the provider as a webhook fallback. */
   async getAsset(user: SessionUser, assetId: string): Promise<MediaAssetView> {
     let asset = await this.getOwnedAsset(user, assetId)
     if (
@@ -140,7 +160,7 @@ export class MediaService {
     return this.toView(asset)
   }
 
-  /** Signed playback for the owner or staff. Learner playback is authorised through enrollments. */
+  /** Signed playback for whoever may use the asset. Learner playback is authorised through enrollments. */
   async playback(user: SessionUser, assetId: string): Promise<PlaybackInfo> {
     const asset = await this.getOwnedAsset(user, assetId)
     return this.playbackFor(asset)
@@ -187,11 +207,18 @@ export class MediaService {
     return 'applied'
   }
 
-  /** Owner, or staff (support agents review teaching samples and course media). */
+  /**
+   * An asset the user may use: one they uploaded, one that belongs to a profile they are on, or
+   * any asset for staff (support agents review teaching samples and course media).
+   */
   async getOwnedAsset(user: SessionUser, assetId: string): Promise<MediaAssetRow> {
     const asset = await this.deps.db.query.mediaAssets.findFirst({ where: { id: assetId } })
     if (!asset) throw errors.notFound('Asset')
-    if (asset.ownerId !== user.id && !hasRole(user, 'support_agent')) throw errors.forbidden()
+    const allowed =
+      asset.uploaderId === user.id ||
+      hasRole(user, 'support_agent') ||
+      (asset.profileId !== null && (await loadActor(this.deps, user, asset.profileId)) !== null)
+    if (!allowed) throw errors.forbidden()
     return asset
   }
 

@@ -2,7 +2,7 @@
   "type": "base",
   "version": "9",
   "dialect": "postgres",
-  "id": "c67592af-c65a-4c26-aa21-28325ed09a21",
+  "id": "7cb43129-d0ed-447f-ae95-b444cd559d88",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -182,6 +182,57 @@
       "statementTarget": [
         "enum",
         "public",
+        "payout_account_status"
+      ],
+      "writes": [
+        "s|enum|public.payout_account_status",
+        "n|enum|public.payout_account_status",
+        "e|enum|public.payout_account_status",
+        "n|type|public.payout_account_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "profile_status"
+      ],
+      "writes": [
+        "s|enum|public.profile_status",
+        "n|enum|public.profile_status",
+        "e|enum|public.profile_status",
+        "n|type|public.profile_status"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "profile_type"
+      ],
+      "writes": [
+        "s|enum|public.profile_type",
+        "n|enum|public.profile_type",
+        "e|enum|public.profile_type",
+        "n|type|public.profile_type"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
         "progress_status"
       ],
       "writes": [
@@ -216,13 +267,13 @@
       "statementTarget": [
         "enum",
         "public",
-        "teacher_status"
+        "stripe_business_type"
       ],
       "writes": [
-        "s|enum|public.teacher_status",
-        "n|enum|public.teacher_status",
-        "e|enum|public.teacher_status",
-        "n|type|public.teacher_status"
+        "s|enum|public.stripe_business_type",
+        "n|enum|public.stripe_business_type",
+        "e|enum|public.stripe_business_type",
+        "n|type|public.stripe_business_type"
       ],
       "reads": [
         "n|sch|public"
@@ -276,7 +327,7 @@
         "n|rel|public.identities",
         "n|type|public.identities",
         "n|rel|public.identities_pkey",
-        "n|rel|public.identities_provider_providerSubject_unique"
+        "n|rel|public.identities_provider_provider_subject_unique"
       ],
       "reads": [
         "n|sch|public",
@@ -297,7 +348,7 @@
         "n|rel|public.magic_links",
         "n|type|public.magic_links",
         "n|rel|public.magic_links_pkey",
-        "n|rel|public.magic_links_tokenHash_unique"
+        "n|rel|public.magic_links_token_hash_key"
       ],
       "reads": [
         "n|sch|public",
@@ -318,7 +369,7 @@
         "n|rel|public.sessions",
         "n|type|public.sessions",
         "n|rel|public.sessions_pkey",
-        "n|rel|public.sessions_tokenHash_unique"
+        "n|rel|public.sessions_token_hash_key"
       ],
       "reads": [
         "n|sch|public",
@@ -338,7 +389,7 @@
         "e|tbl|public.user_roles",
         "n|rel|public.user_roles",
         "n|type|public.user_roles",
-        "n|rel|public.user_roles_user_id_role_pk"
+        "n|rel|public.user_roles_pkey"
       ],
       "reads": [
         "n|sch|public",
@@ -359,7 +410,7 @@
         "n|rel|public.users",
         "n|type|public.users",
         "n|rel|public.users_pkey",
-        "n|rel|public.users_email_unique"
+        "n|rel|public.users_email_key"
       ],
       "reads": [
         "n|sch|public"
@@ -379,8 +430,8 @@
         "n|rel|public.enrollments",
         "n|type|public.enrollments",
         "n|rel|public.enrollments_pkey",
-        "n|rel|public.enrollments_stripeCheckoutSessionId_unique",
-        "n|rel|public.enrollments_userId_courseId_unique"
+        "n|rel|public.enrollments_user_id_course_id_unique",
+        "n|rel|public.enrollments_stripe_checkout_session_id_key"
       ],
       "reads": [
         "n|sch|public",
@@ -402,8 +453,8 @@
         "n|rel|public.payments",
         "n|type|public.payments",
         "n|rel|public.payments_pkey",
-        "n|rel|public.payments_stripeCheckoutSessionId_unique",
-        "n|rel|public.payments_stripePaymentIntentId_unique"
+        "n|rel|public.payments_stripe_checkout_session_id_key",
+        "n|rel|public.payments_stripe_payment_intent_id_key"
       ],
       "reads": [
         "n|sch|public",
@@ -424,7 +475,7 @@
         "n|rel|public.promo_codes",
         "n|type|public.promo_codes",
         "n|rel|public.promo_codes_pkey",
-        "n|rel|public.promo_codes_code_unique"
+        "n|rel|public.promo_codes_code_key"
       ],
       "reads": [
         "n|sch|public",
@@ -445,7 +496,7 @@
         "n|rel|public.refunds",
         "n|type|public.refunds",
         "n|rel|public.refunds_pkey",
-        "n|rel|public.refunds_stripeRefundId_unique"
+        "n|rel|public.refunds_stripe_refund_id_key"
       ],
       "reads": [
         "n|sch|public"
@@ -485,7 +536,7 @@
         "n|rel|public.courses",
         "n|type|public.courses",
         "n|rel|public.courses_pkey",
-        "n|rel|public.courses_slug_unique"
+        "n|rel|public.courses_slug_key"
       ],
       "reads": [
         "n|sch|public",
@@ -505,7 +556,7 @@
         "e|tbl|public.lesson_prerequisites",
         "n|rel|public.lesson_prerequisites",
         "n|type|public.lesson_prerequisites",
-        "n|rel|public.lesson_prerequisites_lesson_id_prerequisite_lesson_id_pk"
+        "n|rel|public.lesson_prerequisites_pkey"
       ],
       "reads": [
         "n|sch|public"
@@ -544,7 +595,7 @@
         "n|rel|public.quizzes",
         "n|type|public.quizzes",
         "n|rel|public.quizzes_pkey",
-        "n|rel|public.quizzes_artefactId_unique"
+        "n|rel|public.quizzes_artefact_id_key"
       ],
       "reads": [
         "n|sch|public"
@@ -563,7 +614,7 @@
         "e|tbl|public.artefact_progress",
         "n|rel|public.artefact_progress",
         "n|type|public.artefact_progress",
-        "n|rel|public.artefact_progress_enrollment_id_artefact_id_pk"
+        "n|rel|public.artefact_progress_pkey"
       ],
       "reads": [
         "n|sch|public",
@@ -584,8 +635,8 @@
         "n|rel|public.certificates",
         "n|type|public.certificates",
         "n|rel|public.certificates_pkey",
-        "n|rel|public.certificates_enrollmentId_unique",
-        "n|rel|public.certificates_token_unique"
+        "n|rel|public.certificates_enrollment_id_key",
+        "n|rel|public.certificates_token_key"
       ],
       "reads": [
         "n|sch|public"
@@ -630,6 +681,51 @@
         "n|enum|public.media_kind",
         "n|enum|public.media_provider",
         "n|enum|public.media_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "payout_accounts"
+      ],
+      "writes": [
+        "s|tbl|public.payout_accounts",
+        "n|tbl|public.payout_accounts",
+        "e|tbl|public.payout_accounts",
+        "n|rel|public.payout_accounts",
+        "n|type|public.payout_accounts",
+        "n|rel|public.payout_accounts_pkey",
+        "n|rel|public.payout_accounts_profile_id_key",
+        "n|rel|public.payout_accounts_stripe_account_id_key"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.stripe_business_type",
+        "n|enum|public.payout_account_status"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "profiles"
+      ],
+      "writes": [
+        "s|tbl|public.profiles",
+        "n|tbl|public.profiles",
+        "e|tbl|public.profiles",
+        "n|rel|public.profiles",
+        "n|type|public.profiles",
+        "n|rel|public.profiles_pkey",
+        "n|rel|public.profiles_legal_entity_id_key"
+      ],
+      "reads": [
+        "n|sch|public",
+        "n|enum|public.profile_type",
+        "n|enum|public.profile_status"
       ]
     },
     {
@@ -683,32 +779,11 @@
         "e|tbl|public.webhook_events",
         "n|rel|public.webhook_events",
         "n|type|public.webhook_events",
-        "n|rel|public.webhook_events_provider_event_id_pk"
+        "n|rel|public.webhook_events_pkey"
       ],
       "reads": [
         "n|sch|public",
         "n|enum|public.webhook_provider"
-      ]
-    },
-    {
-      "statementType": "create_table",
-      "statementTarget": [
-        "table",
-        "public",
-        "teacher_profiles"
-      ],
-      "writes": [
-        "s|tbl|public.teacher_profiles",
-        "n|tbl|public.teacher_profiles",
-        "e|tbl|public.teacher_profiles",
-        "n|rel|public.teacher_profiles",
-        "n|type|public.teacher_profiles",
-        "n|rel|public.teacher_profiles_pkey",
-        "n|rel|public.teacher_profiles_stripeAccountId_unique"
-      ],
-      "reads": [
-        "n|sch|public",
-        "n|enum|public.teacher_status"
       ]
     },
     {
@@ -798,18 +873,19 @@
         "index",
         "public",
         "enrollments",
-        "enrollments_course_id_index"
+        "enrollments_course_id_status_index"
       ],
       "writes": [
-        "s|idx|public.enrollments_course_id_index",
-        "n|idx|public.enrollments_course_id_index",
-        "e|idx|public.enrollments_course_id_index",
-        "n|rel|public.enrollments_course_id_index"
+        "s|idx|public.enrollments_course_id_status_index",
+        "n|idx|public.enrollments_course_id_status_index",
+        "e|idx|public.enrollments_course_id_status_index",
+        "n|rel|public.enrollments_course_id_status_index"
       ],
       "reads": [
         "n|tbl|public.enrollments",
         "n|sch|public",
-        "n|col|public.enrollments.course_id"
+        "n|col|public.enrollments.course_id",
+        "n|col|public.enrollments.status"
       ]
     },
     {
@@ -839,18 +915,39 @@
         "index",
         "public",
         "payments",
-        "payments_teacher_id_paid_at_index"
+        "payments_profile_id_paid_at_index"
       ],
       "writes": [
-        "s|idx|public.payments_teacher_id_paid_at_index",
-        "n|idx|public.payments_teacher_id_paid_at_index",
-        "e|idx|public.payments_teacher_id_paid_at_index",
-        "n|rel|public.payments_teacher_id_paid_at_index"
+        "s|idx|public.payments_profile_id_paid_at_index",
+        "n|idx|public.payments_profile_id_paid_at_index",
+        "e|idx|public.payments_profile_id_paid_at_index",
+        "n|rel|public.payments_profile_id_paid_at_index"
       ],
       "reads": [
         "n|tbl|public.payments",
         "n|sch|public",
-        "n|col|public.payments.teacher_id",
+        "n|col|public.payments.profile_id",
+        "n|col|public.payments.paid_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "payments",
+        "payments_payout_account_id_paid_at_index"
+      ],
+      "writes": [
+        "s|idx|public.payments_payout_account_id_paid_at_index",
+        "n|idx|public.payments_payout_account_id_paid_at_index",
+        "e|idx|public.payments_payout_account_id_paid_at_index",
+        "n|rel|public.payments_payout_account_id_paid_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|col|public.payments.payout_account_id",
         "n|col|public.payments.paid_at"
       ]
     },
@@ -899,6 +996,47 @@
       "statementTarget": [
         "index",
         "public",
+        "payments",
+        "payments_paid_at_index"
+      ],
+      "writes": [
+        "s|idx|public.payments_paid_at_index",
+        "n|idx|public.payments_paid_at_index",
+        "e|idx|public.payments_paid_at_index",
+        "n|rel|public.payments_paid_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|col|public.payments.paid_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "payments",
+        "payments_status_paid_at_index"
+      ],
+      "writes": [
+        "s|idx|public.payments_status_paid_at_index",
+        "n|idx|public.payments_status_paid_at_index",
+        "e|idx|public.payments_status_paid_at_index",
+        "n|rel|public.payments_status_paid_at_index"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|col|public.payments.status",
+        "n|col|public.payments.paid_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
         "artefacts",
         "artefacts_lesson_id_position_index"
       ],
@@ -921,18 +1059,18 @@
         "index",
         "public",
         "courses",
-        "courses_teacher_id_index"
+        "courses_profile_id_index"
       ],
       "writes": [
-        "s|idx|public.courses_teacher_id_index",
-        "n|idx|public.courses_teacher_id_index",
-        "e|idx|public.courses_teacher_id_index",
-        "n|rel|public.courses_teacher_id_index"
+        "s|idx|public.courses_profile_id_index",
+        "n|idx|public.courses_profile_id_index",
+        "e|idx|public.courses_profile_id_index",
+        "n|rel|public.courses_profile_id_index"
       ],
       "reads": [
         "n|tbl|public.courses",
         "n|sch|public",
-        "n|col|public.courses.teacher_id"
+        "n|col|public.courses.profile_id"
       ]
     },
     {
@@ -1046,18 +1184,38 @@
         "index",
         "public",
         "media_assets",
-        "media_assets_owner_id_index"
+        "media_assets_uploader_id_index"
       ],
       "writes": [
-        "s|idx|public.media_assets_owner_id_index",
-        "n|idx|public.media_assets_owner_id_index",
-        "e|idx|public.media_assets_owner_id_index",
-        "n|rel|public.media_assets_owner_id_index"
+        "s|idx|public.media_assets_uploader_id_index",
+        "n|idx|public.media_assets_uploader_id_index",
+        "e|idx|public.media_assets_uploader_id_index",
+        "n|rel|public.media_assets_uploader_id_index"
       ],
       "reads": [
         "n|tbl|public.media_assets",
         "n|sch|public",
-        "n|col|public.media_assets.owner_id"
+        "n|col|public.media_assets.uploader_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "media_assets",
+        "media_assets_profile_id_index"
+      ],
+      "writes": [
+        "s|idx|public.media_assets_profile_id_index",
+        "n|idx|public.media_assets_profile_id_index",
+        "e|idx|public.media_assets_profile_id_index",
+        "n|rel|public.media_assets_profile_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.media_assets.profile_id"
       ]
     },
     {
@@ -1098,6 +1256,46 @@
         "n|tbl|public.media_assets",
         "n|sch|public",
         "n|col|public.media_assets.provider_asset_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "profiles",
+        "profiles_one_personal_per_owner"
+      ],
+      "writes": [
+        "s|idx|public.profiles_one_personal_per_owner",
+        "n|idx|public.profiles_one_personal_per_owner",
+        "e|idx|public.profiles_one_personal_per_owner",
+        "n|rel|public.profiles_one_personal_per_owner"
+      ],
+      "reads": [
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|col|public.profiles.owner_user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "profiles",
+        "profiles_owner_user_id_index"
+      ],
+      "writes": [
+        "s|idx|public.profiles_owner_user_id_index",
+        "n|idx|public.profiles_owner_user_id_index",
+        "e|idx|public.profiles_owner_user_id_index",
+        "n|rel|public.profiles_owner_user_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|col|public.profiles.owner_user_id"
       ]
     },
     {
@@ -1148,6 +1346,26 @@
         "index",
         "public",
         "audit_log",
+        "audit_log_profile_id_index"
+      ],
+      "writes": [
+        "s|idx|public.audit_log_profile_id_index",
+        "n|idx|public.audit_log_profile_id_index",
+        "e|idx|public.audit_log_profile_id_index",
+        "n|rel|public.audit_log_profile_id_index"
+      ],
+      "reads": [
+        "n|tbl|public.audit_log",
+        "n|sch|public",
+        "n|col|public.audit_log.profile_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "audit_log",
         "audit_log_created_at_index"
       ],
       "writes": [
@@ -1170,10 +1388,10 @@
         "identities"
       ],
       "writes": [
-        "s|fk|public.identities.identities_user_id_users_id_fk",
-        "n|fk|public.identities.identities_user_id_users_id_fk",
-        "e|fk|public.identities.identities_user_id_users_id_fk",
-        "n|con|public.identities.identities_user_id_users_id_fk"
+        "s|fk|public.identities.identities_user_id_users_id_fkey",
+        "n|fk|public.identities.identities_user_id_users_id_fkey",
+        "e|fk|public.identities.identities_user_id_users_id_fkey",
+        "n|con|public.identities.identities_user_id_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.identities",
@@ -1193,10 +1411,10 @@
         "sessions"
       ],
       "writes": [
-        "s|fk|public.sessions.sessions_user_id_users_id_fk",
-        "n|fk|public.sessions.sessions_user_id_users_id_fk",
-        "e|fk|public.sessions.sessions_user_id_users_id_fk",
-        "n|con|public.sessions.sessions_user_id_users_id_fk"
+        "s|fk|public.sessions.sessions_user_id_users_id_fkey",
+        "n|fk|public.sessions.sessions_user_id_users_id_fkey",
+        "e|fk|public.sessions.sessions_user_id_users_id_fkey",
+        "n|con|public.sessions.sessions_user_id_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.sessions",
@@ -1216,10 +1434,10 @@
         "user_roles"
       ],
       "writes": [
-        "s|fk|public.user_roles.user_roles_user_id_users_id_fk",
-        "n|fk|public.user_roles.user_roles_user_id_users_id_fk",
-        "e|fk|public.user_roles.user_roles_user_id_users_id_fk",
-        "n|con|public.user_roles.user_roles_user_id_users_id_fk"
+        "s|fk|public.user_roles.user_roles_user_id_users_id_fkey",
+        "n|fk|public.user_roles.user_roles_user_id_users_id_fkey",
+        "e|fk|public.user_roles.user_roles_user_id_users_id_fkey",
+        "n|con|public.user_roles.user_roles_user_id_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.user_roles",
@@ -1239,10 +1457,10 @@
         "user_roles"
       ],
       "writes": [
-        "s|fk|public.user_roles.user_roles_granted_by_users_id_fk",
-        "n|fk|public.user_roles.user_roles_granted_by_users_id_fk",
-        "e|fk|public.user_roles.user_roles_granted_by_users_id_fk",
-        "n|con|public.user_roles.user_roles_granted_by_users_id_fk"
+        "s|fk|public.user_roles.user_roles_granted_by_users_id_fkey",
+        "n|fk|public.user_roles.user_roles_granted_by_users_id_fkey",
+        "e|fk|public.user_roles.user_roles_granted_by_users_id_fkey",
+        "n|con|public.user_roles.user_roles_granted_by_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.user_roles",
@@ -1262,10 +1480,10 @@
         "enrollments"
       ],
       "writes": [
-        "s|fk|public.enrollments.enrollments_user_id_users_id_fk",
-        "n|fk|public.enrollments.enrollments_user_id_users_id_fk",
-        "e|fk|public.enrollments.enrollments_user_id_users_id_fk",
-        "n|con|public.enrollments.enrollments_user_id_users_id_fk"
+        "s|fk|public.enrollments.enrollments_user_id_users_id_fkey",
+        "n|fk|public.enrollments.enrollments_user_id_users_id_fkey",
+        "e|fk|public.enrollments.enrollments_user_id_users_id_fkey",
+        "n|con|public.enrollments.enrollments_user_id_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.enrollments",
@@ -1285,10 +1503,10 @@
         "enrollments"
       ],
       "writes": [
-        "s|fk|public.enrollments.enrollments_course_id_courses_id_fk",
-        "n|fk|public.enrollments.enrollments_course_id_courses_id_fk",
-        "e|fk|public.enrollments.enrollments_course_id_courses_id_fk",
-        "n|con|public.enrollments.enrollments_course_id_courses_id_fk"
+        "s|fk|public.enrollments.enrollments_course_id_courses_id_fkey",
+        "n|fk|public.enrollments.enrollments_course_id_courses_id_fkey",
+        "e|fk|public.enrollments.enrollments_course_id_courses_id_fkey",
+        "n|con|public.enrollments.enrollments_course_id_courses_id_fkey"
       ],
       "reads": [
         "n|tbl|public.enrollments",
@@ -1308,10 +1526,10 @@
         "enrollments"
       ],
       "writes": [
-        "s|fk|public.enrollments.enrollments_promo_code_id_promo_codes_id_fk",
-        "n|fk|public.enrollments.enrollments_promo_code_id_promo_codes_id_fk",
-        "e|fk|public.enrollments.enrollments_promo_code_id_promo_codes_id_fk",
-        "n|con|public.enrollments.enrollments_promo_code_id_promo_codes_id_fk"
+        "s|fk|public.enrollments.enrollments_promo_code_id_promo_codes_id_fkey",
+        "n|fk|public.enrollments.enrollments_promo_code_id_promo_codes_id_fkey",
+        "e|fk|public.enrollments.enrollments_promo_code_id_promo_codes_id_fkey",
+        "n|con|public.enrollments.enrollments_promo_code_id_promo_codes_id_fkey"
       ],
       "reads": [
         "n|tbl|public.enrollments",
@@ -1331,10 +1549,10 @@
         "payments"
       ],
       "writes": [
-        "s|fk|public.payments.payments_enrollment_id_enrollments_id_fk",
-        "n|fk|public.payments.payments_enrollment_id_enrollments_id_fk",
-        "e|fk|public.payments.payments_enrollment_id_enrollments_id_fk",
-        "n|con|public.payments.payments_enrollment_id_enrollments_id_fk"
+        "s|fk|public.payments.payments_enrollment_id_enrollments_id_fkey",
+        "n|fk|public.payments.payments_enrollment_id_enrollments_id_fkey",
+        "e|fk|public.payments.payments_enrollment_id_enrollments_id_fkey",
+        "n|con|public.payments.payments_enrollment_id_enrollments_id_fkey"
       ],
       "reads": [
         "n|tbl|public.payments",
@@ -1354,10 +1572,10 @@
         "payments"
       ],
       "writes": [
-        "s|fk|public.payments.payments_user_id_users_id_fk",
-        "n|fk|public.payments.payments_user_id_users_id_fk",
-        "e|fk|public.payments.payments_user_id_users_id_fk",
-        "n|con|public.payments.payments_user_id_users_id_fk"
+        "s|fk|public.payments.payments_user_id_users_id_fkey",
+        "n|fk|public.payments.payments_user_id_users_id_fkey",
+        "e|fk|public.payments.payments_user_id_users_id_fkey",
+        "n|con|public.payments.payments_user_id_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.payments",
@@ -1377,10 +1595,10 @@
         "payments"
       ],
       "writes": [
-        "s|fk|public.payments.payments_course_id_courses_id_fk",
-        "n|fk|public.payments.payments_course_id_courses_id_fk",
-        "e|fk|public.payments.payments_course_id_courses_id_fk",
-        "n|con|public.payments.payments_course_id_courses_id_fk"
+        "s|fk|public.payments.payments_course_id_courses_id_fkey",
+        "n|fk|public.payments.payments_course_id_courses_id_fkey",
+        "e|fk|public.payments.payments_course_id_courses_id_fkey",
+        "n|con|public.payments.payments_course_id_courses_id_fkey"
       ],
       "reads": [
         "n|tbl|public.payments",
@@ -1400,19 +1618,19 @@
         "payments"
       ],
       "writes": [
-        "s|fk|public.payments.payments_teacher_id_users_id_fk",
-        "n|fk|public.payments.payments_teacher_id_users_id_fk",
-        "e|fk|public.payments.payments_teacher_id_users_id_fk",
-        "n|con|public.payments.payments_teacher_id_users_id_fk"
+        "s|fk|public.payments.payments_profile_id_profiles_id_fkey",
+        "n|fk|public.payments.payments_profile_id_profiles_id_fkey",
+        "e|fk|public.payments.payments_profile_id_profiles_id_fkey",
+        "n|con|public.payments.payments_profile_id_profiles_id_fkey"
       ],
       "reads": [
         "n|tbl|public.payments",
         "n|sch|public",
-        "n|tbl|public.users",
+        "n|tbl|public.profiles",
         "n|sch|public",
-        "n|col|public.payments.teacher_id",
-        "n|col|public.users.id",
-        "e|uniqueness|public.users.id"
+        "n|col|public.payments.profile_id",
+        "n|col|public.profiles.id",
+        "e|uniqueness|public.profiles.id"
       ]
     },
     {
@@ -1423,10 +1641,33 @@
         "payments"
       ],
       "writes": [
-        "s|fk|public.payments.payments_promo_code_id_promo_codes_id_fk",
-        "n|fk|public.payments.payments_promo_code_id_promo_codes_id_fk",
-        "e|fk|public.payments.payments_promo_code_id_promo_codes_id_fk",
-        "n|con|public.payments.payments_promo_code_id_promo_codes_id_fk"
+        "s|fk|public.payments.payments_payout_account_id_payout_accounts_id_fkey",
+        "n|fk|public.payments.payments_payout_account_id_payout_accounts_id_fkey",
+        "e|fk|public.payments.payments_payout_account_id_payout_accounts_id_fkey",
+        "n|con|public.payments.payments_payout_account_id_payout_accounts_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.payments",
+        "n|sch|public",
+        "n|tbl|public.payout_accounts",
+        "n|sch|public",
+        "n|col|public.payments.payout_account_id",
+        "n|col|public.payout_accounts.id",
+        "e|uniqueness|public.payout_accounts.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "payments"
+      ],
+      "writes": [
+        "s|fk|public.payments.payments_promo_code_id_promo_codes_id_fkey",
+        "n|fk|public.payments.payments_promo_code_id_promo_codes_id_fkey",
+        "e|fk|public.payments.payments_promo_code_id_promo_codes_id_fkey",
+        "n|con|public.payments.payments_promo_code_id_promo_codes_id_fkey"
       ],
       "reads": [
         "n|tbl|public.payments",
@@ -1446,10 +1687,10 @@
         "promo_codes"
       ],
       "writes": [
-        "s|fk|public.promo_codes.promo_codes_course_id_courses_id_fk",
-        "n|fk|public.promo_codes.promo_codes_course_id_courses_id_fk",
-        "e|fk|public.promo_codes.promo_codes_course_id_courses_id_fk",
-        "n|con|public.promo_codes.promo_codes_course_id_courses_id_fk"
+        "s|fk|public.promo_codes.promo_codes_course_id_courses_id_fkey",
+        "n|fk|public.promo_codes.promo_codes_course_id_courses_id_fkey",
+        "e|fk|public.promo_codes.promo_codes_course_id_courses_id_fkey",
+        "n|con|public.promo_codes.promo_codes_course_id_courses_id_fkey"
       ],
       "reads": [
         "n|tbl|public.promo_codes",
@@ -1469,10 +1710,10 @@
         "promo_codes"
       ],
       "writes": [
-        "s|fk|public.promo_codes.promo_codes_created_by_users_id_fk",
-        "n|fk|public.promo_codes.promo_codes_created_by_users_id_fk",
-        "e|fk|public.promo_codes.promo_codes_created_by_users_id_fk",
-        "n|con|public.promo_codes.promo_codes_created_by_users_id_fk"
+        "s|fk|public.promo_codes.promo_codes_created_by_users_id_fkey",
+        "n|fk|public.promo_codes.promo_codes_created_by_users_id_fkey",
+        "e|fk|public.promo_codes.promo_codes_created_by_users_id_fkey",
+        "n|con|public.promo_codes.promo_codes_created_by_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.promo_codes",
@@ -1492,10 +1733,10 @@
         "refunds"
       ],
       "writes": [
-        "s|fk|public.refunds.refunds_payment_id_payments_id_fk",
-        "n|fk|public.refunds.refunds_payment_id_payments_id_fk",
-        "e|fk|public.refunds.refunds_payment_id_payments_id_fk",
-        "n|con|public.refunds.refunds_payment_id_payments_id_fk"
+        "s|fk|public.refunds.refunds_payment_id_payments_id_fkey",
+        "n|fk|public.refunds.refunds_payment_id_payments_id_fkey",
+        "e|fk|public.refunds.refunds_payment_id_payments_id_fkey",
+        "n|con|public.refunds.refunds_payment_id_payments_id_fkey"
       ],
       "reads": [
         "n|tbl|public.refunds",
@@ -1515,10 +1756,10 @@
         "refunds"
       ],
       "writes": [
-        "s|fk|public.refunds.refunds_requested_by_users_id_fk",
-        "n|fk|public.refunds.refunds_requested_by_users_id_fk",
-        "e|fk|public.refunds.refunds_requested_by_users_id_fk",
-        "n|con|public.refunds.refunds_requested_by_users_id_fk"
+        "s|fk|public.refunds.refunds_requested_by_users_id_fkey",
+        "n|fk|public.refunds.refunds_requested_by_users_id_fkey",
+        "e|fk|public.refunds.refunds_requested_by_users_id_fkey",
+        "n|con|public.refunds.refunds_requested_by_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.refunds",
@@ -1538,10 +1779,10 @@
         "artefacts"
       ],
       "writes": [
-        "s|fk|public.artefacts.artefacts_lesson_id_lessons_id_fk",
-        "n|fk|public.artefacts.artefacts_lesson_id_lessons_id_fk",
-        "e|fk|public.artefacts.artefacts_lesson_id_lessons_id_fk",
-        "n|con|public.artefacts.artefacts_lesson_id_lessons_id_fk"
+        "s|fk|public.artefacts.artefacts_lesson_id_lessons_id_fkey",
+        "n|fk|public.artefacts.artefacts_lesson_id_lessons_id_fkey",
+        "e|fk|public.artefacts.artefacts_lesson_id_lessons_id_fkey",
+        "n|con|public.artefacts.artefacts_lesson_id_lessons_id_fkey"
       ],
       "reads": [
         "n|tbl|public.artefacts",
@@ -1561,10 +1802,10 @@
         "artefacts"
       ],
       "writes": [
-        "s|fk|public.artefacts.artefacts_media_asset_id_media_assets_id_fk",
-        "n|fk|public.artefacts.artefacts_media_asset_id_media_assets_id_fk",
-        "e|fk|public.artefacts.artefacts_media_asset_id_media_assets_id_fk",
-        "n|con|public.artefacts.artefacts_media_asset_id_media_assets_id_fk"
+        "s|fk|public.artefacts.artefacts_media_asset_id_media_assets_id_fkey",
+        "n|fk|public.artefacts.artefacts_media_asset_id_media_assets_id_fkey",
+        "e|fk|public.artefacts.artefacts_media_asset_id_media_assets_id_fkey",
+        "n|con|public.artefacts.artefacts_media_asset_id_media_assets_id_fkey"
       ],
       "reads": [
         "n|tbl|public.artefacts",
@@ -1584,19 +1825,19 @@
         "courses"
       ],
       "writes": [
-        "s|fk|public.courses.courses_teacher_id_users_id_fk",
-        "n|fk|public.courses.courses_teacher_id_users_id_fk",
-        "e|fk|public.courses.courses_teacher_id_users_id_fk",
-        "n|con|public.courses.courses_teacher_id_users_id_fk"
+        "s|fk|public.courses.courses_profile_id_profiles_id_fkey",
+        "n|fk|public.courses.courses_profile_id_profiles_id_fkey",
+        "e|fk|public.courses.courses_profile_id_profiles_id_fkey",
+        "n|con|public.courses.courses_profile_id_profiles_id_fkey"
       ],
       "reads": [
         "n|tbl|public.courses",
         "n|sch|public",
-        "n|tbl|public.users",
+        "n|tbl|public.profiles",
         "n|sch|public",
-        "n|col|public.courses.teacher_id",
-        "n|col|public.users.id",
-        "e|uniqueness|public.users.id"
+        "n|col|public.courses.profile_id",
+        "n|col|public.profiles.id",
+        "e|uniqueness|public.profiles.id"
       ]
     },
     {
@@ -1607,10 +1848,10 @@
         "courses"
       ],
       "writes": [
-        "s|fk|public.courses.courses_thumbnail_media_id_media_assets_id_fk",
-        "n|fk|public.courses.courses_thumbnail_media_id_media_assets_id_fk",
-        "e|fk|public.courses.courses_thumbnail_media_id_media_assets_id_fk",
-        "n|con|public.courses.courses_thumbnail_media_id_media_assets_id_fk"
+        "s|fk|public.courses.courses_thumbnail_media_id_media_assets_id_fkey",
+        "n|fk|public.courses.courses_thumbnail_media_id_media_assets_id_fkey",
+        "e|fk|public.courses.courses_thumbnail_media_id_media_assets_id_fkey",
+        "n|con|public.courses.courses_thumbnail_media_id_media_assets_id_fkey"
       ],
       "reads": [
         "n|tbl|public.courses",
@@ -1630,10 +1871,10 @@
         "courses"
       ],
       "writes": [
-        "s|fk|public.courses.courses_reviewed_by_users_id_fk",
-        "n|fk|public.courses.courses_reviewed_by_users_id_fk",
-        "e|fk|public.courses.courses_reviewed_by_users_id_fk",
-        "n|con|public.courses.courses_reviewed_by_users_id_fk"
+        "s|fk|public.courses.courses_reviewed_by_users_id_fkey",
+        "n|fk|public.courses.courses_reviewed_by_users_id_fkey",
+        "e|fk|public.courses.courses_reviewed_by_users_id_fkey",
+        "n|con|public.courses.courses_reviewed_by_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.courses",
@@ -1653,10 +1894,10 @@
         "lesson_prerequisites"
       ],
       "writes": [
-        "s|fk|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fk",
-        "n|fk|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fk",
-        "e|fk|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fk",
-        "n|con|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fk"
+        "s|fk|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fkey",
+        "n|fk|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fkey",
+        "e|fk|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fkey",
+        "n|con|public.lesson_prerequisites.lesson_prerequisites_lesson_id_lessons_id_fkey"
       ],
       "reads": [
         "n|tbl|public.lesson_prerequisites",
@@ -1676,10 +1917,10 @@
         "lesson_prerequisites"
       ],
       "writes": [
-        "s|fk|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fk",
-        "n|fk|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fk",
-        "e|fk|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fk",
-        "n|con|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fk"
+        "s|fk|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fkey",
+        "n|fk|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fkey",
+        "e|fk|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fkey",
+        "n|con|public.lesson_prerequisites.lesson_prerequisites_prerequisite_lesson_id_lessons_id_fkey"
       ],
       "reads": [
         "n|tbl|public.lesson_prerequisites",
@@ -1699,10 +1940,10 @@
         "lessons"
       ],
       "writes": [
-        "s|fk|public.lessons.lessons_course_id_courses_id_fk",
-        "n|fk|public.lessons.lessons_course_id_courses_id_fk",
-        "e|fk|public.lessons.lessons_course_id_courses_id_fk",
-        "n|con|public.lessons.lessons_course_id_courses_id_fk"
+        "s|fk|public.lessons.lessons_course_id_courses_id_fkey",
+        "n|fk|public.lessons.lessons_course_id_courses_id_fkey",
+        "e|fk|public.lessons.lessons_course_id_courses_id_fkey",
+        "n|con|public.lessons.lessons_course_id_courses_id_fkey"
       ],
       "reads": [
         "n|tbl|public.lessons",
@@ -1722,10 +1963,10 @@
         "quizzes"
       ],
       "writes": [
-        "s|fk|public.quizzes.quizzes_artefact_id_artefacts_id_fk",
-        "n|fk|public.quizzes.quizzes_artefact_id_artefacts_id_fk",
-        "e|fk|public.quizzes.quizzes_artefact_id_artefacts_id_fk",
-        "n|con|public.quizzes.quizzes_artefact_id_artefacts_id_fk"
+        "s|fk|public.quizzes.quizzes_artefact_id_artefacts_id_fkey",
+        "n|fk|public.quizzes.quizzes_artefact_id_artefacts_id_fkey",
+        "e|fk|public.quizzes.quizzes_artefact_id_artefacts_id_fkey",
+        "n|con|public.quizzes.quizzes_artefact_id_artefacts_id_fkey"
       ],
       "reads": [
         "n|tbl|public.quizzes",
@@ -1745,10 +1986,10 @@
         "artefact_progress"
       ],
       "writes": [
-        "s|fk|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fk",
-        "n|fk|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fk",
-        "e|fk|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fk",
-        "n|con|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fk"
+        "s|fk|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fkey",
+        "n|fk|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fkey",
+        "e|fk|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fkey",
+        "n|con|public.artefact_progress.artefact_progress_enrollment_id_enrollments_id_fkey"
       ],
       "reads": [
         "n|tbl|public.artefact_progress",
@@ -1768,10 +2009,10 @@
         "artefact_progress"
       ],
       "writes": [
-        "s|fk|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fk",
-        "n|fk|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fk",
-        "e|fk|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fk",
-        "n|con|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fk"
+        "s|fk|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fkey",
+        "n|fk|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fkey",
+        "e|fk|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fkey",
+        "n|con|public.artefact_progress.artefact_progress_artefact_id_artefacts_id_fkey"
       ],
       "reads": [
         "n|tbl|public.artefact_progress",
@@ -1791,10 +2032,10 @@
         "certificates"
       ],
       "writes": [
-        "s|fk|public.certificates.certificates_enrollment_id_enrollments_id_fk",
-        "n|fk|public.certificates.certificates_enrollment_id_enrollments_id_fk",
-        "e|fk|public.certificates.certificates_enrollment_id_enrollments_id_fk",
-        "n|con|public.certificates.certificates_enrollment_id_enrollments_id_fk"
+        "s|fk|public.certificates.certificates_enrollment_id_enrollments_id_fkey",
+        "n|fk|public.certificates.certificates_enrollment_id_enrollments_id_fkey",
+        "e|fk|public.certificates.certificates_enrollment_id_enrollments_id_fkey",
+        "n|con|public.certificates.certificates_enrollment_id_enrollments_id_fkey"
       ],
       "reads": [
         "n|tbl|public.certificates",
@@ -1814,10 +2055,10 @@
         "quiz_attempts"
       ],
       "writes": [
-        "s|fk|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fk",
-        "n|fk|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fk",
-        "e|fk|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fk",
-        "n|con|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fk"
+        "s|fk|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fkey",
+        "n|fk|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fkey",
+        "e|fk|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fkey",
+        "n|con|public.quiz_attempts.quiz_attempts_enrollment_id_enrollments_id_fkey"
       ],
       "reads": [
         "n|tbl|public.quiz_attempts",
@@ -1837,10 +2078,10 @@
         "quiz_attempts"
       ],
       "writes": [
-        "s|fk|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fk",
-        "n|fk|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fk",
-        "e|fk|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fk",
-        "n|con|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fk"
+        "s|fk|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fkey",
+        "n|fk|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fkey",
+        "e|fk|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fkey",
+        "n|con|public.quiz_attempts.quiz_attempts_quiz_id_quizzes_id_fkey"
       ],
       "reads": [
         "n|tbl|public.quiz_attempts",
@@ -1860,17 +2101,178 @@
         "media_assets"
       ],
       "writes": [
-        "s|fk|public.media_assets.media_assets_owner_id_users_id_fk",
-        "n|fk|public.media_assets.media_assets_owner_id_users_id_fk",
-        "e|fk|public.media_assets.media_assets_owner_id_users_id_fk",
-        "n|con|public.media_assets.media_assets_owner_id_users_id_fk"
+        "s|fk|public.media_assets.media_assets_uploader_id_users_id_fkey",
+        "n|fk|public.media_assets.media_assets_uploader_id_users_id_fkey",
+        "e|fk|public.media_assets.media_assets_uploader_id_users_id_fkey",
+        "n|con|public.media_assets.media_assets_uploader_id_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.media_assets",
         "n|sch|public",
         "n|tbl|public.users",
         "n|sch|public",
-        "n|col|public.media_assets.owner_id",
+        "n|col|public.media_assets.uploader_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "media_assets"
+      ],
+      "writes": [
+        "s|fk|public.media_assets.media_assets_profile_id_profiles_id_fkey",
+        "n|fk|public.media_assets.media_assets_profile_id_profiles_id_fkey",
+        "e|fk|public.media_assets.media_assets_profile_id_profiles_id_fkey",
+        "n|con|public.media_assets.media_assets_profile_id_profiles_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|col|public.media_assets.profile_id",
+        "n|col|public.profiles.id",
+        "e|uniqueness|public.profiles.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "payout_accounts"
+      ],
+      "writes": [
+        "s|fk|public.payout_accounts.payout_accounts_profile_id_profiles_id_fkey",
+        "n|fk|public.payout_accounts.payout_accounts_profile_id_profiles_id_fkey",
+        "e|fk|public.payout_accounts.payout_accounts_profile_id_profiles_id_fkey",
+        "n|con|public.payout_accounts.payout_accounts_profile_id_profiles_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.payout_accounts",
+        "n|sch|public",
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|col|public.payout_accounts.profile_id",
+        "n|col|public.profiles.id",
+        "e|uniqueness|public.profiles.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "payout_accounts"
+      ],
+      "writes": [
+        "s|fk|public.payout_accounts.payout_accounts_name_verified_by_users_id_fkey",
+        "n|fk|public.payout_accounts.payout_accounts_name_verified_by_users_id_fkey",
+        "e|fk|public.payout_accounts.payout_accounts_name_verified_by_users_id_fkey",
+        "n|con|public.payout_accounts.payout_accounts_name_verified_by_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.payout_accounts",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.payout_accounts.name_verified_by",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "profiles"
+      ],
+      "writes": [
+        "s|fk|public.profiles.profiles_owner_user_id_users_id_fkey",
+        "n|fk|public.profiles.profiles_owner_user_id_users_id_fkey",
+        "e|fk|public.profiles.profiles_owner_user_id_users_id_fkey",
+        "n|con|public.profiles.profiles_owner_user_id_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.profiles.owner_user_id",
+        "n|col|public.users.id",
+        "e|uniqueness|public.users.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "profiles"
+      ],
+      "writes": [
+        "s|fk|public.profiles.profiles_teaching_sample_media_id_media_assets_id_fkey",
+        "n|fk|public.profiles.profiles_teaching_sample_media_id_media_assets_id_fkey",
+        "e|fk|public.profiles.profiles_teaching_sample_media_id_media_assets_id_fkey",
+        "n|con|public.profiles.profiles_teaching_sample_media_id_media_assets_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.profiles.teaching_sample_media_id",
+        "n|col|public.media_assets.id",
+        "e|uniqueness|public.media_assets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "profiles"
+      ],
+      "writes": [
+        "s|fk|public.profiles.profiles_avatar_media_id_media_assets_id_fkey",
+        "n|fk|public.profiles.profiles_avatar_media_id_media_assets_id_fkey",
+        "e|fk|public.profiles.profiles_avatar_media_id_media_assets_id_fkey",
+        "n|con|public.profiles.profiles_avatar_media_id_media_assets_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.profiles.avatar_media_id",
+        "n|col|public.media_assets.id",
+        "e|uniqueness|public.media_assets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "profiles"
+      ],
+      "writes": [
+        "s|fk|public.profiles.profiles_reviewed_by_users_id_fkey",
+        "n|fk|public.profiles.profiles_reviewed_by_users_id_fkey",
+        "e|fk|public.profiles.profiles_reviewed_by_users_id_fkey",
+        "n|con|public.profiles.profiles_reviewed_by_users_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.profiles",
+        "n|sch|public",
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|col|public.profiles.reviewed_by",
         "n|col|public.users.id",
         "e|uniqueness|public.users.id"
       ]
@@ -1883,10 +2285,10 @@
         "analytics_events"
       ],
       "writes": [
-        "s|fk|public.analytics_events.analytics_events_user_id_users_id_fk",
-        "n|fk|public.analytics_events.analytics_events_user_id_users_id_fk",
-        "e|fk|public.analytics_events.analytics_events_user_id_users_id_fk",
-        "n|con|public.analytics_events.analytics_events_user_id_users_id_fk"
+        "s|fk|public.analytics_events.analytics_events_user_id_users_id_fkey",
+        "n|fk|public.analytics_events.analytics_events_user_id_users_id_fkey",
+        "e|fk|public.analytics_events.analytics_events_user_id_users_id_fkey",
+        "n|con|public.analytics_events.analytics_events_user_id_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.analytics_events",
@@ -1906,10 +2308,10 @@
         "audit_log"
       ],
       "writes": [
-        "s|fk|public.audit_log.audit_log_actor_id_users_id_fk",
-        "n|fk|public.audit_log.audit_log_actor_id_users_id_fk",
-        "e|fk|public.audit_log.audit_log_actor_id_users_id_fk",
-        "n|con|public.audit_log.audit_log_actor_id_users_id_fk"
+        "s|fk|public.audit_log.audit_log_actor_id_users_id_fkey",
+        "n|fk|public.audit_log.audit_log_actor_id_users_id_fkey",
+        "e|fk|public.audit_log.audit_log_actor_id_users_id_fkey",
+        "n|con|public.audit_log.audit_log_actor_id_users_id_fkey"
       ],
       "reads": [
         "n|tbl|public.audit_log",
@@ -1926,68 +2328,22 @@
       "statementTarget": [
         "table",
         "public",
-        "teacher_profiles"
+        "audit_log"
       ],
       "writes": [
-        "s|fk|public.teacher_profiles.teacher_profiles_user_id_users_id_fk",
-        "n|fk|public.teacher_profiles.teacher_profiles_user_id_users_id_fk",
-        "e|fk|public.teacher_profiles.teacher_profiles_user_id_users_id_fk",
-        "n|con|public.teacher_profiles.teacher_profiles_user_id_users_id_fk"
+        "s|fk|public.audit_log.audit_log_profile_id_profiles_id_fkey",
+        "n|fk|public.audit_log.audit_log_profile_id_profiles_id_fkey",
+        "e|fk|public.audit_log.audit_log_profile_id_profiles_id_fkey",
+        "n|con|public.audit_log.audit_log_profile_id_profiles_id_fkey"
       ],
       "reads": [
-        "n|tbl|public.teacher_profiles",
+        "n|tbl|public.audit_log",
         "n|sch|public",
-        "n|tbl|public.users",
+        "n|tbl|public.profiles",
         "n|sch|public",
-        "n|col|public.teacher_profiles.user_id",
-        "n|col|public.users.id",
-        "e|uniqueness|public.users.id"
-      ]
-    },
-    {
-      "statementType": "create_fk",
-      "statementTarget": [
-        "table",
-        "public",
-        "teacher_profiles"
-      ],
-      "writes": [
-        "s|fk|public.teacher_profiles.teacher_profiles_teaching_sample_media_id_media_assets_id_fk",
-        "n|fk|public.teacher_profiles.teacher_profiles_teaching_sample_media_id_media_assets_id_fk",
-        "e|fk|public.teacher_profiles.teacher_profiles_teaching_sample_media_id_media_assets_id_fk",
-        "n|con|public.teacher_profiles.teacher_profiles_teaching_sample_media_id_media_assets_id_fk"
-      ],
-      "reads": [
-        "n|tbl|public.teacher_profiles",
-        "n|sch|public",
-        "n|tbl|public.media_assets",
-        "n|sch|public",
-        "n|col|public.teacher_profiles.teaching_sample_media_id",
-        "n|col|public.media_assets.id",
-        "e|uniqueness|public.media_assets.id"
-      ]
-    },
-    {
-      "statementType": "create_fk",
-      "statementTarget": [
-        "table",
-        "public",
-        "teacher_profiles"
-      ],
-      "writes": [
-        "s|fk|public.teacher_profiles.teacher_profiles_reviewed_by_users_id_fk",
-        "n|fk|public.teacher_profiles.teacher_profiles_reviewed_by_users_id_fk",
-        "e|fk|public.teacher_profiles.teacher_profiles_reviewed_by_users_id_fk",
-        "n|con|public.teacher_profiles.teacher_profiles_reviewed_by_users_id_fk"
-      ],
-      "reads": [
-        "n|tbl|public.teacher_profiles",
-        "n|sch|public",
-        "n|tbl|public.users",
-        "n|sch|public",
-        "n|col|public.teacher_profiles.reviewed_by",
-        "n|col|public.users.id",
-        "e|uniqueness|public.users.id"
+        "n|col|public.audit_log.profile_id",
+        "n|col|public.profiles.id",
+        "e|uniqueness|public.profiles.id"
       ]
     }
   ],
@@ -2102,6 +2458,18 @@
     },
     {
       "schema": "public",
+      "name": "payout_accounts",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "profiles",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
       "name": "analytics_events",
       "isRlsEnabled": false,
       "entityType": "tables"
@@ -2115,12 +2483,6 @@
     {
       "schema": "public",
       "name": "webhook_events",
-      "isRlsEnabled": false,
-      "entityType": "tables"
-    },
-    {
-      "schema": "public",
-      "name": "teacher_profiles",
       "isRlsEnabled": false,
       "entityType": "tables"
     },
@@ -2229,6 +2591,34 @@
     },
     {
       "schema": "public",
+      "name": "payout_account_status",
+      "values": [
+        "onboarding",
+        "active"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "profile_status",
+      "values": [
+        "applied",
+        "approved",
+        "rejected"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "name": "profile_type",
+      "values": [
+        "personal",
+        "corporate"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
       "name": "progress_status",
       "values": [
         "not_started",
@@ -2248,11 +2638,10 @@
     },
     {
       "schema": "public",
-      "name": "teacher_status",
+      "name": "stripe_business_type",
       "values": [
-        "applied",
-        "approved",
-        "rejected"
+        "individual",
+        "company"
       ],
       "entityType": "enums"
     },
@@ -2260,7 +2649,6 @@
       "schema": "public",
       "name": "user_role",
       "values": [
-        "teacher",
         "support_agent",
         "super_admin"
       ],
@@ -2915,7 +3303,20 @@
     {
       "schema": "public",
       "table": "payments",
-      "name": "teacher_id",
+      "name": "profile_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payout_account_id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -3604,7 +4005,7 @@
     {
       "schema": "public",
       "table": "courses",
-      "name": "teacher_id",
+      "name": "profile_id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -4410,10 +4811,23 @@
     {
       "schema": "public",
       "table": "media_assets",
-      "name": "owner_id",
+      "name": "uploader_id",
       "type": "uuid",
       "typeSchema": null,
-      "notNull": true,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "profile_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
@@ -4630,6 +5044,409 @@
     },
     {
       "schema": "public",
+      "table": "payout_accounts",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "profile_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "stripe_account_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "business_type",
+      "type": "stripe_business_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "status",
+      "type": "payout_account_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'onboarding'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "details_submitted",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "charges_enabled",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "payouts_enabled",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "activated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "name_verified_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "name_verified_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "type",
+      "type": "profile_type",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "owner_user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "display_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "headline",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "bio",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "credentials",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "teaching_sample_url",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "teaching_sample_media_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "avatar_media_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "legal_entity_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "status",
+      "type": "profile_status",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'applied'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "review_note",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "commission_bps",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1500",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "applied_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "reviewed_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "reviewed_by",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
       "table": "analytics_events",
       "name": "id",
       "type": "uuid",
@@ -4761,6 +5578,19 @@
     {
       "schema": "public",
       "table": "audit_log",
+      "name": "profile_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
       "name": "metadata",
       "type": "jsonb",
       "typeSchema": null,
@@ -4877,240 +5707,6 @@
     },
     {
       "schema": "public",
-      "table": "teacher_profiles",
-      "name": "user_id",
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "display_name",
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "headline",
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "bio",
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "credentials",
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "teaching_sample_url",
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "teaching_sample_media_id",
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "status",
-      "type": "teacher_status",
-      "typeSchema": "public",
-      "notNull": true,
-      "dimensions": 0,
-      "default": "'applied'",
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "review_note",
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "commission_bps",
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "1500",
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "stripe_account_id",
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "stripe_details_submitted",
-      "type": "boolean",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "false",
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "stripe_charges_enabled",
-      "type": "boolean",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "false",
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "stripe_payouts_enabled",
-      "type": "boolean",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "false",
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "applied_at",
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "reviewed_at",
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "reviewed_by",
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "updated_at",
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "entityType": "columns"
-    },
-    {
-      "schema": "public",
       "table": "identities",
       "name": "identities_user_id_index",
       "nameExplicit": false,
@@ -5203,11 +5799,18 @@
     {
       "schema": "public",
       "table": "enrollments",
-      "name": "enrollments_course_id_index",
+      "name": "enrollments_course_id_status_index",
       "nameExplicit": false,
       "columns": [
         {
           "value": "course_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "status",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -5252,11 +5855,39 @@
     {
       "schema": "public",
       "table": "payments",
-      "name": "payments_teacher_id_paid_at_index",
+      "name": "payments_profile_id_paid_at_index",
       "nameExplicit": false,
       "columns": [
         {
-          "value": "teacher_id",
+          "value": "profile_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "paid_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_payout_account_id_paid_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "payout_account_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -5321,6 +5952,55 @@
     },
     {
       "schema": "public",
+      "table": "payments",
+      "name": "payments_paid_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "paid_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_status_paid_at_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "paid_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
       "table": "artefacts",
       "name": "artefacts_lesson_id_position_index",
       "nameExplicit": false,
@@ -5350,11 +6030,11 @@
     {
       "schema": "public",
       "table": "courses",
-      "name": "courses_teacher_id_index",
+      "name": "courses_profile_id_index",
       "nameExplicit": false,
       "columns": [
         {
-          "value": "teacher_id",
+          "value": "profile_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -5511,11 +6191,32 @@
     {
       "schema": "public",
       "table": "media_assets",
-      "name": "media_assets_owner_id_index",
+      "name": "media_assets_uploader_id_index",
       "nameExplicit": false,
       "columns": [
         {
-          "value": "owner_id",
+          "value": "uploader_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "media_assets_profile_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "profile_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -5558,6 +6259,48 @@
       "columns": [
         {
           "value": "provider_asset_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "profiles_one_personal_per_owner",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "owner_user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"type\" = 'personal'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "profiles_owner_user_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "owner_user_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -5630,6 +6373,27 @@
     {
       "schema": "public",
       "table": "audit_log",
+      "name": "audit_log_profile_id_index",
+      "nameExplicit": false,
+      "columns": [
+        {
+          "value": "profile_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "audit_log",
       "name": "audit_log_created_at_index",
       "nameExplicit": false,
       "columns": [
@@ -5651,7 +6415,7 @@
     {
       "schema": "public",
       "table": "identities",
-      "name": "identities_user_id_users_id_fk",
+      "name": "identities_user_id_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -5668,7 +6432,7 @@
     {
       "schema": "public",
       "table": "sessions",
-      "name": "sessions_user_id_users_id_fk",
+      "name": "sessions_user_id_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -5685,7 +6449,7 @@
     {
       "schema": "public",
       "table": "user_roles",
-      "name": "user_roles_user_id_users_id_fk",
+      "name": "user_roles_user_id_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -5702,7 +6466,7 @@
     {
       "schema": "public",
       "table": "user_roles",
-      "name": "user_roles_granted_by_users_id_fk",
+      "name": "user_roles_granted_by_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "granted_by"
@@ -5719,7 +6483,7 @@
     {
       "schema": "public",
       "table": "enrollments",
-      "name": "enrollments_user_id_users_id_fk",
+      "name": "enrollments_user_id_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -5736,7 +6500,7 @@
     {
       "schema": "public",
       "table": "enrollments",
-      "name": "enrollments_course_id_courses_id_fk",
+      "name": "enrollments_course_id_courses_id_fkey",
       "nameExplicit": false,
       "columns": [
         "course_id"
@@ -5753,7 +6517,7 @@
     {
       "schema": "public",
       "table": "enrollments",
-      "name": "enrollments_promo_code_id_promo_codes_id_fk",
+      "name": "enrollments_promo_code_id_promo_codes_id_fkey",
       "nameExplicit": false,
       "columns": [
         "promo_code_id"
@@ -5770,7 +6534,7 @@
     {
       "schema": "public",
       "table": "payments",
-      "name": "payments_enrollment_id_enrollments_id_fk",
+      "name": "payments_enrollment_id_enrollments_id_fkey",
       "nameExplicit": false,
       "columns": [
         "enrollment_id"
@@ -5787,7 +6551,7 @@
     {
       "schema": "public",
       "table": "payments",
-      "name": "payments_user_id_users_id_fk",
+      "name": "payments_user_id_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -5804,7 +6568,7 @@
     {
       "schema": "public",
       "table": "payments",
-      "name": "payments_course_id_courses_id_fk",
+      "name": "payments_course_id_courses_id_fkey",
       "nameExplicit": false,
       "columns": [
         "course_id"
@@ -5821,13 +6585,13 @@
     {
       "schema": "public",
       "table": "payments",
-      "name": "payments_teacher_id_users_id_fk",
+      "name": "payments_profile_id_profiles_id_fkey",
       "nameExplicit": false,
       "columns": [
-        "teacher_id"
+        "profile_id"
       ],
       "schemaTo": "public",
-      "tableTo": "users",
+      "tableTo": "profiles",
       "columnsTo": [
         "id"
       ],
@@ -5838,7 +6602,24 @@
     {
       "schema": "public",
       "table": "payments",
-      "name": "payments_promo_code_id_promo_codes_id_fk",
+      "name": "payments_payout_account_id_payout_accounts_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "payout_account_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "payout_accounts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_promo_code_id_promo_codes_id_fkey",
       "nameExplicit": false,
       "columns": [
         "promo_code_id"
@@ -5855,7 +6636,7 @@
     {
       "schema": "public",
       "table": "promo_codes",
-      "name": "promo_codes_course_id_courses_id_fk",
+      "name": "promo_codes_course_id_courses_id_fkey",
       "nameExplicit": false,
       "columns": [
         "course_id"
@@ -5872,7 +6653,7 @@
     {
       "schema": "public",
       "table": "promo_codes",
-      "name": "promo_codes_created_by_users_id_fk",
+      "name": "promo_codes_created_by_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "created_by"
@@ -5889,7 +6670,7 @@
     {
       "schema": "public",
       "table": "refunds",
-      "name": "refunds_payment_id_payments_id_fk",
+      "name": "refunds_payment_id_payments_id_fkey",
       "nameExplicit": false,
       "columns": [
         "payment_id"
@@ -5906,7 +6687,7 @@
     {
       "schema": "public",
       "table": "refunds",
-      "name": "refunds_requested_by_users_id_fk",
+      "name": "refunds_requested_by_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "requested_by"
@@ -5923,7 +6704,7 @@
     {
       "schema": "public",
       "table": "artefacts",
-      "name": "artefacts_lesson_id_lessons_id_fk",
+      "name": "artefacts_lesson_id_lessons_id_fkey",
       "nameExplicit": false,
       "columns": [
         "lesson_id"
@@ -5940,7 +6721,7 @@
     {
       "schema": "public",
       "table": "artefacts",
-      "name": "artefacts_media_asset_id_media_assets_id_fk",
+      "name": "artefacts_media_asset_id_media_assets_id_fkey",
       "nameExplicit": false,
       "columns": [
         "media_asset_id"
@@ -5957,13 +6738,13 @@
     {
       "schema": "public",
       "table": "courses",
-      "name": "courses_teacher_id_users_id_fk",
+      "name": "courses_profile_id_profiles_id_fkey",
       "nameExplicit": false,
       "columns": [
-        "teacher_id"
+        "profile_id"
       ],
       "schemaTo": "public",
-      "tableTo": "users",
+      "tableTo": "profiles",
       "columnsTo": [
         "id"
       ],
@@ -5974,7 +6755,7 @@
     {
       "schema": "public",
       "table": "courses",
-      "name": "courses_thumbnail_media_id_media_assets_id_fk",
+      "name": "courses_thumbnail_media_id_media_assets_id_fkey",
       "nameExplicit": false,
       "columns": [
         "thumbnail_media_id"
@@ -5991,7 +6772,7 @@
     {
       "schema": "public",
       "table": "courses",
-      "name": "courses_reviewed_by_users_id_fk",
+      "name": "courses_reviewed_by_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "reviewed_by"
@@ -6008,7 +6789,7 @@
     {
       "schema": "public",
       "table": "lesson_prerequisites",
-      "name": "lesson_prerequisites_lesson_id_lessons_id_fk",
+      "name": "lesson_prerequisites_lesson_id_lessons_id_fkey",
       "nameExplicit": false,
       "columns": [
         "lesson_id"
@@ -6025,7 +6806,7 @@
     {
       "schema": "public",
       "table": "lesson_prerequisites",
-      "name": "lesson_prerequisites_prerequisite_lesson_id_lessons_id_fk",
+      "name": "lesson_prerequisites_prerequisite_lesson_id_lessons_id_fkey",
       "nameExplicit": false,
       "columns": [
         "prerequisite_lesson_id"
@@ -6042,7 +6823,7 @@
     {
       "schema": "public",
       "table": "lessons",
-      "name": "lessons_course_id_courses_id_fk",
+      "name": "lessons_course_id_courses_id_fkey",
       "nameExplicit": false,
       "columns": [
         "course_id"
@@ -6059,7 +6840,7 @@
     {
       "schema": "public",
       "table": "quizzes",
-      "name": "quizzes_artefact_id_artefacts_id_fk",
+      "name": "quizzes_artefact_id_artefacts_id_fkey",
       "nameExplicit": false,
       "columns": [
         "artefact_id"
@@ -6076,7 +6857,7 @@
     {
       "schema": "public",
       "table": "artefact_progress",
-      "name": "artefact_progress_enrollment_id_enrollments_id_fk",
+      "name": "artefact_progress_enrollment_id_enrollments_id_fkey",
       "nameExplicit": false,
       "columns": [
         "enrollment_id"
@@ -6093,7 +6874,7 @@
     {
       "schema": "public",
       "table": "artefact_progress",
-      "name": "artefact_progress_artefact_id_artefacts_id_fk",
+      "name": "artefact_progress_artefact_id_artefacts_id_fkey",
       "nameExplicit": false,
       "columns": [
         "artefact_id"
@@ -6110,7 +6891,7 @@
     {
       "schema": "public",
       "table": "certificates",
-      "name": "certificates_enrollment_id_enrollments_id_fk",
+      "name": "certificates_enrollment_id_enrollments_id_fkey",
       "nameExplicit": false,
       "columns": [
         "enrollment_id"
@@ -6127,7 +6908,7 @@
     {
       "schema": "public",
       "table": "quiz_attempts",
-      "name": "quiz_attempts_enrollment_id_enrollments_id_fk",
+      "name": "quiz_attempts_enrollment_id_enrollments_id_fkey",
       "nameExplicit": false,
       "columns": [
         "enrollment_id"
@@ -6144,7 +6925,7 @@
     {
       "schema": "public",
       "table": "quiz_attempts",
-      "name": "quiz_attempts_quiz_id_quizzes_id_fk",
+      "name": "quiz_attempts_quiz_id_quizzes_id_fkey",
       "nameExplicit": false,
       "columns": [
         "quiz_id"
@@ -6161,10 +6942,10 @@
     {
       "schema": "public",
       "table": "media_assets",
-      "name": "media_assets_owner_id_users_id_fk",
+      "name": "media_assets_uploader_id_users_id_fkey",
       "nameExplicit": false,
       "columns": [
-        "owner_id"
+        "uploader_id"
       ],
       "schemaTo": "public",
       "tableTo": "users",
@@ -6172,13 +6953,132 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "media_assets",
+      "name": "media_assets_profile_id_profiles_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "profile_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "profiles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "payout_accounts_profile_id_profiles_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "profile_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "profiles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "payout_accounts_name_verified_by_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "name_verified_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "profiles_owner_user_id_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "owner_user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "profiles_teaching_sample_media_id_media_assets_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "teaching_sample_media_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "media_assets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "profiles_avatar_media_id_media_assets_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "avatar_media_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "media_assets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "profiles_reviewed_by_users_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "reviewed_by"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
       "entityType": "fks"
     },
     {
       "schema": "public",
       "table": "analytics_events",
-      "name": "analytics_events_user_id_users_id_fk",
+      "name": "analytics_events_user_id_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -6195,7 +7095,7 @@
     {
       "schema": "public",
       "table": "audit_log",
-      "name": "audit_log_actor_id_users_id_fk",
+      "name": "audit_log_actor_id_users_id_fkey",
       "nameExplicit": false,
       "columns": [
         "actor_id"
@@ -6211,31 +7111,14 @@
     },
     {
       "schema": "public",
-      "table": "teacher_profiles",
-      "name": "teacher_profiles_user_id_users_id_fk",
+      "table": "audit_log",
+      "name": "audit_log_profile_id_profiles_id_fkey",
       "nameExplicit": false,
       "columns": [
-        "user_id"
+        "profile_id"
       ],
       "schemaTo": "public",
-      "tableTo": "users",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "entityType": "fks"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "teacher_profiles_teaching_sample_media_id_media_assets_id_fk",
-      "nameExplicit": false,
-      "columns": [
-        "teaching_sample_media_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "media_assets",
+      "tableTo": "profiles",
       "columnsTo": [
         "id"
       ],
@@ -6245,20 +7128,47 @@
     },
     {
       "schema": "public",
-      "table": "teacher_profiles",
-      "name": "teacher_profiles_reviewed_by_users_id_fk",
-      "nameExplicit": false,
+      "table": "user_roles",
+      "name": "user_roles_pkey",
       "columns": [
-        "reviewed_by"
+        "user_id",
+        "role"
       ],
-      "schemaTo": "public",
-      "tableTo": "users",
-      "columnsTo": [
-        "id"
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "lesson_prerequisites",
+      "name": "lesson_prerequisites_pkey",
+      "columns": [
+        "lesson_id",
+        "prerequisite_lesson_id"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "SET NULL",
-      "entityType": "fks"
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "artefact_progress",
+      "name": "artefact_progress_pkey",
+      "columns": [
+        "enrollment_id",
+        "artefact_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "webhook_events",
+      "name": "webhook_events_pkey",
+      "columns": [
+        "provider",
+        "event_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
     },
     {
       "schema": "public",
@@ -6286,17 +7196,6 @@
       "name": "sessions_pkey",
       "columns": [
         "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "schema": "public",
-      "table": "user_roles",
-      "name": "user_roles_user_id_role_pk",
-      "columns": [
-        "user_id",
-        "role"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -6373,17 +7272,6 @@
     },
     {
       "schema": "public",
-      "table": "lesson_prerequisites",
-      "name": "lesson_prerequisites_lesson_id_prerequisite_lesson_id_pk",
-      "columns": [
-        "lesson_id",
-        "prerequisite_lesson_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "schema": "public",
       "table": "lessons",
       "name": "lessons_pkey",
       "columns": [
@@ -6398,17 +7286,6 @@
       "name": "quizzes_pkey",
       "columns": [
         "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "schema": "public",
-      "table": "artefact_progress",
-      "name": "artefact_progress_enrollment_id_artefact_id_pk",
-      "columns": [
-        "enrollment_id",
-        "artefact_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -6445,6 +7322,26 @@
     },
     {
       "schema": "public",
+      "table": "payout_accounts",
+      "name": "payout_accounts_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "profiles",
+      "name": "profiles_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
       "table": "analytics_events",
       "name": "analytics_events_pkey",
       "columns": [
@@ -6465,30 +7362,9 @@
     },
     {
       "schema": "public",
-      "table": "webhook_events",
-      "name": "webhook_events_provider_event_id_pk",
-      "columns": [
-        "provider",
-        "event_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "schema": "public",
-      "table": "teacher_profiles",
-      "name": "teacher_profiles_pkey",
-      "columns": [
-        "user_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "schema": "public",
       "table": "identities",
-      "name": "identities_provider_providerSubject_unique",
-      "nameExplicit": true,
+      "name": "identities_provider_provider_subject_unique",
+      "nameExplicit": false,
       "columns": [
         "provider",
         "provider_subject"
@@ -6498,9 +7374,21 @@
     },
     {
       "schema": "public",
+      "table": "enrollments",
+      "name": "enrollments_user_id_course_id_unique",
+      "nameExplicit": false,
+      "columns": [
+        "user_id",
+        "course_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
       "table": "magic_links",
-      "name": "magic_links_tokenHash_unique",
-      "nameExplicit": true,
+      "name": "magic_links_token_hash_key",
+      "nameExplicit": false,
       "columns": [
         "token_hash"
       ],
@@ -6510,8 +7398,8 @@
     {
       "schema": "public",
       "table": "sessions",
-      "name": "sessions_tokenHash_unique",
-      "nameExplicit": true,
+      "name": "sessions_token_hash_key",
+      "nameExplicit": false,
       "columns": [
         "token_hash"
       ],
@@ -6521,7 +7409,7 @@
     {
       "schema": "public",
       "table": "users",
-      "name": "users_email_unique",
+      "name": "users_email_key",
       "nameExplicit": false,
       "columns": [
         "email"
@@ -6532,31 +7420,8 @@
     {
       "schema": "public",
       "table": "enrollments",
-      "name": "enrollments_stripeCheckoutSessionId_unique",
-      "nameExplicit": true,
-      "columns": [
-        "stripe_checkout_session_id"
-      ],
-      "nullsNotDistinct": false,
-      "entityType": "uniques"
-    },
-    {
-      "schema": "public",
-      "table": "enrollments",
-      "name": "enrollments_userId_courseId_unique",
-      "nameExplicit": true,
-      "columns": [
-        "user_id",
-        "course_id"
-      ],
-      "nullsNotDistinct": false,
-      "entityType": "uniques"
-    },
-    {
-      "schema": "public",
-      "table": "payments",
-      "name": "payments_stripeCheckoutSessionId_unique",
-      "nameExplicit": true,
+      "name": "enrollments_stripe_checkout_session_id_key",
+      "nameExplicit": false,
       "columns": [
         "stripe_checkout_session_id"
       ],
@@ -6566,8 +7431,19 @@
     {
       "schema": "public",
       "table": "payments",
-      "name": "payments_stripePaymentIntentId_unique",
-      "nameExplicit": true,
+      "name": "payments_stripe_checkout_session_id_key",
+      "nameExplicit": false,
+      "columns": [
+        "stripe_checkout_session_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "name": "payments_stripe_payment_intent_id_key",
+      "nameExplicit": false,
       "columns": [
         "stripe_payment_intent_id"
       ],
@@ -6577,7 +7453,7 @@
     {
       "schema": "public",
       "table": "promo_codes",
-      "name": "promo_codes_code_unique",
+      "name": "promo_codes_code_key",
       "nameExplicit": false,
       "columns": [
         "code"
@@ -6588,8 +7464,8 @@
     {
       "schema": "public",
       "table": "refunds",
-      "name": "refunds_stripeRefundId_unique",
-      "nameExplicit": true,
+      "name": "refunds_stripe_refund_id_key",
+      "nameExplicit": false,
       "columns": [
         "stripe_refund_id"
       ],
@@ -6599,7 +7475,7 @@
     {
       "schema": "public",
       "table": "courses",
-      "name": "courses_slug_unique",
+      "name": "courses_slug_key",
       "nameExplicit": false,
       "columns": [
         "slug"
@@ -6610,8 +7486,8 @@
     {
       "schema": "public",
       "table": "quizzes",
-      "name": "quizzes_artefactId_unique",
-      "nameExplicit": true,
+      "name": "quizzes_artefact_id_key",
+      "nameExplicit": false,
       "columns": [
         "artefact_id"
       ],
@@ -6621,8 +7497,8 @@
     {
       "schema": "public",
       "table": "certificates",
-      "name": "certificates_enrollmentId_unique",
-      "nameExplicit": true,
+      "name": "certificates_enrollment_id_key",
+      "nameExplicit": false,
       "columns": [
         "enrollment_id"
       ],
@@ -6632,7 +7508,7 @@
     {
       "schema": "public",
       "table": "certificates",
-      "name": "certificates_token_unique",
+      "name": "certificates_token_key",
       "nameExplicit": false,
       "columns": [
         "token"
@@ -6642,9 +7518,20 @@
     },
     {
       "schema": "public",
-      "table": "teacher_profiles",
-      "name": "teacher_profiles_stripeAccountId_unique",
-      "nameExplicit": true,
+      "table": "payout_accounts",
+      "name": "payout_accounts_profile_id_key",
+      "nameExplicit": false,
+      "columns": [
+        "profile_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
+      "table": "payout_accounts",
+      "name": "payout_accounts_stripe_account_id_key",
+      "nameExplicit": false,
       "columns": [
         "stripe_account_id"
       ],
@@ -6653,23 +7540,34 @@
     },
     {
       "schema": "public",
+      "table": "profiles",
+      "name": "profiles_legal_entity_id_key",
+      "nameExplicit": false,
+      "columns": [
+        "legal_entity_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "public",
       "table": "courses",
       "name": "courses_price_cents_non_negative",
-      "value": "\"courses\".\"price_cents\" >= 0",
+      "value": "\"price_cents\" >= 0",
       "entityType": "checks"
     },
     {
       "schema": "public",
       "table": "lesson_prerequisites",
       "name": "lesson_prerequisites_not_self",
-      "value": "\"lesson_prerequisites\".\"lesson_id\" <> \"lesson_prerequisites\".\"prerequisite_lesson_id\"",
+      "value": "\"lesson_id\" <> \"prerequisite_lesson_id\"",
       "entityType": "checks"
     },
     {
       "schema": "public",
-      "table": "teacher_profiles",
-      "name": "teacher_profiles_commission_bps_range",
-      "value": "\"teacher_profiles\".\"commission_bps\" between 0 and 10000",
+      "table": "profiles",
+      "name": "profiles_commission_bps_range",
+      "value": "\"commission_bps\" between 0 and 10000",
       "entityType": "checks"
     }
   ]

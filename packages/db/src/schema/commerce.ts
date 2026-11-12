@@ -4,6 +4,7 @@ import { users } from './auth'
 import { citext, createdAt, id, ts, updatedAt } from './columns'
 import { courses } from './courses'
 import { enrollmentModeEnum, enrollmentStatusEnum, paymentStatusEnum, promoTypeEnum } from './enums'
+import { payoutAccounts, profiles } from './profiles'
 
 /** Platform-managed promo codes (not Stripe promotion codes) so the application fee stays exact. */
 export const promoCodes = snakeCase.table('promo_codes', {
@@ -44,15 +45,14 @@ export const enrollments = snakeCase.table(
     status: enrollmentStatusEnum().notNull().default('pending_payment'),
     attendanceRecords: jsonb().$type<AttendanceRecord[]>().notNull().default(sql`'[]'::jsonb`),
     promoCodeId: uuid().references(() => promoCodes.id, { onDelete: 'set null' }),
-    // Name pinned to the applied migration; see the note in ./index.ts.
-    stripeCheckoutSessionId: text().unique('enrollments_stripeCheckoutSessionId_unique'),
+    stripeCheckoutSessionId: text().unique(),
     enrolledAt: ts(),
     completedAt: ts(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
-    unique('enrollments_userId_courseId_unique').on(t.userId, t.courseId),
+    unique().on(t.userId, t.courseId),
     index().on(t.courseId, t.status),
     index().on(t.userId, t.status),
   ],
@@ -71,11 +71,16 @@ export const payments = snakeCase.table(
     courseId: uuid()
       .notNull()
       .references(() => courses.id, { onDelete: 'restrict' }),
-    teacherId: uuid()
+    /** The profile at the time of sale, kept for audit. Money queries go by `payoutAccountId`. */
+    profileId: uuid()
       .notNull()
-      .references(() => users.id, { onDelete: 'restrict' }),
-    stripeCheckoutSessionId: text().notNull().unique('payments_stripeCheckoutSessionId_unique'),
-    stripePaymentIntentId: text().unique('payments_stripePaymentIntentId_unique'),
+      .references(() => profiles.id, { onDelete: 'restrict' }),
+    /** The account this sale paid. Set once at fulfilment and never updated. */
+    payoutAccountId: uuid()
+      .notNull()
+      .references(() => payoutAccounts.id, { onDelete: 'restrict' }),
+    stripeCheckoutSessionId: text().notNull().unique(),
+    stripePaymentIntentId: text().unique(),
     stripeChargeId: text(),
     stripeTransferId: text(),
     stripeApplicationFeeId: text(),
@@ -99,7 +104,8 @@ export const payments = snakeCase.table(
     createdAt: createdAt(),
   },
   (t) => [
-    index().on(t.teacherId, t.paidAt),
+    index().on(t.profileId, t.paidAt),
+    index().on(t.payoutAccountId, t.paidAt),
     index().on(t.courseId),
     index().on(t.userId),
     index().on(t.paidAt),
@@ -112,7 +118,7 @@ export const refunds = snakeCase.table('refunds', {
   paymentId: uuid()
     .notNull()
     .references(() => payments.id, { onDelete: 'restrict' }),
-  stripeRefundId: text().notNull().unique('refunds_stripeRefundId_unique'),
+  stripeRefundId: text().notNull().unique(),
   amountCents: integer().notNull(),
   reason: text(),
   requestedBy: uuid().references(() => users.id, { onDelete: 'set null' }),

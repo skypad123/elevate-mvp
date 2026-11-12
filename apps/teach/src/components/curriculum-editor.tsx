@@ -17,6 +17,7 @@ import { FileAudio, FileText, Film, HelpCircle, type LucideIcon, Plus, Trash2 } 
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { type CourseActions, uploadInlineImage, useCourseActions } from '../lib/courses'
+import { useCurrentProfile } from '../lib/profile'
 import { useSaveTracker } from '../lib/save-tracker'
 import { useDebounced } from '../lib/use-debounced'
 import { QuizEditor } from './quiz-editor'
@@ -327,6 +328,7 @@ function ArtefactEditor({
   locked: boolean
 }) {
   const { track } = useSaveTracker()
+  const { profileId } = useCurrentProfile()
   const [title, setTitle] = useState(artefact.title)
   const [quizSaving, setQuizSaving] = useState(false)
   const saveTitle = useDebounced(
@@ -357,6 +359,7 @@ function ArtefactEditor({
       {artefact.type === 'video' || artefact.type === 'audio' ? (
         <MediaUploader
           api={api}
+          profileId={profileId}
           kind={artefact.type}
           value={artefact.media}
           disabled={locked}
@@ -377,7 +380,7 @@ function ArtefactEditor({
           disabled={locked}
           placeholder="Write the lesson text. Headings, lists, links and images are supported."
           onChange={saveContent}
-          onPickImage={uploadInlineImage}
+          onPickImage={() => uploadInlineImage(profileId)}
           minHeight={320}
         />
       ) : null}

@@ -24,7 +24,7 @@ const progress = (artefactId: string, body: unknown) =>
 
 beforeAll(async () => {
   t = await createTestApp()
-  await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', storageDir: null })
+  await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', mode: 'demo', storage: null })
   const signed = await t.signIn('student@example.com')
   learner = signed.token as string
   const course = await t.db.query.courses.findFirst({

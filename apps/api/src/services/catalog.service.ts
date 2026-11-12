@@ -10,15 +10,19 @@ import { schema as s } from '@elevate/db'
 import { and, EmptyFilter, eq, exists, ilike, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
+import { hasRole, type SessionUser } from '../middleware/auth'
+import { loadActor } from './auth.service'
 import { MediaService } from './media.service'
+import { profileAvatarUrl } from './profiles.service'
 
 type CourseWithCard = typeof s.courses.$inferSelect & {
   thumbnail: typeof s.mediaAssets.$inferSelect | null
-  teacher: typeof s.users.$inferSelect & {
-    teacherProfile: typeof s.teacherProfiles.$inferSelect | null
-  }
+  profile: Pick<typeof s.profiles.$inferSelect, 'displayName'>
   lessons: Array<{ id: string }>
 }
+
+/** Who is looking: only used to show unpublished courses to the people who may preview them. */
+type Viewer = Pick<SessionUser, 'id' | 'roles'>
 
 const encodeOffset = (offset: number) => Buffer.from(String(offset)).toString('base64url')
 const decodeOffset = (cursor?: string) => {
@@ -42,8 +46,7 @@ export class CatalogService {
       category: course.category,
       priceCents: course.priceCents,
       thumbnailUrl: await this.media.publicUrl(course.thumbnail),
-      teacherName:
-        course.teacher.teacherProfile?.displayName ?? course.teacher.name ?? 'Elevate teacher',
+      teacherName: course.profile.displayName,
       enrolCount: course.enrolCount,
       lessonCount: course.lessons.length,
       publishedAt: course.publishedAt?.toISOString() ?? null,
@@ -72,7 +75,7 @@ export class CatalogService {
       where: {
         status: 'live',
         ...(query.category ? { category: query.category } : {}),
-        // Search matches the title, the summary or the teacher's display name. The callback's
+        // Search matches the title, the summary or the profile's display name. The callback's
         // `course` is the query's own alias for the table, which the subquery must refer to.
         ...(like
           ? {
@@ -83,11 +86,11 @@ export class CatalogService {
                   exists(
                     db
                       .select({ one: sql`1` })
-                      .from(s.teacherProfiles)
+                      .from(s.profiles)
                       .where(
                         and(
-                          eq(s.teacherProfiles.userId, course.teacherId),
-                          ilike(s.teacherProfiles.displayName, like),
+                          eq(s.profiles.id, course.profileId),
+                          ilike(s.profiles.displayName, like),
                         ),
                       ),
                   ),
@@ -97,7 +100,7 @@ export class CatalogService {
       },
       with: {
         thumbnail: true,
-        teacher: { with: { teacherProfile: true } },
+        profile: true,
         lessons: { columns: { id: true } },
       },
       orderBy:
@@ -115,13 +118,13 @@ export class CatalogService {
     }
   }
 
-  async detail(slug: string, viewerId: string | null): Promise<CoursePublicView> {
+  async detail(slug: string, viewer: Viewer | null): Promise<CoursePublicView> {
     const { db } = this.deps
     const course = await db.query.courses.findFirst({
       where: { slug },
       with: {
         thumbnail: true,
-        teacher: { with: { teacherProfile: true } },
+        profile: { with: { owner: true, avatar: true } },
         lessons: {
           orderBy: { position: 'asc' },
           with: {
@@ -135,14 +138,18 @@ export class CatalogService {
       },
     })
     if (!course) throw errors.notFound('Course')
-    const viewer = viewerId
+    const enrollment = viewer
       ? await db.query.enrollments.findFirst({
-          where: { courseId: course.id, userId: viewerId },
+          where: { courseId: course.id, userId: viewer.id },
         })
       : null
-    // Teachers and staff may preview unpublished courses; everyone else sees live ones only.
+    // Anyone on the course's profile, and staff, may preview an unpublished course; everyone
+    // else sees live ones only.
     if (course.status !== 'live') {
-      const allowed = viewerId && (viewerId === course.teacherId || (await this.isStaff(viewerId)))
+      const allowed =
+        viewer &&
+        (hasRole(viewer, 'support_agent') ||
+          (await loadActor(this.deps, viewer, course.profileId)) !== null)
       if (!allowed) throw errors.notFound('Course')
     }
     const lessons = course.lessons.map((l) => ({
@@ -178,27 +185,22 @@ export class CatalogService {
       lessonCount: lessons.length,
       artefactCount,
       durationSeconds,
+      // The public card keeps its field names; `id` is the profile's ID.
       teacher: {
-        id: course.teacher.id,
-        displayName:
-          course.teacher.teacherProfile?.displayName ?? course.teacher.name ?? 'Elevate teacher',
-        headline: course.teacher.teacherProfile?.headline ?? null,
-        bio: course.teacher.teacherProfile?.bio ?? null,
-        avatarUrl: course.teacher.avatarUrl,
+        id: course.profile.id,
+        displayName: course.profile.displayName,
+        headline: course.profile.headline,
+        bio: course.profile.bio,
+        avatarUrl: await profileAvatarUrl(this.media, course.profile),
       },
       lessons,
-      viewer: viewer
+      viewer: enrollment
         ? {
-            enrollmentId: viewer.id,
-            status: viewer.status,
-            completedAt: viewer.completedAt?.toISOString() ?? null,
+            enrollmentId: enrollment.id,
+            status: enrollment.status,
+            completedAt: enrollment.completedAt?.toISOString() ?? null,
           }
         : null,
     }
-  }
-
-  private async isStaff(userId: string): Promise<boolean> {
-    const roles = await this.deps.db.query.userRoles.findMany({ where: { userId } })
-    return roles.some((r) => r.role === 'support_agent' || r.role === 'super_admin')
   }
 }

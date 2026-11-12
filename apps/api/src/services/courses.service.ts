@@ -1,9 +1,11 @@
 import {
   ANALYTICS_EVENTS,
   type ArtefactView,
+  type Capability,
   type CourseSummary,
   type CourseView,
   type CreateCourse,
+  can,
   isEmptyDoc,
   type LessonView,
   type QuizDefinition,
@@ -17,11 +19,19 @@ import { schema as s } from '@elevate/db'
 import { eq, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
-import { hasRole, type SessionUser } from '../middleware/auth'
+import { isPayable } from '../lib/payout'
+import type { ProfileActor, SessionUser } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
 import { MediaService } from './media.service'
 
 const EDITABLE_STATUSES = new Set(['draft', 'rejected', 'live'])
+
+/** Any one of these lets an actor change course content; which one applies depends on the course. */
+const CONTENT_CAPABILITIES: Capability[] = [
+  'course.editDraft',
+  'course.editLive',
+  'course.proposeLiveEdit',
+]
 
 type CourseRow = typeof s.courses.$inferSelect
 
@@ -33,13 +43,17 @@ export class CoursesService {
 
   // ── loading ──────────────────────────────────────────────────────────────
 
-  async loadCourseView(courseId: string): Promise<CourseView> {
+  /**
+   * The full builder view of a course. With `profileId`, the course must belong to that profile;
+   * a course of another profile is reported as not found.
+   */
+  async loadCourseView(courseId: string, profileId?: string): Promise<CourseView> {
     const { db } = this.deps
     const course = await db.query.courses.findFirst({
-      where: { id: courseId },
+      where: { id: courseId, ...(profileId ? { profileId } : {}) },
       with: {
         thumbnail: true,
-        teacher: { with: { teacherProfile: true } },
+        profile: { with: { owner: true, payoutAccount: true } },
         lessons: {
           orderBy: { position: 'asc', createdAt: 'asc' },
           with: {
@@ -81,8 +95,7 @@ export class CoursesService {
       })
     }
 
-    const teacherProfile = course.teacher.teacherProfile
-    const stripeChargesEnabled = teacherProfile?.stripeChargesEnabled ?? false
+    const payable = isPayable(course.profile.payoutAccount)
     const thumbnail = course.thumbnail ? await this.media.toView(course.thumbnail) : null
     const checklist = validateCourseForSubmission({
       title: course.title,
@@ -106,7 +119,7 @@ export class CoursesService {
       prerequisites: lessons.flatMap((l) =>
         l.prerequisiteIds.map((prerequisiteId) => ({ lessonId: l.id, prerequisiteId })),
       ),
-      teacherStripeChargesEnabled: stripeChargesEnabled,
+      payable,
     })
 
     return {
@@ -121,11 +134,11 @@ export class CoursesService {
       status: course.status,
       rejectionReason: course.rejectionReason,
       thumbnail,
-      teacher: {
-        id: course.teacher.id,
-        displayName: teacherProfile?.displayName ?? course.teacher.name ?? course.teacher.email,
-        email: course.teacher.email,
-        stripeChargesEnabled,
+      profile: {
+        id: course.profile.id,
+        displayName: course.profile.displayName,
+        ownerEmail: course.profile.owner.email,
+        payable,
       },
       lessons,
       checklist,
@@ -138,9 +151,14 @@ export class CoursesService {
     }
   }
 
-  /** Lists courses, optionally narrowed to one status and/or one teacher. */
+  /** Support's read of a course: any profile's, with no actor. */
+  async loadForSupport(courseId: string): Promise<CourseView> {
+    return this.loadCourseView(courseId)
+  }
+
+  /** Lists courses, optionally narrowed to one status and/or one profile. */
   async listSummaries(
-    filter: { status?: CourseRow['status']; teacherId?: string } = {},
+    filter: { status?: CourseRow['status']; profileId?: string } = {},
     orderBy: 'updated' | 'submitted' = 'updated',
   ): Promise<CourseSummary[]> {
     const { db } = this.deps
@@ -148,11 +166,11 @@ export class CoursesService {
       // Drizzle rejects a filter key whose value is undefined, so absent ones are left out.
       where: {
         ...(filter.status ? { status: filter.status } : {}),
-        ...(filter.teacherId ? { teacherId: filter.teacherId } : {}),
+        ...(filter.profileId ? { profileId: filter.profileId } : {}),
       },
       with: {
         thumbnail: true,
-        teacher: { with: { teacherProfile: true } },
+        profile: { with: { owner: true } },
         lessons: { with: { artefacts: { columns: { id: true } } }, columns: { id: true } },
       },
       orderBy: orderBy === 'submitted' ? { submittedAt: 'asc' } : { updatedAt: 'desc' },
@@ -170,8 +188,9 @@ export class CoursesService {
         lessonCount: c.lessons.length,
         artefactCount: c.lessons.reduce((n, l) => n + l.artefacts.length, 0),
         enrolCount: c.enrolCount,
-        teacherName: c.teacher.teacherProfile?.displayName ?? c.teacher.name ?? c.teacher.email,
-        teacherEmail: c.teacher.email,
+        profileId: c.profileId,
+        profileName: c.profile.displayName,
+        ownerEmail: c.profile.owner.email,
         submittedAt: c.submittedAt?.toISOString() ?? null,
         updatedAt: c.updatedAt.toISOString(),
       })
@@ -179,44 +198,71 @@ export class CoursesService {
     return out
   }
 
-  // ── teacher operations ───────────────────────────────────────────────────
+  // ── profile operations ───────────────────────────────────────────────────
+  //
+  // Every function here takes the actor that `requireProfile` resolved. Each lookup filters by the
+  // actor's profile in the same query that loads the row, so a course, lesson or artefact of
+  // another profile is simply not found.
 
-  async listForTeacher(user: SessionUser): Promise<CourseSummary[]> {
-    return this.listSummaries({ teacherId: user.id })
+  async listForProfile(actor: ProfileActor): Promise<CourseSummary[]> {
+    return this.listSummaries({ profileId: actor.profileId })
   }
 
-  private async ownedCourse(
-    user: SessionUser,
-    courseId: string,
-    options: { forEdit?: boolean } = {},
-  ): Promise<CourseRow> {
-    const course = await this.deps.db.query.courses.findFirst({ where: { id: courseId } })
-    if (!course) throw errors.notFound('Course')
-    if (course.teacherId !== user.id && !hasRole(user, 'support_agent')) throw errors.forbidden()
-    if (options.forEdit && !EDITABLE_STATUSES.has(course.status)) {
+  async view(actor: ProfileActor, courseId: string): Promise<CourseView> {
+    return this.loadCourseView(courseId, actor.profileId)
+  }
+
+  /** Refuses early when the actor cannot change course content on any course. */
+  private assertCanEditContent(actor: ProfileActor): void {
+    if (!CONTENT_CAPABILITIES.some((capability) => can(actor, capability))) throw errors.forbidden()
+  }
+
+  /** The content rule for one course: locked while under review, otherwise by status. */
+  private assertEditable(actor: ProfileActor, course: CourseRow): void {
+    if (!EDITABLE_STATUSES.has(course.status)) {
       throw errors.conflict(
         'course_locked',
         'This course is under review and cannot be edited until the review is complete',
       )
     }
+    const needed: Capability = course.status === 'live' ? 'course.editLive' : 'course.editDraft'
+    if (!can(actor, needed)) throw errors.forbidden()
+  }
+
+  private async profileCourse(
+    actor: ProfileActor,
+    courseId: string,
+    options: { forEdit?: boolean } = {},
+  ): Promise<CourseRow> {
+    if (options.forEdit) this.assertCanEditContent(actor)
+    const course = await this.deps.db.query.courses.findFirst({
+      where: { id: courseId, profileId: actor.profileId },
+    })
+    if (!course) throw errors.notFound('Course')
+    if (options.forEdit) this.assertEditable(actor, course)
     return course
   }
 
-  private async ownedLesson(user: SessionUser, lessonId: string) {
-    const lesson = await this.deps.db.query.lessons.findFirst({ where: { id: lessonId } })
+  private async profileLesson(actor: ProfileActor, lessonId: string) {
+    this.assertCanEditContent(actor)
+    const lesson = await this.deps.db.query.lessons.findFirst({
+      where: { id: lessonId, course: { profileId: actor.profileId } },
+      with: { course: true },
+    })
     if (!lesson) throw errors.notFound('Lesson')
-    const course = await this.ownedCourse(user, lesson.courseId, { forEdit: true })
-    return { lesson, course }
+    this.assertEditable(actor, lesson.course)
+    return { lesson, course: lesson.course }
   }
 
-  private async ownedArtefact(user: SessionUser, artefactId: string) {
+  private async profileArtefact(actor: ProfileActor, artefactId: string) {
+    this.assertCanEditContent(actor)
     const artefact = await this.deps.db.query.artefacts.findFirst({
-      where: { id: artefactId },
-      with: { lesson: true },
+      where: { id: artefactId, lesson: { course: { profileId: actor.profileId } } },
+      with: { lesson: { with: { course: true } } },
     })
     if (!artefact) throw errors.notFound('Artefact')
-    const course = await this.ownedCourse(user, artefact.lesson.courseId, { forEdit: true })
-    return { artefact, course }
+    this.assertEditable(actor, artefact.lesson.course)
+    return { artefact, course: artefact.lesson.course }
   }
 
   private async uniqueSlug(title: string): Promise<string> {
@@ -232,11 +278,11 @@ export class CoursesService {
     return `${base}-${Date.now().toString(36)}`
   }
 
-  async create(user: SessionUser, input: CreateCourse): Promise<CourseView> {
+  async create(actor: ProfileActor, input: CreateCourse): Promise<CourseView> {
     const [course] = await this.deps.db
       .insert(s.courses)
       .values({
-        teacherId: user.id,
+        profileId: actor.profileId,
         title: input.title,
         slug: await this.uniqueSlug(input.title),
         category: input.category,
@@ -246,14 +292,19 @@ export class CoursesService {
     return this.loadCourseView(course.id)
   }
 
-  async update(user: SessionUser, courseId: string, patch: UpdateCourse): Promise<CourseView> {
-    const course = await this.ownedCourse(user, courseId, { forEdit: true })
+  /** Course details. Price is not among them: see `setPrice`. */
+  async update(
+    user: SessionUser,
+    actor: ProfileActor,
+    courseId: string,
+    patch: UpdateCourse,
+  ): Promise<CourseView> {
+    const course = await this.profileCourse(actor, courseId, { forEdit: true })
     const values: Partial<typeof s.courses.$inferInsert> = {}
     if (patch.title !== undefined) values.title = patch.title
     if (patch.summary !== undefined) values.summary = patch.summary
     if (patch.descriptionJson !== undefined) values.descriptionJson = patch.descriptionJson
     if (patch.category !== undefined) values.category = patch.category
-    if (patch.priceCents !== undefined) values.priceCents = patch.priceCents
     if (patch.thumbnailMediaId !== undefined) {
       if (patch.thumbnailMediaId)
         await this.media.getOwnedReadyAsset(user, patch.thumbnailMediaId, 'image')
@@ -266,8 +317,31 @@ export class CoursesService {
     return this.loadCourseView(courseId)
   }
 
-  async remove(user: SessionUser, courseId: string): Promise<void> {
-    const course = await this.ownedCourse(user, courseId)
+  /** The route requires `course.setPrice`; a price change is always written to the audit log. */
+  async setPrice(actor: ProfileActor, courseId: string, priceCents: number): Promise<CourseView> {
+    const course = await this.profileCourse(actor, courseId)
+    if (!EDITABLE_STATUSES.has(course.status)) {
+      throw errors.conflict(
+        'course_locked',
+        'This course is under review and cannot be edited until the review is complete',
+      )
+    }
+    if (priceCents !== course.priceCents) {
+      await this.deps.db.update(s.courses).set({ priceCents }).where(eq(s.courses.id, courseId))
+      await recordAudit(this.deps, {
+        actorId: actor.userId,
+        action: 'course.price',
+        entityType: 'course',
+        entityId: courseId,
+        profileId: actor.profileId,
+        metadata: { from: course.priceCents, to: priceCents },
+      })
+    }
+    return this.loadCourseView(courseId)
+  }
+
+  async remove(actor: ProfileActor, courseId: string): Promise<void> {
+    const course = await this.profileCourse(actor, courseId)
     if (course.status === 'live' || course.status === 'pending_review')
       throw errors.conflict('course_live', 'Live or submitted courses cannot be deleted')
     const [{ count }] = (await this.deps.db
@@ -279,8 +353,8 @@ export class CoursesService {
     await this.deps.db.delete(s.courses).where(eq(s.courses.id, courseId))
   }
 
-  async submit(user: SessionUser, courseId: string): Promise<CourseView> {
-    const course = await this.ownedCourse(user, courseId)
+  async submit(actor: ProfileActor, courseId: string): Promise<CourseView> {
+    const course = await this.profileCourse(actor, courseId)
     if (course.status === 'pending_review')
       throw errors.conflict('already_submitted', 'This course is already under review')
     if (course.status === 'live')
@@ -297,15 +371,16 @@ export class CoursesService {
       .set({ status: 'pending_review', submittedAt: this.deps.now(), rejectionReason: null })
       .where(eq(s.courses.id, courseId))
     await trackEvent(this.deps, {
-      userId: user.id,
+      userId: actor.userId,
       name: ANALYTICS_EVENTS.courseSubmitted,
-      properties: { courseId },
+      properties: { courseId, profileId: actor.profileId },
     })
     await recordAudit(this.deps, {
-      actorId: user.id,
+      actorId: actor.userId,
       action: 'course.submit',
       entityType: 'course',
       entityId: courseId,
+      profileId: actor.profileId,
     })
     return this.loadCourseView(courseId)
   }
@@ -313,11 +388,11 @@ export class CoursesService {
   // lessons
 
   async addLesson(
-    user: SessionUser,
+    actor: ProfileActor,
     courseId: string,
     input: { title: string; summary?: string | null },
   ): Promise<CourseView> {
-    await this.ownedCourse(user, courseId, { forEdit: true })
+    await this.profileCourse(actor, courseId, { forEdit: true })
     const [{ max }] = (await this.deps.db
       .select({ max: sql<number>`coalesce(max(${s.lessons.position}), -1)::int` })
       .from(s.lessons)
@@ -329,23 +404,23 @@ export class CoursesService {
   }
 
   async updateLesson(
-    user: SessionUser,
+    actor: ProfileActor,
     lessonId: string,
     patch: { title?: string; summary?: string | null },
   ): Promise<CourseView> {
-    const { course } = await this.ownedLesson(user, lessonId)
+    const { course } = await this.profileLesson(actor, lessonId)
     await this.deps.db.update(s.lessons).set(patch).where(eq(s.lessons.id, lessonId))
     return this.loadCourseView(course.id)
   }
 
-  async removeLesson(user: SessionUser, lessonId: string): Promise<CourseView> {
-    const { course } = await this.ownedLesson(user, lessonId)
+  async removeLesson(actor: ProfileActor, lessonId: string): Promise<CourseView> {
+    const { course } = await this.profileLesson(actor, lessonId)
     await this.deps.db.delete(s.lessons).where(eq(s.lessons.id, lessonId))
     return this.loadCourseView(course.id)
   }
 
-  async reorderLessons(user: SessionUser, courseId: string, ids: string[]): Promise<CourseView> {
-    await this.ownedCourse(user, courseId, { forEdit: true })
+  async reorderLessons(actor: ProfileActor, courseId: string, ids: string[]): Promise<CourseView> {
+    await this.profileCourse(actor, courseId, { forEdit: true })
     const existing = await this.deps.db.query.lessons.findMany({
       where: { courseId },
       columns: { id: true },
@@ -362,11 +437,11 @@ export class CoursesService {
   }
 
   async setPrerequisites(
-    user: SessionUser,
+    actor: ProfileActor,
     lessonId: string,
     prerequisiteIds: string[],
   ): Promise<CourseView> {
-    const { course } = await this.ownedLesson(user, lessonId)
+    const { course } = await this.profileLesson(actor, lessonId)
     const { db } = this.deps
     const courseLessons = await db.query.lessons.findMany({
       where: { courseId: course.id },
@@ -394,11 +469,11 @@ export class CoursesService {
   // artefacts
 
   async addArtefact(
-    user: SessionUser,
+    actor: ProfileActor,
     lessonId: string,
     input: { type: ArtefactView['type']; title: string },
   ): Promise<CourseView> {
-    const { course } = await this.ownedLesson(user, lessonId)
+    const { course } = await this.profileLesson(actor, lessonId)
     const { db } = this.deps
     const [{ max }] = (await db
       .select({ max: sql<number>`coalesce(max(${s.artefacts.position}), -1)::int` })
@@ -419,6 +494,7 @@ export class CoursesService {
 
   async updateArtefact(
     user: SessionUser,
+    actor: ProfileActor,
     artefactId: string,
     patch: {
       title?: string
@@ -427,7 +503,7 @@ export class CoursesService {
       durationSeconds?: number | null
     },
   ): Promise<CourseView> {
-    const { artefact, course } = await this.ownedArtefact(user, artefactId)
+    const { artefact, course } = await this.profileArtefact(actor, artefactId)
     const values: Partial<typeof s.artefacts.$inferInsert> = {}
     if (patch.title !== undefined) values.title = patch.title
     if (patch.durationSeconds !== undefined) values.durationSeconds = patch.durationSeconds
@@ -453,14 +529,18 @@ export class CoursesService {
     return this.loadCourseView(course.id)
   }
 
-  async removeArtefact(user: SessionUser, artefactId: string): Promise<CourseView> {
-    const { course } = await this.ownedArtefact(user, artefactId)
+  async removeArtefact(actor: ProfileActor, artefactId: string): Promise<CourseView> {
+    const { course } = await this.profileArtefact(actor, artefactId)
     await this.deps.db.delete(s.artefacts).where(eq(s.artefacts.id, artefactId))
     return this.loadCourseView(course.id)
   }
 
-  async reorderArtefacts(user: SessionUser, lessonId: string, ids: string[]): Promise<CourseView> {
-    const { course } = await this.ownedLesson(user, lessonId)
+  async reorderArtefacts(
+    actor: ProfileActor,
+    lessonId: string,
+    ids: string[],
+  ): Promise<CourseView> {
+    const { course } = await this.profileLesson(actor, lessonId)
     const existing = await this.deps.db.query.artefacts.findMany({
       where: { lessonId },
       columns: { id: true },
@@ -477,11 +557,11 @@ export class CoursesService {
   }
 
   async upsertQuiz(
-    user: SessionUser,
+    actor: ProfileActor,
     artefactId: string,
     definition: QuizDefinition,
   ): Promise<CourseView> {
-    const { artefact, course } = await this.ownedArtefact(user, artefactId)
+    const { artefact, course } = await this.profileArtefact(actor, artefactId)
     if (artefact.type !== 'quiz')
       throw errors.badRequest('wrong_type', 'Only quiz artefacts have questions')
     const values = {

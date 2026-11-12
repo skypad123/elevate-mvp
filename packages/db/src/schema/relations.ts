@@ -4,8 +4,8 @@ import { enrollments, payments, promoCodes, refunds } from './commerce'
 import { artefacts, courses, lessonPrerequisites, lessons, quizzes } from './courses'
 import { artefactProgress, certificates, quizAttempts } from './learning'
 import { mediaAssets } from './media'
+import { payoutAccounts, profiles } from './profiles'
 import { analyticsEvents, auditLog, webhookEvents } from './system'
-import { teacherProfiles } from './teachers'
 
 /**
  * Every table, keyed by the name services use in `db.query.<name>`. Listed here rather than taken
@@ -17,7 +17,8 @@ const tables = {
   sessions,
   magicLinks,
   userRoles,
-  teacherProfiles,
+  profiles,
+  payoutAccounts,
   mediaAssets,
   courses,
   lessons,
@@ -46,8 +47,7 @@ export const relations = defineRelations(tables, (r) => ({
     identities: r.many.identities({ from: r.users.id, to: r.identities.userId }),
     sessions: r.many.sessions({ from: r.users.id, to: r.sessions.userId }),
     roles: r.many.userRoles({ from: r.users.id, to: r.userRoles.userId }),
-    teacherProfile: r.one.teacherProfiles({ from: r.users.id, to: r.teacherProfiles.userId }),
-    courses: r.many.courses({ from: r.users.id, to: r.courses.teacherId }),
+    ownedProfiles: r.many.profiles({ from: r.users.id, to: r.profiles.ownerUserId }),
     enrollments: r.many.enrollments({ from: r.users.id, to: r.enrollments.userId }),
   },
   identities: {
@@ -59,18 +59,30 @@ export const relations = defineRelations(tables, (r) => ({
   userRoles: {
     user: r.one.users({ from: r.userRoles.userId, to: r.users.id, optional: false }),
   },
-  teacherProfiles: {
-    user: r.one.users({ from: r.teacherProfiles.userId, to: r.users.id, optional: false }),
+  profiles: {
+    owner: r.one.users({ from: r.profiles.ownerUserId, to: r.users.id, optional: false }),
+    courses: r.many.courses({ from: r.profiles.id, to: r.courses.profileId }),
+    /** At most one for now; a profile with none cannot be paid. */
+    payoutAccount: r.one.payoutAccounts({ from: r.profiles.id, to: r.payoutAccounts.profileId }),
+    avatar: r.one.mediaAssets({ from: r.profiles.avatarMediaId, to: r.mediaAssets.id }),
     teachingSample: r.one.mediaAssets({
-      from: r.teacherProfiles.teachingSampleMediaId,
+      from: r.profiles.teachingSampleMediaId,
       to: r.mediaAssets.id,
     }),
   },
+  payoutAccounts: {
+    profile: r.one.profiles({
+      from: r.payoutAccounts.profileId,
+      to: r.profiles.id,
+      optional: false,
+    }),
+  },
   mediaAssets: {
-    owner: r.one.users({ from: r.mediaAssets.ownerId, to: r.users.id, optional: false }),
+    uploader: r.one.users({ from: r.mediaAssets.uploaderId, to: r.users.id }),
+    profile: r.one.profiles({ from: r.mediaAssets.profileId, to: r.profiles.id }),
   },
   courses: {
-    teacher: r.one.users({ from: r.courses.teacherId, to: r.users.id, optional: false }),
+    profile: r.one.profiles({ from: r.courses.profileId, to: r.profiles.id, optional: false }),
     thumbnail: r.one.mediaAssets({ from: r.courses.thumbnailMediaId, to: r.mediaAssets.id }),
     lessons: r.many.lessons({ from: r.courses.id, to: r.lessons.courseId }),
     enrollments: r.many.enrollments({ from: r.courses.id, to: r.enrollments.courseId }),
@@ -129,7 +141,12 @@ export const relations = defineRelations(tables, (r) => ({
     }),
     course: r.one.courses({ from: r.payments.courseId, to: r.courses.id, optional: false }),
     user: r.one.users({ from: r.payments.userId, to: r.users.id, optional: false }),
-    teacher: r.one.users({ from: r.payments.teacherId, to: r.users.id, optional: false }),
+    profile: r.one.profiles({ from: r.payments.profileId, to: r.profiles.id, optional: false }),
+    payoutAccount: r.one.payoutAccounts({
+      from: r.payments.payoutAccountId,
+      to: r.payoutAccounts.id,
+      optional: false,
+    }),
     promoCode: r.one.promoCodes({ from: r.payments.promoCodeId, to: r.promoCodes.id }),
     refunds: r.many.refunds({ from: r.payments.id, to: r.refunds.paymentId }),
   },

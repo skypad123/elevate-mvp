@@ -12,7 +12,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
-    "generate": "drizzle-kit generate",
+    "generate": "node --import tsx scripts/generate.ts",
     "migrate": "node --env-file=../../.env --import tsx scripts/migrate.ts",
     "seed": "node --env-file=../../.env --import tsx scripts/seed.ts",
     "reset": "node --env-file=../../.env --import tsx scripts/reset.ts"

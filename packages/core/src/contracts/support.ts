@@ -1,5 +1,8 @@
 import { z } from 'zod'
+import type { ProfileStatus, ProfileType } from '../domain/permissions'
+import type { ProfileSummary } from './auth'
 import { roleSchema } from './common'
+import type { CourseSummary, MoneyBreakdown, PayoutAccountStatus, ProfileView } from './teach'
 
 export const rejectSchema = z.object({ reason: z.string().trim().min(10).max(2000) })
 export const reviewNoteSchema = z.object({ note: z.string().trim().max(2000).optional() })
@@ -8,8 +11,15 @@ export const refundSchema = z.object({ reason: z.string().trim().min(3).max(500)
 export const grantRoleSchema = z.object({ role: roleSchema, grant: z.boolean() })
 export const peopleQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
-  role: z.enum(['teacher', 'learner', 'staff']).optional(),
+  /** `learner`: owns no profile and is not staff. Teachers are found through the profiles list. */
+  role: z.enum(['learner', 'staff']).optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+})
+export const profilesQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
   status: z.enum(['applied', 'approved', 'rejected']).optional(),
+  type: z.enum(['personal', 'corporate']).optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
 })
@@ -21,18 +31,45 @@ export type PersonSummary = {
   avatarUrl: string | null
   roles: z.infer<typeof roleSchema>[]
   createdAt: string
-  teacher: {
-    status: 'applied' | 'approved' | 'rejected'
-    displayName: string
-    commissionBps: number
-    stripeChargesEnabled: boolean
-    appliedAt: string
-  } | null
+  /** The teaching profiles this person owns or belongs to. */
+  profiles: ProfileSummary[]
 }
 
 export type PersonDetail = PersonSummary & {
-  teacherProfile: import('./teach').TeacherProfileView | null
-  stats: { enrollments: number; courses: number; liveCourses: number }
+  stats: { enrollments: number }
+}
+
+export type SupportProfileSummary = {
+  id: string
+  type: ProfileType
+  status: ProfileStatus
+  displayName: string
+  ownerId: string
+  ownerEmail: string
+  ownerName: string | null
+  commissionBps: number
+  /** The profile has an active payout account that can take charges. */
+  payable: boolean
+  appliedAt: string
+}
+
+export type SupportPayoutAccount = {
+  id: string
+  stripeAccountId: string | null
+  businessType: 'individual' | 'company'
+  status: PayoutAccountStatus
+  detailsSubmitted: boolean
+  chargesEnabled: boolean
+  payoutsEnabled: boolean
+  activatedAt: string | null
+}
+
+export type SupportProfileDetail = {
+  profile: ProfileView
+  courses: CourseSummary[]
+  payoutAccounts: SupportPayoutAccount[]
+  /** Totals over every payment made to the profile's payout account. */
+  earnings: MoneyBreakdown
 }
 
 export type TransactionSummary = {
@@ -46,7 +83,9 @@ export type TransactionSummary = {
   learnerEmail: string
   courseTitle: string
   courseSlug: string
-  teacherName: string
+  profileId: string
+  profileName: string
+  payoutAccountId: string
 }
 
 export type TransactionDetail = TransactionSummary & {
@@ -78,12 +117,14 @@ export type TransactionDetail = TransactionSummary & {
   }>
 }
 
+/** One row per payout account; the profile is shown beside it. */
 export type PayoutLedgerRow = {
-  teacherId: string
-  teacherName: string
-  teacherEmail: string
+  payoutAccountId: string
   stripeAccountId: string | null
   payoutsEnabled: boolean
+  profileId: string
+  profileName: string
+  ownerEmail: string
   transferCount: number
   transferredCents: number
   refundedCents: number
@@ -94,6 +135,7 @@ export type AuditEntry = {
   action: string
   entityType: string
   entityId: string | null
+  profileId: string | null
   actorEmail: string | null
   metadata: Record<string, unknown> | null
   createdAt: string

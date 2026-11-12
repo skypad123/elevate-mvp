@@ -2,6 +2,7 @@ import type {
   Audience,
   AuthUser,
   MagicLinkRequest,
+  ProfileSummary,
   VerifyRequest,
   VerifyResponse,
 } from '@elevate/core'
@@ -11,7 +12,7 @@ import type { Deps } from '../deps'
 import { magicLinkEmail } from '../emails/templates'
 import { hmacHex, randomCode, randomToken } from '../lib/crypto'
 import { errors } from '../lib/errors'
-import type { SessionUser } from '../middleware/auth'
+import type { ProfileActor, SessionUser } from '../middleware/auth'
 
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000
 const MAGIC_LINK_MAX_PER_WINDOW = 5
@@ -169,12 +170,16 @@ export class AuthService {
   ): Promise<{ token: string; expiresAt: string }> {
     const token = randomToken(32)
     const expiresAt = new Date(this.deps.now().getTime() + SESSION_TTL_MS)
+    const now = this.deps.now()
     await this.deps.db.insert(s.sessions).values({
       userId,
       audience,
       tokenHash: this.hash(token),
       userAgent: userAgent?.slice(0, 512) ?? null,
       expiresAt,
+      lastSeenAt: now,
+      // The sign-in time. Written from the app clock, like every check that reads it.
+      createdAt: now,
     })
     return { token, expiresAt: expiresAt.toISOString() }
   }
@@ -193,7 +198,12 @@ export class AuthService {
         .where(eq(s.sessions.id, session.id))
     }
     const user = await this.buildAuthUser(session.userId)
-    return { ...user, sessionId: session.id, audience: session.audience }
+    return {
+      ...user,
+      sessionId: session.id,
+      audience: session.audience,
+      signedInAt: session.createdAt,
+    }
   }
 
   async signOut(sessionId: string): Promise<void> {
@@ -203,7 +213,13 @@ export class AuthService {
   async buildAuthUser(userId: string): Promise<AuthUser> {
     const user = await this.deps.db.query.users.findFirst({
       where: { id: userId },
-      with: { roles: true, teacherProfile: true },
+      with: {
+        roles: true,
+        ownedProfiles: {
+          columns: { id: true, type: true, displayName: true, status: true },
+          orderBy: { appliedAt: 'asc' },
+        },
+      },
     })
     if (!user) throw errors.notFound('User')
     return {
@@ -212,17 +228,47 @@ export class AuthService {
       name: user.name,
       avatarUrl: user.avatarUrl,
       roles: user.roles.map((r) => r.role),
-      teacher: user.teacherProfile
-        ? {
-            status: user.teacherProfile.status,
-            displayName: user.teacherProfile.displayName,
-            stripeChargesEnabled: user.teacherProfile.stripeChargesEnabled,
-            stripePayoutsEnabled: user.teacherProfile.stripePayoutsEnabled,
-            stripeDetailsSubmitted: user.teacherProfile.stripeDetailsSubmitted,
-            commissionBps: user.teacherProfile.commissionBps,
-          }
-        : null,
+      profiles: user.ownedProfiles.map((p) => profileSummary(p, 'owner')),
       createdAt: user.createdAt.toISOString(),
     }
   }
+}
+
+export function profileSummary(
+  profile: Pick<typeof s.profiles.$inferSelect, 'id' | 'type' | 'displayName' | 'status'>,
+  role: ProfileSummary['role'],
+): ProfileSummary {
+  return {
+    id: profile.id,
+    type: profile.type,
+    displayName: profile.displayName,
+    status: profile.status,
+    role,
+  }
+}
+
+/**
+ * Who `user` is on a profile: its owner, or platform staff (`super_admin`) acting inside it.
+ * Returns null when the profile does not exist or the user has no access, and callers answer 404
+ * for both, so a profile's ID is never confirmed to someone outside it.
+ */
+export async function loadActor(
+  deps: Deps,
+  user: Pick<AuthUser, 'id' | 'roles'>,
+  profileId: string,
+): Promise<ProfileActor | null> {
+  const profile = await deps.db.query.profiles.findFirst({
+    where: { id: profileId },
+    columns: { id: true, type: true, status: true, ownerUserId: true },
+  })
+  if (!profile) return null
+  const on = {
+    profileId: profile.id,
+    profileType: profile.type,
+    profileStatus: profile.status,
+    userId: user.id,
+  }
+  if (profile.ownerUserId === user.id) return { ...on, role: 'owner' }
+  if (user.roles.includes('super_admin')) return { ...on, role: 'staff' }
+  return null
 }

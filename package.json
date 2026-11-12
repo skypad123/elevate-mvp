@@ -19,7 +19,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "check:dupes": "node scripts/check-dupes.mjs",
-    "db:generate": "npm -w @elevate/db run generate",
+    "db:generate": "npm -w @elevate/db run generate --",
     "db:migrate": "npm -w @elevate/db run migrate",
     "db:seed": "npm -w @elevate/db run seed",
     "db:reset": "npm -w @elevate/db run reset"

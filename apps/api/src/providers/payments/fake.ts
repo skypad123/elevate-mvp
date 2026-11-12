@@ -1,15 +1,26 @@
-import type {
-  CheckoutSessionInput,
-  CheckoutSessionResult,
-  ConnectedAccountStatus,
-  PaymentDetails,
-  PaymentsProvider,
-  PaymentsWebhookEvent,
-  RefundResult,
+import {
+  type BusinessType,
+  type CheckoutSessionInput,
+  type CheckoutSessionResult,
+  type ConnectedAccountInput,
+  type ConnectedAccountStatus,
+  checkoutIdempotencyKey,
+  type PaymentDetails,
+  type PaymentsProvider,
+  type PaymentsWebhookEvent,
+  type RefundResult,
 } from './types'
+
+/** What the fake remembers about an account beyond its status, so tests can assert on it. */
+type FakeAccount = ConnectedAccountStatus & {
+  businessType: BusinessType
+  metadata: { elevateProfileId: string; elevatePayoutAccountId: string }
+}
 
 type FakeSession = CheckoutSessionInput & {
   id: string
+  /** The key real Stripe would deduplicate on. */
+  idempotencyKey: string
   paid: boolean
   paymentIntentId: string
   refundedCents: number
@@ -22,7 +33,7 @@ type FakeSession = CheckoutSessionInput & {
  */
 export class FakePaymentsProvider implements PaymentsProvider {
   readonly driver = 'fake'
-  readonly accounts = new Map<string, ConnectedAccountStatus>()
+  readonly accounts = new Map<string, FakeAccount>()
   readonly sessions = new Map<string, FakeSession>()
   readonly refunds: Array<{ refundId: string; paymentIntentId: string; amountCents: number }> = []
   /** Actual Stripe fee the fake reports, in basis points + fixed, so tests can check estimate vs actual. */
@@ -30,17 +41,19 @@ export class FakePaymentsProvider implements PaymentsProvider {
   feeFixedCents = 50
   private counter = 0
 
-  async createConnectedAccount(_input: {
-    email: string
-    userId: string
-    displayName: string
-  }): Promise<{ accountId: string }> {
+  async createConnectedAccount(input: ConnectedAccountInput): Promise<{ accountId: string }> {
     const accountId = `acct_fake_${++this.counter}`
     this.accounts.set(accountId, {
       accountId,
       detailsSubmitted: false,
       chargesEnabled: false,
       payoutsEnabled: false,
+      legalName: null,
+      businessType: input.businessType,
+      metadata: {
+        elevateProfileId: input.profileId,
+        elevatePayoutAccountId: input.payoutAccountId,
+      },
     })
     return { accountId }
   }
@@ -62,13 +75,17 @@ export class FakePaymentsProvider implements PaymentsProvider {
   }
   /** Simulates the teacher finishing Connect onboarding; returns the account.updated event. */
   enableAccount(accountId: string): PaymentsWebhookEvent {
-    const account = {
+    const existing = this.accounts.get(accountId)
+    this.accounts.set(accountId, {
+      legalName: null,
+      businessType: 'individual',
+      metadata: { elevateProfileId: '', elevatePayoutAccountId: '' },
+      ...existing,
       accountId,
       detailsSubmitted: true,
       chargesEnabled: true,
       payoutsEnabled: true,
-    }
-    this.accounts.set(accountId, account)
+    })
     return {
       id: `evt_acct_${accountId}_${++this.counter}`,
       type: 'account.updated',
@@ -85,8 +102,9 @@ export class FakePaymentsProvider implements PaymentsProvider {
   }
 
   async createCheckoutSession(input: CheckoutSessionInput): Promise<{ id: string; url: string }> {
+    const idempotencyKey = checkoutIdempotencyKey(input)
     const existing = [...this.sessions.values()].find(
-      (s) => s.enrollmentId === input.enrollmentId && !s.paid,
+      (s) => s.idempotencyKey === idempotencyKey && !s.paid,
     )
     if (existing)
       return { id: existing.id, url: `https://checkout.fake-stripe.test/${existing.id}` }
@@ -96,6 +114,7 @@ export class FakePaymentsProvider implements PaymentsProvider {
     this.sessions.set(id, {
       ...input,
       id,
+      idempotencyKey,
       paid: false,
       paymentIntentId: `pi_fake_${this.counter}`,
       refundedCents: 0,

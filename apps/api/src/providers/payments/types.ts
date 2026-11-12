@@ -3,11 +3,28 @@ export type ConnectedAccountStatus = {
   detailsSubmitted: boolean
   chargesEnabled: boolean
   payoutsEnabled: boolean
+  /** A company account's registered name, when Stripe provides it; null for individuals. */
+  legalName: string | null
+}
+
+export type BusinessType = 'individual' | 'company'
+
+export type ConnectedAccountInput = {
+  businessType: BusinessType
+  /** Both IDs are stored in the Stripe account's metadata. */
+  profileId: string
+  payoutAccountId: string
+  email: string
+  /** Sent as the account's public business name. */
+  displayName: string
 }
 
 export type CheckoutSessionInput = {
-  /** Our enrollment id; also used as the idempotency key. */
+  /** Our enrollment id; part of the idempotency key. */
   enrollmentId: string
+  /** The account being paid, and the profile it belongs to at the time of sale. */
+  payoutAccountId: string
+  profileId: string
   courseTitle: string
   courseImageUrl: string | null
   amountCents: number
@@ -17,7 +34,21 @@ export type CheckoutSessionInput = {
   customerEmail: string
   successUrl: string
   cancelUrl: string
+  /** Written to the session and its payment intent as given; the caller builds it. */
   metadata: Record<string, string>
+}
+
+/**
+ * A retried checkout for the same enrolment, amount and payee returns the same Stripe session. A
+ * different payee is a different session, so a learner is never sent to pay an account that is no
+ * longer the course's.
+ */
+export function checkoutIdempotencyKey(input: {
+  enrollmentId: string
+  amountCents: number
+  payoutAccountId: string
+}): string {
+  return `checkout:${input.enrollmentId}:${input.amountCents}:${input.payoutAccountId}`
 }
 
 export type CheckoutSessionResult = {
@@ -55,11 +86,7 @@ export type PaymentsWebhookEvent = {
 
 export interface PaymentsProvider {
   readonly driver: 'stripe' | 'fake' | 'unconfigured'
-  createConnectedAccount(input: {
-    email: string
-    userId: string
-    displayName: string
-  }): Promise<{ accountId: string }>
+  createConnectedAccount(input: ConnectedAccountInput): Promise<{ accountId: string }>
   createOnboardingLink(input: {
     accountId: string
     refreshUrl: string

@@ -17,16 +17,18 @@ import {
   RichTextEditor,
   Textarea,
 } from '@elevate/web-ui'
-import { usePortalAuth } from '@elevate/web-ui/portal'
 import { type FormEvent, useState } from 'react'
 import { api } from '../lib/api'
 import { uploadInlineImage, useCourseActions } from '../lib/courses'
+import { useCurrentProfile } from '../lib/profile'
 import { useSaveTracker } from '../lib/save-tracker'
 
 export function DetailsForm({ course, locked }: { course: CourseView; locked: boolean }) {
   const actions = useCourseActions(course.id)
   const { track } = useSaveTracker()
-  const { user } = usePortalAuth()
+  const { profileId, profile, can } = useCurrentProfile()
+  // Price has its own permission: staff can fix a course's details but not what it costs.
+  const canSetPrice = can('course.setPrice')
   const [title, setTitle] = useState(course.title)
   const [summary, setSummary] = useState(course.summary ?? '')
   const [category, setCategory] = useState(course.category)
@@ -40,7 +42,7 @@ export function DetailsForm({ course, locked }: { course: CourseView; locked: bo
     priceCents !== null && priceCents > 0
       ? quote({
           listPriceCents: priceCents,
-          commissionBps: user?.teacher?.commissionBps ?? 1500,
+          commissionBps: profile?.commissionBps ?? 1500,
           stripeFeeBps: 340,
           stripeFixedCents: 50,
         })
@@ -52,13 +54,16 @@ export function DetailsForm({ course, locked }: { course: CourseView; locked: bo
     setBusy(true)
     try {
       await track(
-        actions.updateCourse({
-          title: title.trim(),
-          summary: summary.trim() || null,
-          category: category as (typeof COURSE_CATEGORIES)[number]['slug'],
-          priceCents,
-          descriptionJson: description,
-        }),
+        actions.saveDetails(
+          {
+            title: title.trim(),
+            summary: summary.trim() || null,
+            category: category as (typeof COURSE_CATEGORIES)[number]['slug'],
+            descriptionJson: description,
+          },
+          // The price goes to its own route, and only when it changed.
+          canSetPrice && priceCents !== course.priceCents ? priceCents : null,
+        ),
       )
       setDirty(false)
     } finally {
@@ -124,7 +129,7 @@ export function DetailsForm({ course, locked }: { course: CourseView; locked: bo
                 setDescription(doc)
                 mark()
               }}
-              onPickImage={uploadInlineImage}
+              onPickImage={() => uploadInlineImage(profileId)}
               minHeight={260}
             />
           </div>
@@ -135,6 +140,7 @@ export function DetailsForm({ course, locked }: { course: CourseView; locked: bo
           <CardHeader title="Cover image" description="4:3 works best. JPG, PNG or WebP." />
           <MediaUploader
             api={api}
+            profileId={profileId}
             kind="image"
             value={course.thumbnail}
             disabled={locked}
@@ -149,7 +155,8 @@ export function DetailsForm({ course, locked }: { course: CourseView; locked: bo
             label="Price (S$)"
             inputMode="decimal"
             value={price}
-            disabled={locked}
+            disabled={locked || !canSetPrice}
+            hint={canSetPrice ? undefined : 'Only the profile’s owner can change the price.'}
             error={priceCents === null ? 'Enter a valid amount' : undefined}
             onChange={(e) => {
               setPrice(e.target.value)

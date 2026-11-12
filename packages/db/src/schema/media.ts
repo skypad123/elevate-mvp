@@ -1,15 +1,25 @@
-import { bigint, index, integer, snakeCase, text, uuid } from 'drizzle-orm/pg-core'
+import {
+  type AnyPgColumn,
+  bigint,
+  index,
+  integer,
+  snakeCase,
+  text,
+  uuid,
+} from 'drizzle-orm/pg-core'
 import { users } from './auth'
 import { createdAt, id, updatedAt } from './columns'
 import { mediaKindEnum, mediaProviderEnum, mediaStatusEnum } from './enums'
+import { profiles } from './profiles'
 
 export const mediaAssets = snakeCase.table(
   'media_assets',
   {
     id: id(),
-    ownerId: uuid()
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Who uploaded it. Kept when the user is deleted, so course media outlives its uploader. */
+    uploaderId: uuid().references(() => users.id, { onDelete: 'set null' }),
+    /** Set for a profile's course media; empty for learner avatars and teaching samples. */
+    profileId: uuid().references((): AnyPgColumn => profiles.id, { onDelete: 'restrict' }),
     kind: mediaKindEnum().notNull(),
     provider: mediaProviderEnum().notNull(),
     status: mediaStatusEnum().notNull().default('pending'),
@@ -31,5 +41,10 @@ export const mediaAssets = snakeCase.table(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index().on(t.ownerId), index().on(t.providerUploadId), index().on(t.providerAssetId)],
+  (t) => [
+    index().on(t.uploaderId),
+    index().on(t.profileId),
+    index().on(t.providerUploadId),
+    index().on(t.providerAssetId),
+  ],
 )

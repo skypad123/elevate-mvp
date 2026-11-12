@@ -9,6 +9,8 @@ export async function recordAudit(
     action: string
     entityType: string
     entityId?: string | null
+    /** The profile the change belongs to, when it has one. */
+    profileId?: string | null
     metadata?: Record<string, unknown>
   },
 ): Promise<void> {
@@ -17,7 +19,27 @@ export async function recordAudit(
     action: input.action,
     entityType: input.entityType,
     entityId: input.entityId ?? null,
+    profileId: input.profileId ?? null,
     metadata: input.metadata ?? null,
+  })
+}
+
+/**
+ * One entry per change that platform staff make while acting inside a teacher's profile, written
+ * under the staff member's own user ID. `route` is the route pattern, `path` the concrete path.
+ */
+export async function recordStaffAction(
+  deps: Deps,
+  actor: { userId: string; profileId: string },
+  request: { method: string; route: string; path: string },
+): Promise<void> {
+  await recordAudit(deps, {
+    actorId: actor.userId,
+    action: `staff.${request.method} ${request.route}`,
+    entityType: 'profile',
+    entityId: actor.profileId,
+    profileId: actor.profileId,
+    metadata: { method: request.method, path: request.path },
   })
 }
 

@@ -18,7 +18,7 @@ export class EnrollmentsService {
         course: {
           with: {
             thumbnail: true,
-            teacher: { with: { teacherProfile: true } },
+            profile: true,
             lessons: { columns: { id: true }, with: { artefacts: { columns: { id: true } } } },
           },
         },

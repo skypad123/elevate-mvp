@@ -2,6 +2,7 @@ import { index, jsonb, primaryKey, snakeCase, text, uuid } from 'drizzle-orm/pg-
 import { users } from './auth'
 import { createdAt, id, ts } from './columns'
 import { webhookProviderEnum } from './enums'
+import { profiles } from './profiles'
 
 /** Idempotency ledger for Stripe and Mux webhooks. */
 export const webhookEvents = snakeCase.table(
@@ -26,10 +27,12 @@ export const auditLog = snakeCase.table(
     action: text().notNull(),
     entityType: text().notNull(),
     entityId: text(),
+    /** The profile a change belongs to, when it has one; lets Support list a profile's history. */
+    profileId: uuid().references(() => profiles.id, { onDelete: 'set null' }),
     metadata: jsonb().$type<Record<string, unknown>>(),
     createdAt: createdAt(),
   },
-  (t) => [index().on(t.entityType, t.entityId), index().on(t.createdAt)],
+  (t) => [index().on(t.entityType, t.entityId), index().on(t.profileId), index().on(t.createdAt)],
 )
 
 export const analyticsEvents = snakeCase.table(

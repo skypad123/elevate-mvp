@@ -3,7 +3,8 @@ import { z } from 'zod'
 export const audienceSchema = z.enum(['learner', 'teach', 'support'])
 export type Audience = z.infer<typeof audienceSchema>
 
-export const roleSchema = z.enum(['teacher', 'support_agent', 'super_admin'])
+/** Platform staff roles. Teaching comes from a profile (`AuthUser.profiles`), not from a role. */
+export const roleSchema = z.enum(['support_agent', 'super_admin'])
 export type Role = z.infer<typeof roleSchema>
 
 export const uuidSchema = z.string().uuid()

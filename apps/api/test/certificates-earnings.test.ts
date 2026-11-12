@@ -1,6 +1,5 @@
 import { schema as s } from '@elevate/db'
 import { seedDatabase } from '@elevate/db/seed'
-import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -10,7 +9,10 @@ let teacher: string
 let admin: string
 let agent: string
 let courseId: string
-let teacherId: string
+let profileId: string
+
+/** Every Teach route for the teacher sits under their profile. */
+const teach = (path: string) => `/api/teach/profiles/${profileId}${path}`
 
 const stripePost = (event: unknown) =>
   t.app.request('/api/webhooks/stripe', {
@@ -63,7 +65,7 @@ async function completeCourse(token: string, enrollmentId: string) {
 
 beforeAll(async () => {
   t = await createTestApp()
-  await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', storageDir: null })
+  await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', mode: 'demo', storage: null })
   const signed = await t.signIn('grad@example.com')
   learner = signed.token as string
   await t.api('PATCH', '/api/me', { token: learner, body: { name: 'Grace Lim' } })
@@ -71,22 +73,8 @@ beforeAll(async () => {
     where: { slug: 'sourdough-from-scratch' },
   })
   courseId = course?.id as string
-  teacherId = course?.teacherId as string
-  const { accountId } = await t.payments.createConnectedAccount({
-    email: 'daniel@example.com',
-    userId: teacherId,
-    displayName: 'Daniel',
-  })
-  t.payments.enableAccount(accountId)
-  await t.db
-    .update(s.teacherProfiles)
-    .set({
-      stripeAccountId: accountId,
-      stripeChargesEnabled: true,
-      stripePayoutsEnabled: true,
-      stripeDetailsSubmitted: true,
-    })
-    .where(eq(s.teacherProfiles.userId, teacherId))
+  profileId = course?.profileId as string
+  await t.makePayable(profileId)
   teacher = (await t.signIn('daniel@example.com', 'teach')).token as string
   admin = (await t.signIn('admin@test.local', 'support')).token as string
   await t.grantRole('agent@example.com', 'support_agent')
@@ -175,7 +163,7 @@ describe('earnings and transactions', () => {
     t.advanceClock(60_000)
     second = (await t.signIn('second-buyer@example.com')).token as string
     secondEnrollment = await buy(second)
-    const earnings = await t.api('GET', '/api/teach/earnings', { token: teacher })
+    const earnings = await t.api('GET', teach('/earnings'), { token: teacher })
     expect(earnings.status).toBe(200)
     const { totals, courses, recent, stripe } = earnings.body.earnings
     expect(totals.paymentCount).toBe(3)
@@ -191,12 +179,12 @@ describe('earnings and transactions', () => {
     expect(stripe).toEqual({ connected: true, chargesEnabled: true, payoutsEnabled: true })
     netBefore = totals.netCents
 
-    const reconcile = await t.api('GET', '/api/teach/earnings/reconcile', { token: teacher })
+    const reconcile = await t.api('GET', teach('/earnings/reconcile'), { token: teacher })
     expect(reconcile.status).toBe(200)
     expect(reconcile.body.reconciliation.stripeTransferTotalCents).toBe(totals.netCents)
     expect(reconcile.body.reconciliation.differenceCents).toBe(0)
 
-    const perCourse = await t.api('GET', `/api/teach/earnings/courses/${courseId}`, {
+    const perCourse = await t.api('GET', teach(`/earnings/courses/${courseId}`), {
       token: teacher,
     })
     expect(perCourse.status).toBe(200)
@@ -209,11 +197,11 @@ describe('earnings and transactions', () => {
         .filter(Boolean),
     ).toEqual(['WELCOME10'])
 
-    // learners and non-teachers cannot read earnings
-    expect((await t.api('GET', '/api/teach/earnings', { token: learner })).status).toBe(403)
+    // someone outside the profile cannot read its earnings, or learn that the profile exists
+    expect((await t.api('GET', teach('/earnings'), { token: learner })).status).toBe(404)
     expect(
-      (await t.api('GET', `/api/teach/earnings/courses/${courseId}`, { token: learner })).status,
-    ).toBe(403)
+      (await t.api('GET', teach(`/earnings/courses/${courseId}`), { token: learner })).status,
+    ).toBe(404)
   })
 
   it('lists transactions for Support and lets a super admin refund through Stripe', async () => {
@@ -257,7 +245,11 @@ describe('earnings and transactions', () => {
       reason: 'Duplicate purchase',
       requestedBy: 'admin@test.local',
     })
-    expect(t.mailer.last()?.subject).toContain('Refund issued')
+    // the learner and the owner of the profile that was paid are each told once
+    const notices = t.mailer.sent.slice(-2)
+    expect(notices[0]?.subject).toContain('Refund issued')
+    expect(notices[1]).toMatchObject({ to: 'daniel@example.com' })
+    expect(notices[1]?.subject).toContain('was refunded')
     expect(t.payments.refunds).toHaveLength(1)
     // access is revoked
     expect(
@@ -304,16 +296,17 @@ describe('earnings and transactions', () => {
   })
 
   it('reflects refunds in earnings, the payout ledger and the audit log', async () => {
-    const after = await t.api('GET', '/api/teach/earnings', { token: teacher })
+    const after = await t.api('GET', teach('/earnings'), { token: teacher })
     expect(after.body.earnings.totals.refundedCents).toBe(8900 * 2)
     expect(after.body.earnings.totals.netCents).toBeLessThan(netBefore)
-    const reconcile = await t.api('GET', '/api/teach/earnings/reconcile', { token: teacher })
+    const reconcile = await t.api('GET', teach('/earnings/reconcile'), { token: teacher })
     expect(reconcile.body.reconciliation.differenceCents).toBe(0)
 
     const payouts = await t.api('GET', '/api/support/payouts', { token: agent })
     expect(payouts.body.items[0]).toMatchObject({
-      teacherName: 'Daniel Goh',
-      teacherEmail: 'daniel@example.com',
+      profileId,
+      profileName: 'Daniel Goh',
+      ownerEmail: 'daniel@example.com',
       payoutsEnabled: true,
       transferCount: 3,
       refundedCents: 8900 * 2,

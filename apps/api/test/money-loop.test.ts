@@ -10,7 +10,7 @@ import { createTestApp, type TestApp } from './helpers/test-app'
  */
 let t: TestApp
 let teacher: string
-let teacherId: string
+let profileId: string
 let agent: string
 let admin: string
 let learner: string
@@ -20,6 +20,9 @@ let lessonA: string
 let lessonB: string
 let enrollmentId: string
 let certificateToken: string
+
+/** Every Teach route for the teacher sits under their profile, once they have one. */
+const teach = (path: string) => `/api/teach/profiles/${profileId}${path}`
 
 const stripePost = (event: unknown) =>
   t.app.request('/api/webhooks/stripe', {
@@ -41,7 +44,6 @@ beforeAll(async () => {
   agent = (await t.signIn('agent@example.com', 'support')).token as string
   const signedTeacher = await t.signIn('noor@example.com', 'teach')
   teacher = signedTeacher.token as string
-  teacherId = signedTeacher.body.user.id
   learner = (await t.signIn('amira@example.com')).token as string
   await t.api('PATCH', '/api/me', { token: learner, body: { name: 'Amira Binte Rahman' } })
 })
@@ -64,34 +66,38 @@ describe('money loop', () => {
     })
     expect(applied.status).toBe(200)
     expect(applied.body.profile.status).toBe('applied')
-    expect((await t.api('GET', '/api/teach/courses', { token: teacher })).status).toBe(403)
+    profileId = applied.body.profile.id
+    // an applicant can see the (empty) course list but cannot create a course yet
+    const newCourse = { title: 'Not yet', category: 'craft-making' }
+    expect((await t.api('GET', teach('/courses'), { token: teacher })).body.items).toEqual([])
+    expect(
+      (await t.api('POST', teach('/courses'), { token: teacher, body: newCourse })).status,
+    ).toBe(403)
 
-    const approved = await t.api('POST', `/api/support/teachers/${teacherId}/approve`, {
+    const approved = await t.api('POST', `/api/support/profiles/${profileId}/approve`, {
       token: agent,
       body: {},
     })
     expect(approved.status).toBe(200)
     expect(approved.body.profile.status).toBe('approved')
-    expect((await t.api('GET', '/api/teach/courses', { token: teacher })).status).toBe(200)
+    expect((await t.api('GET', teach('/courses'), { token: teacher })).status).toBe(200)
   })
 
   it('2. the teacher connects a Stripe account and charges get enabled by webhook', async () => {
-    const link = await t.api('POST', '/api/teach/stripe/onboarding-link', { token: teacher })
+    const link = await t.api('POST', teach('/stripe/onboarding-link'), { token: teacher })
     expect(link.status).toBe(200)
     expect(link.body.url).toContain('connect.fake-stripe.test')
-    const profile = await t.db.query.teacherProfiles.findFirst({
-      where: { userId: teacherId },
-    })
-    const accountId = profile?.stripeAccountId as string
+    const account = await t.db.query.payoutAccounts.findFirst({ where: { profileId } })
+    const accountId = account?.stripeAccountId as string
     expect(accountId).toMatch(/^acct_fake_/)
     const hook = await stripePost(t.payments.enableAccount(accountId))
     expect(await hook.json()).toMatchObject({ outcome: 'applied' })
-    const status = await t.api('GET', '/api/teach/stripe/status', { token: teacher })
+    const status = await t.api('GET', teach('/stripe/status'), { token: teacher })
     expect(status.body.stripe).toMatchObject({ chargesEnabled: true, payoutsEnabled: true })
   })
 
   it('3. the teacher builds a gated two-lesson course with a quiz and submits it', async () => {
-    const created = await t.api('POST', '/api/teach/courses', {
+    const created = await t.api('POST', teach('/courses'), {
       token: teacher,
       body: { title: 'Hand-drawn Batik: Wax, Dye, Finish', category: 'craft-making' },
     })
@@ -99,32 +105,32 @@ describe('money loop', () => {
     courseId = created.body.course.id
     courseSlug = created.body.course.slug
 
-    const a = await t.api('POST', `/api/teach/courses/${courseId}/lessons`, {
+    const a = await t.api('POST', teach(`/courses/${courseId}/lessons`), {
       token: teacher,
       body: { title: 'Tools, wax and the canting' },
     })
     lessonA = a.body.course.lessons[0].id
-    const b = await t.api('POST', `/api/teach/courses/${courseId}/lessons`, {
+    const b = await t.api('POST', teach(`/courses/${courseId}/lessons`), {
       token: teacher,
       body: { title: 'Dye baths and finishing' },
     })
     lessonB = b.body.course.lessons[1].id
 
-    const text = await t.api('POST', `/api/teach/lessons/${lessonA}/artefacts`, {
+    const text = await t.api('POST', teach(`/lessons/${lessonA}/artefacts`), {
       token: teacher,
       body: { type: 'text', title: 'Setting up a safe wax station' },
     })
     const textId = text.body.course.lessons[0].artefacts[0].id
-    await t.api('PATCH', `/api/teach/artefacts/${textId}`, {
+    await t.api('PATCH', teach(`/artefacts/${textId}`), {
       token: teacher,
       body: { contentJson: doc('Heat the wax to about 70°C and keep a damp cloth within reach.') },
     })
-    const quiz = await t.api('POST', `/api/teach/lessons/${lessonB}/artefacts`, {
+    const quiz = await t.api('POST', teach(`/lessons/${lessonB}/artefacts`), {
       token: teacher,
       body: { type: 'quiz', title: 'Final check' },
     })
     const quizArtefactId = quiz.body.course.lessons[1].artefacts[0].id
-    const upserted = await t.api('PUT', `/api/teach/artefacts/${quizArtefactId}/quiz`, {
+    const upserted = await t.api('PUT', teach(`/artefacts/${quizArtefactId}/quiz`), {
       token: teacher,
       body: {
         passMarkPercent: 70,
@@ -149,7 +155,7 @@ describe('money loop', () => {
       },
     })
     expect(upserted.status).toBe(200)
-    const gated = await t.api('PUT', `/api/teach/lessons/${lessonB}/prerequisites`, {
+    const gated = await t.api('PUT', teach(`/lessons/${lessonB}/prerequisites`), {
       token: teacher,
       body: { prerequisiteIds: [lessonA] },
     })
@@ -164,19 +170,23 @@ describe('money loop', () => {
     })
     await t.storage.put(asset?.storageKey as string, new Uint8Array([1]), 'image/png')
     await t.api('POST', `/api/media/assets/${upload.body.asset.id}/complete`, { token: teacher })
-    const patched = await t.api('PATCH', `/api/teach/courses/${courseId}`, {
+    const patched = await t.api('PATCH', teach(`/courses/${courseId}`), {
       token: teacher,
       body: {
         summary: 'Draw with hot wax, dye in layers and finish a cloth you will actually use.',
         descriptionJson: doc('Two evenings: one at the wax table, one at the dye bath.'),
-        priceCents: 7900,
         thumbnailMediaId: upload.body.asset.id,
       },
     })
     expect(patched.status).toBe(200)
-    const ready = await t.api('GET', `/api/teach/courses/${courseId}`, { token: teacher })
+    const priced = await t.api('PUT', teach(`/courses/${courseId}/price`), {
+      token: teacher,
+      body: { priceCents: 7900 },
+    })
+    expect(priced.status).toBe(200)
+    const ready = await t.api('GET', teach(`/courses/${courseId}`), { token: teacher })
     expect(ready.body.course.checklist.ok).toBe(true)
-    const submitted = await t.api('POST', `/api/teach/courses/${courseId}/submit`, {
+    const submitted = await t.api('POST', teach(`/courses/${courseId}/submit`), {
       token: teacher,
     })
     expect(submitted.body.course.status).toBe('pending_review')
@@ -289,7 +299,7 @@ describe('money loop', () => {
   })
 
   it('8. the teacher sees the payout and the ledger reconciles with Stripe transfers', async () => {
-    const earnings = await t.api('GET', '/api/teach/earnings', { token: teacher })
+    const earnings = await t.api('GET', teach('/earnings'), { token: teacher })
     expect(earnings.status).toBe(200)
     expect(earnings.body.earnings.totals).toMatchObject({
       paymentCount: 1,
@@ -300,7 +310,7 @@ describe('money loop', () => {
       refundedCents: 0,
     })
     expect(earnings.body.earnings.courses[0]).toMatchObject({ slug: courseSlug, netCents: 6444 })
-    const reconcile = await t.api('GET', '/api/teach/earnings/reconcile', { token: teacher })
+    const reconcile = await t.api('GET', teach('/earnings/reconcile'), { token: teacher })
     expect(reconcile.body.reconciliation).toMatchObject({
       stripeTransferTotalCents: 6444,
       ledgerNetCents: 6444,
@@ -313,7 +323,8 @@ describe('money loop', () => {
     expect(list.body.items).toHaveLength(1)
     expect(list.body.items[0]).toMatchObject({
       learnerEmail: 'amira@example.com',
-      teacherName: 'Noor Hassan',
+      profileId,
+      profileName: 'Noor Hassan',
       amountCents: 7900,
       applicationFeeCents: 1456,
       teacherNetCents: 6444,
@@ -322,7 +333,9 @@ describe('money loop', () => {
     const payouts = await t.api('GET', '/api/support/payouts', { token: admin })
     expect(payouts.body.items).toHaveLength(1)
     expect(payouts.body.items[0]).toMatchObject({
-      teacherEmail: 'noor@example.com',
+      profileId,
+      profileName: 'Noor Hassan',
+      ownerEmail: 'noor@example.com',
       transferCount: 1,
       transferredCents: 6444,
       payoutsEnabled: true,
