@@ -21,8 +21,9 @@ Branches: `main` and `v0` are development (local only), `staging` and `productio
 ## API
 
 1. Image: `docker build -f apps/api/Dockerfile -t elevate-api .` from the repo root. It contains
-   `dist/server.js` (the default command) and `dist/migrate.js`, with the workspace packages
-   bundled in. Outside Docker: `npm run build -w @elevate/api`, then `npm run start:prod`.
+   `dist/server.js` (the default command), `dist/migrate.js`, and two commands run by hand as
+   one-off tasks, `dist/seed.js` and `dist/reset-schema.js`, with the workspace packages bundled
+   in. Outside Docker: `npm run build -w @elevate/api`, then `npm run start:prod`.
 2. Required env: `DATABASE_URL`, `SESSION_SECRET` (32+ random chars), `API_URL`, `LEARNER_URL`,
    `TEACH_URL`, `SUPPORT_URL` (these three are also the CORS allow-list in production),
    `NODE_ENV=production`, and `STORAGE_DRIVER=s3` + `S3_BUCKET` + `S3_REGION`. On AWS leave the S3
@@ -31,8 +32,13 @@ Branches: `main` and `v0` are development (local only), `staging` and `productio
    `VIDEO_DRIVER=mux` + `MUX_*`, `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` +
    `STRIPE_CONNECT_WEBHOOK_SECRET`.
 3. Migrations: `node dist/migrate.js` (in the image) against the target `DATABASE_URL` before the
-   new API version takes traffic; the Deploy workflow does this. Migrations are additive so far.
-   `MIGRATIONS_DIR` points the bundle at the SQL files. Seed only on staging.
+   new API version takes traffic; the Deploy workflow does this. `MIGRATIONS_DIR` points the
+   bundle at the migration folders. Migrations are additive, with one exception: the teacher
+   profiles change squashed the earlier migrations into one and needs each environment emptied
+   once (`infra/README.md`, "Resetting an environment").
+   Seeding: `node dist/seed.js --demo` (staging: the super admin plus demo teachers, courses and
+   a learner) or `node dist/seed.js --admin-only` (production: the super admin and nothing else).
+   Both need `SEED_SUPER_ADMIN_EMAIL` and write thumbnails through the configured storage.
 4. Webhooks: a Stripe endpoint for `checkout.session.completed`, `checkout.session.async_payment_*`,
    `charge.refunded` on the account, and a **Connect** endpoint for `account.updated`, both pointing
    at `https://<api>/api/webhooks/stripe`; a Mux endpoint for `video.*` at `/api/webhooks/mux`.
@@ -67,9 +73,9 @@ Branches: `main` and `v0` are development (local only), `staging` and `productio
 
 - [ ] Stripe Connect platform profile completed and the `losses.payments: 'application'`
   acknowledgement accepted (`docs/runbooks/stripe.md`).
-- [ ] `DEFAULT_COMMISSION_BPS` set; per-teacher rates are edited by a super admin in Support.
+- [ ] `DEFAULT_COMMISSION_BPS` set; per-profile rates are edited by a super admin in Support.
 - [ ] `STRIPE_FEE_BPS` / `STRIPE_FEE_FIXED_CENTS` match the negotiated Stripe pricing.
-- [ ] A `super_admin` exists (`SEED_SUPER_ADMIN_EMAIL` on the first migration+seed, or grant via
-  Support → People → Roles).
+- [ ] A `super_admin` exists (`node dist/seed.js --admin-only` with `SEED_SUPER_ADMIN_EMAIL`, or
+  grant via Support → People → Roles).
 - [ ] Run the manual money loop (`docs/runbooks/money-loop.md`) against the production build in
   Stripe test mode before switching to live keys.

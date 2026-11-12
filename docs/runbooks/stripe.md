@@ -1,9 +1,10 @@
 # Stripe (sandbox) setup
 
 Elevate uses Stripe Connect **destination charges**: the learner pays the platform, the full amount
-is transferred to the teacher's connected account, and the platform takes back an
-`application_fee_amount` that covers Stripe's fee plus the per-teacher commission
-(see `docs/adr/003-payments-destination-charges.md`).
+is transferred to the connected account of the teaching profile that sold the course, and the
+platform takes back an `application_fee_amount` that covers Stripe's fee plus the profile's
+commission (see `docs/adr/003-payments-destination-charges.md` and
+`docs/adr/007-payout-accounts.md`).
 
 ## 1. Create a sandbox and keys
 
@@ -31,7 +32,7 @@ for both scopes). Restart the API.
 
 Without the CLI the app still works: the checkout success page calls
 `GET /api/checkout/sessions/:id/sync`, which re-reads the session from Stripe and runs the same
-fulfilment code. Teacher onboarding status is re-read when they return from Stripe.
+fulfilment code. A profile's onboarding status is re-read when its owner returns from Stripe.
 
 ## 3. Webhooks in production
 
@@ -57,14 +58,37 @@ Create two endpoints in Dashboard → Developers → Webhooks, both pointing at
   `refunds.create({ payment_intent, reverse_transfer: true, refund_application_fee: true })`, so
   the teacher's transfer and the platform fee both come back before the learner is refunded. Stripe
   keeps its processing fee (the platform bears it, per `losses.payments: 'application'`). The
-  payment becomes `refunded`, the enrolment `refunded` (access removed), and the learner gets an
-  email.
+  payment becomes `refunded`, the enrolment `refunded` (access removed), and the learner and the
+  owner of the profile that was paid each get an email.
 - Refunds made in the Stripe dashboard arrive as `charge.refunded`; the webhook applies the same
   ledger change once per Stripe refund id, so a dashboard refund and a Support refund never double
-  count.
-- Teacher reconciliation (`GET /api/teach/earnings/reconcile`) sums `transfers.list({ destination })`
-  for the connected account and compares it with Σ `teacher_net_cents` net of refunds. A non-zero
-  difference means a transfer happened outside this platform or a webhook was missed: replay it from
-  the Stripe dashboard (Developers → Webhooks → event → Resend) or hit `/api/checkout/sessions/:id/sync`.
+  count. A dashboard refund sends the same two emails; a Support refund's own webhook sends none.
+- Reconciliation (`GET /api/teach/profiles/:profileId/earnings/reconcile`) sums `transfers.list({ destination })`
+  for the profile's payout account and compares it with Σ `teacher_net_cents` of the payments made
+  to that account, net of refunds. A non-zero difference means a transfer happened outside this
+  platform, a webhook was missed, or a paid session could not be attributed (see section 6): replay
+  it from the Stripe dashboard (Developers → Webhooks → event → Resend) or hit
+  `/api/checkout/sessions/:id/sync`.
 - Partial refunds are not exposed in the UI; if one is made in the dashboard the ledger pro-rates
   the teacher net and marks the payment `partially_refunded`.
+
+## 6. Payout accounts
+
+- Each connected account is a `payout_accounts` row, one per teaching profile. It is created the
+  first time the profile's owner opens Stripe onboarding, and reused for every later link. The
+  Stripe account's metadata carries `elevateProfileId` and `elevatePayoutAccountId`.
+- **Activation.** An individual account becomes `active` the first time Stripe enables charges,
+  from the `account.updated` webhook or from the status check when the owner returns from
+  onboarding. A course can be bought only while the account is `active` and Stripe still allows
+  charges; otherwise checkout answers `teacher_not_payable`.
+- **Who a sale pays.** The Checkout session's metadata carries `elevatePayoutAccountId` and
+  `elevateProfileId`, and fulfilment writes the payment from them. If a paid session has neither,
+  or names an account that does not exist, no payment is written: the webhook answers 500 and the
+  event is stored in `webhook_events` with an `unattributed_checkout` error. The learner has paid
+  and has no enrolment until someone acts on it.
+- **Unknown accounts.** An `account.updated` event for a Stripe account with no row is stored in
+  `webhook_events` with an `unknown_account` error. Accounts created before the database reset
+  cause these; they can be ignored, or the accounts closed in the Stripe test dashboard.
+- **Stripe links.** Only the profile's owner can open onboarding or the Stripe dashboard, and only
+  with a sign-in from the last 24 hours; an older session is sent to sign in again. Each request
+  is written to the audit log and emailed to the owner.

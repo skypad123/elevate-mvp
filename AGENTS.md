@@ -11,7 +11,7 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 - `apps/learner` — Expo (expo-router) learner app: web + iOS + Android.
 - `apps/teach` — Vite + React teacher portal. `apps/support` — Vite + React internal portal.
 - `apps/api` — Hono API (Drizzle, Stripe, Mux, pdf-lib). Exports `@elevate/api/client` for typed RPC.
-- `packages/core` — zod contracts + pure domain logic (DAG, money, grading, lesson states).
+- `packages/core` — zod contracts + pure domain logic (DAG, money, grading, lesson states, permissions).
 - `packages/db` — Drizzle schema, migrations, seed. `packages/tokens` — design tokens → CSS.
 - `packages/web-ui` — Radix + Tailwind components for the two web portals.
 - `infra/terraform` — AWS staging and production (see `infra/README.md`). Branches `staging` and
@@ -27,6 +27,14 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 - Every API handler returns `c.json(body, 200)` with an explicit status so RPC response types narrow.
 - Money is integer cents; the only fee computation lives in `packages/core/src/domain/money.ts`.
 - Course status can reach `live` only through the Support approve route.
+- Teaching is not a platform role. A teacher is whoever owns (or belongs to) a teaching profile;
+  `user_roles` holds staff roles only. Courses, payments and course media belong to a profile.
+- Every Teach API route lives under `/teach/profiles/:profileId` and uses `requireProfile` with a
+  capability from the route table in `docs/designs/teacher-profiles.md` (item 1.15); the Teach
+  portal mirrors it under `/p/:profileId`. The role table is `packages/core/src/domain/permissions.ts`;
+  a new route also needs a row in `apps/api/test/role-routes.test.ts`.
+- A lookup of a course, lesson or artefact for Teach filters by the actor's profile in the same
+  query and answers 404 when it is not there. Money queries select payments by `payout_account_id`.
 - Run `npm run lint` (Biome) and `npx turbo run typecheck test` before committing.
 
 ## Expo conventions (apps/learner)
@@ -56,5 +64,7 @@ https://orm.drizzle.team/docs/rqb-v2.
   it compiles and then throws. Leave the key out, or return `EmptyFilter`.
 - SQL expressions inside a filter go in `RAW: (table) => ...` and must use the callback's `table`, not the
   imported one, because the query aliases its table.
-- Migrations are folders, `packages/db/drizzle/<timestamp>_<name>/` with `migration.sql` and `snapshot.json`,
-  written by `npm run db:generate`. There are no numbered `.sql` files and no `meta/` folder.
+- Migrations are folders, `packages/db/drizzle/<timestamp>_<name>/` with `migration.sql` and `snapshot.json`.
+  Generate them with `npm run db:generate -- --name <name>`, never `drizzle-kit generate` directly: the
+  script also keeps the `CREATE EXTENSION` lines in the `init` migration. There are no numbered `.sql`
+  files and no `meta/` folder.

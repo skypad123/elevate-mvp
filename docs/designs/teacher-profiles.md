@@ -1,8 +1,8 @@
 # Teacher profiles separate from users
 
 -   **Author:** sky
--   **Status:** In progress. Step 0 (the Drizzle 1.0 upgrade) was implemented on 2026-11-12; steps
-    1 to 3 are not started.
+-   **Status:** In progress. Step 0 (the Drizzle 1.0 upgrade) and step 1 (Structure) were
+    implemented on 2026-11-12; steps 2 and 3 are not started.
 -   **Date:** 2026-11-11
 -   **Related:** reviews in [reviews/teacher-profiles/](reviews/teacher-profiles/); the brief this design came from, [teacher-profiles-brief.md](teacher-profiles-brief.md).
     Changes [ADR 003](../adr/003-payments-destination-charges.md): the destination charge goes to
@@ -518,7 +518,8 @@ request ──► authenticate (unchanged: user rebuilt from the session on ever
   profile, so when the promotion brief lets an account move to another profile, its history moves
   with it. This is the "earnings follow the account" rule.
 - **The per-course breakdown** groups those payments by `course_id`. It does not start from the
-  courses the profile owns. Reconciliation runs per payout account, using
+  courses the profile owns. The profile's own courses that have no payments yet are added to the
+  list with zeros, so the page still shows every course (decided in step 1). Reconciliation runs per payout account, using
   `listTransferAmountCents(account)`.
 - **The Support ledger** groups by payout account and shows the profile beside it.
 - **First-payout analytics** is counted per profile: the time from profile approval to the first
@@ -1279,6 +1280,72 @@ with its checks passing.
 -   **Why**: answered the open question on `CREATE VIEW` before step 2 depends on it.
 
 #### Step 1: Structure
+
+**Status:** implemented on 2026-11-12. The items below describe the change as planned; this block
+records what was built differently and how it was checked.
+
+**Built differently from the items below**
+
+- **An applicant can list courses (1.15).** `GET courses` and `GET courses/:id` need
+  `profile.read`, as the route table says, so the owner of a profile awaiting approval gets an
+  empty list where the old API answered 403. Creating a course is still refused. The money-loop
+  test changed to match.
+- **Unsold courses stay on the earnings page (1.22, section 6).** The per-course figures come
+  from the payout account's payments, as designed. The profile's own courses with no payments are
+  listed as well, with zeros, so the page shows every course as it did before.
+- **An index on `profiles.owner_user_id` (1.2)**, beside the partial unique index. The signed-in
+  user's profile list is read by owner on every request, and the partial index covers personal
+  profiles only.
+- **IDs that are not UUIDs answer 404 (1.13, 1.15).** A small middleware, `uuidParam`, checks
+  `:profileId` and `:id` on the Teach and Support profile routes before any query. Such a value
+  used to reach Postgres and come back as a 500.
+- **`createSession` writes `lastSeenAt` as well as `createdAt` from the app clock (1.13)**, so a
+  test with a fixed clock sees a session renew.
+- **Contracts carry a little more than listed (1.12).** `ProfileView` also has `avatarUrl` and
+  `owner`; its `payout` and the Stripe status view have all three Stripe flags and the status.
+- **`packages/db/src/seed/content.ts` needed no change (1.29).**
+- **The Stripe link notice (1.18) links to the profile's settings page**, which holds the payments
+  card; Teach has no Stripe page of its own.
+- **A sign-in race in the shared portal code is fixed (1.33).** `PortalAuthProvider` could apply
+  the answer of an earlier "who am I" request after a new sign-in, and show the previous user's
+  profiles. It now drops an answer whose token has been replaced. Found in the browser check,
+  when a super admin and a teacher signed in one after the other.
+- **The documentation items D.1 to D.5 were written with this step**, because the commands and
+  routes they describe now exist: ADR 006 and ADR 007, the spec, the Stripe, money-loop, deploy
+  and local-dev runbooks, the reset procedure in `infra/README.md`, and the rules in `AGENTS.md`.
+
+**How it was checked**
+
+- `npm run lint`, `npm run check:dupes` and `npx turbo run typecheck test build` pass with nothing
+  cached. The API suite is 20 files and 115 tests; the core suite is 38 tests.
+- Each goal has its named test (1.36): Goal 1 `migration-guard.test.ts`, Goal 2
+  `profiles.test.ts`, Goal 3 `permissions.test.ts` and `role-routes.test.ts` (which also fails
+  when a Teach route has no row in its table), Goals 4 and 5 `payout-accounts.test.ts`, Goal 6
+  `profile-isolation.test.ts`, Goal 15 `staff-acting.test.ts`, and the 24-hour rule
+  `stripe-reauth.test.ts`. The existing suites pass with changes to fixtures, paths and renamed
+  fields (Goal 7), apart from the two differences above.
+- **Goal 8, local migration check**, on a throwaway Postgres 17: reset, migrate and seed; a second
+  seed changes nothing; `npm run db:generate` reports no changes; `drizzle/` holds one folder,
+  `20261111170534_init`.
+- **The image commands (1.28)**, built and run against the same database: `reset-schema` refuses
+  without `ALLOW_SCHEMA_RESET=yes` and empties both schemas with it; `migrate` applies the `init`
+  migration; `seed` refuses without a mode or without `SEED_SUPER_ADMIN_EMAIL`, `--admin-only`
+  creates only the super admin, and `--demo` creates the demo data and writes thumbnails through
+  the storage provider.
+- **In a browser**, against that database with the fake Stripe provider: CUJ 1 (apply, Support
+  approves, connect Stripe and return, build a course, set the price, submit, Support approves,
+  the course is in the catalogue and a learner's checkout starts), CUJ 5 (a super admin opens the
+  profile from Support, Teach shows the staff banner, the price field and Stripe buttons are not
+  available, an edit is saved and recorded under the staff member), CUJ 6 (a second profile for
+  the same user appears in the switcher and each profile shows only its own data), the 24-hour
+  rule (an aged session is sent to sign in and returns to the page) and the profile picture.
+
+**Not checked:** real Stripe in test mode (no keys in this environment), the learner app's teacher
+badge on a device, and staging.
+
+**Found and left alone:** a sign-in link fails once when the browser still holds a session token
+that the API no longer accepts, because the request that verifies the link carries the old token.
+A second try works. This was the case before this step.
 
 ##### 1.1 `packages/db/src/schema/enums.ts` (Modify)
 
@@ -2415,7 +2482,8 @@ Step 3 starts only after the Stripe company-account test in Open Questions passe
       - **(a)** push to the branch, and expect Deploy to fail at "Run database migrations" with
         the first message in section 12;
       - **(b)** find the task definition it registered
-        (`aws ecs list-task-definitions --family-prefix "$ECS_TASK_FAMILY" --sort DESC --max-items 1`)
+        (`aws ecs describe-task-definition --task-definition "$ECS_TASK_FAMILY"`, the same call the
+        workflow uses to read the newest revision)
         and run `reset-schema` with the same `aws ecs run-task` flags the workflow's migration
         step uses (`--cluster "$ECS_CLUSTER"`, `--launch-type FARGATE`, `--network-configuration`
         with `$ECS_SUBNETS` and `$ECS_SECURITY_GROUP`, `deploy.yml:90–97`; the values come from
