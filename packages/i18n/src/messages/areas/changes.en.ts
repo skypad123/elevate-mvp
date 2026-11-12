@@ -196,4 +196,14 @@ export const changesEn = {
   'changes.toast.discarded': 'Changes discarded',
   'changes.toast.discarded.description': 'The course is unchanged.',
   'changes.toast.discardFailed': 'Could not discard',
+
+  // A badge on a change that also clashes with the live course; it links to the clash
+  'changes.item.clash': 'Clash above',
+  // Under an item's title: the lesson it is in. {lesson} is the lesson's title.
+  'changes.item.inLesson': 'In “{lesson}”',
+  // An edited item with no field to compare: a quiz (its questions are listed separately) or anything else
+  'changes.item.edited.quiz': 'Its questions or settings changed; they are compared below.',
+  'changes.item.edited.other': 'Its details changed.',
+  // The unresolved count is a button that jumps to the first clash without a choice
+  'changes.decide.firstOpen': 'Go to the first open clash',
 } as const

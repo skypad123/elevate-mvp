@@ -33,15 +33,18 @@ export function CourseChangesPage() {
     </Link>
   )
 
-  if (changeSet.isPending || live.isPending) return <Skeleton className="h-96 w-full" />
-  if (changeSet.isError || live.isError)
+  // The proposed version is needed too: without it, added items and comparisons render empty.
+  const draftPending = !!changeSet.data && draft.isPending
+  if (changeSet.isPending || live.isPending || draftPending)
+    return <Skeleton className="h-96 w-full" />
+  if (changeSet.isError || live.isError || draft.isError)
     return (
       <>
         {back}
         <EmptyState
           tone="danger"
           title={t('changes.loadFailed')}
-          body={errorMessage(changeSet.error ?? live.error)}
+          body={errorMessage(changeSet.error ?? live.error ?? draft.error)}
         />
       </>
     )
@@ -66,9 +69,9 @@ export function CourseChangesPage() {
           title={t('changes.none.title')}
           body={t('changes.none.body')}
           action={
-            <Link to={builder}>
-              <Button variant="secondary">{t('changes.none.open')}</Button>
-            </Link>
+            <Button asChild variant="secondary">
+              <Link to={builder}>{t('changes.none.open')}</Link>
+            </Button>
           }
         />
       )}

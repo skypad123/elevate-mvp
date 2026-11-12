@@ -45,6 +45,21 @@ function index(course: CourseView | undefined) {
 }
 type Index = ReturnType<typeof index>
 
+/** A clash's identity on the page: its element id, its key in the choices, its radio group. */
+const conflictKey = (c: ChangeSetConflict) => `conflict-${c.kind}-${c.id}`
+
+/** The title of the lesson an item or quiz is in; none for a lesson or its prerequisites. */
+function lessonOf(item: ChangeSetItem, before: Index, after: Index): string | null {
+  if (item.kind !== 'artefact' && item.kind !== 'quiz') return null
+  const artefact =
+    (item.draftId ? after.artefacts.get(item.draftId) : undefined) ??
+    (item.liveId ? before.artefacts.get(item.liveId) : undefined)
+  if (!artefact) return null
+  return (
+    (after.lessons.get(artefact.lessonId) ?? before.lessons.get(artefact.lessonId))?.title ?? null
+  )
+}
+
 /**
  * A writer's edits to a live course, for the owner or a manager to decide on. It lists what would
  * change, with the live version beside the proposed one, then every place where the change clashes
@@ -72,22 +87,38 @@ export function ChangeSetReview({
   const formatDate = useFormatDate()
   const [busy, setBusy] = useState<'approve' | 'discard' | string | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  // A choice shows at once, before the server has stored it; a failure takes it back.
+  const [chosen, setChosen] = useState<Record<string, 'live' | 'draft'>>({})
+  const choiceOf = (c: ChangeSetConflict) => chosen[conflictKey(c)] ?? c.resolution
   const canDecide = can('changeSet.review')
   const writer =
     changeSet.openedBy?.name ?? changeSet.openedBy?.email ?? t('changes.writer.unknown')
   const before = index(live)
   const after = index(draft)
-  const unresolved = changeSet.conflicts.filter((c) => c.resolution === null).length
+  const open = changeSet.conflicts.filter((c) => choiceOf(c) === null)
+  const unresolved = open.length
+  /** The clash a listed change is part of, so the list can point back to it. */
+  const clashOf = (item: ChangeSetItem) =>
+    changeSet.conflicts.find(
+      (c) =>
+        (item.liveId !== null && c.liveId === item.liveId) ||
+        (item.draftId !== null && c.draftId === item.draftId),
+    )
   /** Drafts the writer removed: a clash on one of these is "keep it" against "remove it". */
   const removed = new Set(
     changeSet.items.filter((i) => i.change === 'removed').map((i) => i.draftId),
   )
 
   async function choose(conflict: ChangeSetConflict, keep: 'live' | 'draft') {
-    setBusy(conflict.id)
+    const key = conflictKey(conflict)
+    setChosen((all) => ({ ...all, [key]: keep }))
+    setBusy(key)
     try {
       await actions.resolve([{ kind: conflict.kind, id: conflict.id, keep, seen: conflict.seen }])
+      // The stored choice is in the change set the server sent back; the local one can go.
+      setChosen(({ [key]: _, ...rest }) => rest)
     } catch (error) {
+      setChosen(({ [key]: _, ...rest }) => rest)
       // The live course changed again since this list was loaded: show it as it is now.
       await actions.refresh()
       toast({
@@ -166,7 +197,14 @@ export function ChangeSetReview({
                 isRemoval={conflict.draftId !== null && removed.has(conflict.draftId)}
                 before={before}
                 after={after}
-                disabled={!canDecide || busy !== null}
+                resolution={choiceOf(conflict)}
+                // Only the clash being saved waits; the others stay usable.
+                disabled={
+                  !canDecide ||
+                  busy === conflictKey(conflict) ||
+                  busy === 'approve' ||
+                  busy === 'discard'
+                }
                 onChoose={(keep) => void choose(conflict, keep)}
               />
             ))}
@@ -185,29 +223,47 @@ export function ChangeSetReview({
               body={t('changes.empty.body', { writer })}
             />
           ) : (
-            changeSet.items.map((item) => (
-              <Card
-                key={`${item.kind}:${item.draftId ?? item.liveId}`}
-                as="article"
-                className="space-y-3"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={CHANGE_TONE[item.change]}>
-                    {t(`changes.change.${item.change}`)}
-                  </Badge>
-                  <span className="font-mono text-eyebrow uppercase tracking-[0.08em] text-ink-tertiary">
-                    {t(`changes.kind.${item.kind}`)}
-                  </span>
-                  <h3 className="font-semibold text-ink">{item.title}</h3>
-                </div>
-                <ItemDetail item={item} before={before} after={after} />
-              </Card>
-            ))
+            changeSet.items.map((item) => {
+              const clash = clashOf(item)
+              const lesson = lessonOf(item, before, after)
+              return (
+                <Card
+                  key={`${item.kind}:${item.draftId ?? item.liveId}`}
+                  as="article"
+                  className="space-y-3"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={CHANGE_TONE[item.change]}>
+                      {t(`changes.change.${item.change}`)}
+                    </Badge>
+                    <span className="font-mono text-eyebrow uppercase tracking-[0.08em] text-ink-tertiary">
+                      {t(`changes.kind.${item.kind}`)}
+                    </span>
+                    <h3 className="font-semibold text-ink">{item.title}</h3>
+                    {clash ? (
+                      <a
+                        href={`#${conflictKey(clash)}`}
+                        className="ml-auto text-small font-semibold text-brand-fg hover:underline"
+                      >
+                        {t('changes.item.clash')}
+                      </a>
+                    ) : null}
+                  </div>
+                  {lesson ? (
+                    <p className="text-caption text-ink-tertiary">
+                      {t('changes.item.inLesson', { lesson })}
+                    </p>
+                  ) : null}
+                  <ItemDetail item={item} before={before} after={after} />
+                </Card>
+              )
+            })
           )}
         </section>
       </div>
 
-      <div className="space-y-6">
+      {/* Sticky beside a long list on wide screens; above the list on narrow ones. */}
+      <div className="order-first space-y-6 lg:sticky lg:top-6 lg:order-none lg:self-start">
         <Card as="section" className="space-y-4">
           <CardHeader
             title={t('changes.decide.title')}
@@ -229,14 +285,31 @@ export function ChangeSetReview({
                 {t('changes.decide.approve')}
               </Button>
               {unresolved > 0 ? (
-                <p className="text-small text-warning">
-                  {t(
-                    unresolved === 1
-                      ? 'changes.decide.unresolved.one'
-                      : 'changes.decide.unresolved.other',
-                    { count: unresolved },
-                  )}
-                </p>
+                <div className="space-y-1">
+                  <p className="text-small text-warning">
+                    {t(
+                      unresolved === 1
+                        ? 'changes.decide.unresolved.one'
+                        : 'changes.decide.unresolved.other',
+                      { count: unresolved },
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    className="text-small font-semibold text-brand-fg hover:underline"
+                    onClick={() => {
+                      const first = open[0]
+                      if (!first) return
+                      const element = document.getElementById(conflictKey(first))
+                      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      element
+                        ?.querySelector<HTMLInputElement>('input')
+                        ?.focus({ preventScroll: true })
+                    }}
+                  >
+                    {t('changes.decide.firstOpen')}
+                  </button>
+                </div>
               ) : (
                 <p className="text-small text-ink-tertiary">{t('changes.decide.together')}</p>
               )}
@@ -369,6 +442,20 @@ function ItemDetail({ item, before, after }: { item: ChangeSetItem; before: Inde
         <ArtefactBody artefact={now} />
       </div>
     ) : null
+  const changed =
+    was &&
+    now &&
+    (was.title !== now.title ||
+      was.position !== now.position ||
+      (was.media?.id ?? null) !== (now.media?.id ?? null) ||
+      JSON.stringify(was.contentJson) !== JSON.stringify(now.contentJson))
+  // Nothing here to compare: a quiz's questions are a change of their own, listed below.
+  if (was && now && !changed)
+    return (
+      <p className="text-small text-ink-secondary">
+        {now.type === 'quiz' ? t('changes.item.edited.quiz') : t('changes.item.edited.other')}
+      </p>
+    )
   return (
     <>
       {was && now && was.title !== now.title ? (
@@ -524,6 +611,7 @@ function ConflictChoice({
   isRemoval,
   before,
   after,
+  resolution,
   disabled,
   onChoose,
 }: {
@@ -532,6 +620,8 @@ function ConflictChoice({
   isRemoval: boolean
   before: Index
   after: Index
+  /** The choice on screen: the stored one, or one just made that is still being saved. */
+  resolution: 'live' | 'draft' | null
   disabled: boolean
   onChoose: (keep: 'live' | 'draft') => void
 }) {
@@ -569,9 +659,10 @@ function ConflictChoice({
     keepDraft = t('changes.clash.edited.keepDraft', { writer })
   }
 
-  const name = `conflict-${conflict.kind}-${conflict.id}`
+  const name = conflictKey(conflict)
   return (
     <fieldset
+      id={name}
       disabled={disabled}
       className="space-y-3 rounded-control border border-border px-4 py-3 disabled:opacity-70"
     >
@@ -593,14 +684,14 @@ function ConflictChoice({
               type="radio"
               name={name}
               className="size-4 accent-[var(--brand)]"
-              checked={conflict.resolution === keep}
+              checked={resolution === keep}
               onChange={() => onChoose(keep)}
             />
             {label}
           </label>
         ))}
       </div>
-      {conflict.resolution === null ? (
+      {resolution === null ? (
         <p className="text-caption text-warning">{t('changes.clash.noChoice')}</p>
       ) : null}
     </fieldset>

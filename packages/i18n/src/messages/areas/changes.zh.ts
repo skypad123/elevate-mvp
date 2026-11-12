@@ -130,4 +130,10 @@ export const changesZh = {
   'changes.toast.discarded': '更改已放弃',
   'changes.toast.discarded.description': '课程保持不变。',
   'changes.toast.discardFailed': '放弃更改失败',
+
+  'changes.item.clash': '见上方冲突',
+  'changes.item.inLesson': '位于“{lesson}”',
+  'changes.item.edited.quiz': '题目或设置有改动，对比见下方。',
+  'changes.item.edited.other': '详细信息有改动。',
+  'changes.decide.firstOpen': '前往第一处未处理的冲突',
 } satisfies Record<keyof typeof changesEn, string>

@@ -81,7 +81,8 @@ export function CourseBuilder() {
           <strong className="font-semibold">Changes requested:</strong> {c.rejectionReason}
         </div>
       ) : null}
-      {live && editsLive ? (
+      {/* One banner at a time: with changes waiting, the amber one below says it all. */}
+      {live && editsLive && !c.changeSet ? (
         <div className="mb-6 rounded-card border border-success bg-success-tint px-4 py-3 text-small text-ink">
           <strong className="font-semibold">Live.</strong> Edits publish immediately to enrolled
           learners.
@@ -106,11 +107,9 @@ export function CourseBuilder() {
             </span>
           )}
           {c.viewing === 'draft' ? (
-            <Link to={changesPath}>
-              <Button variant="secondary" size="sm" icon={GitPullRequestArrow}>
-                See what is waiting
-              </Button>
-            </Link>
+            <Button asChild variant="secondary" size="sm" icon={GitPullRequestArrow}>
+              <Link to={changesPath}>See what is waiting</Link>
+            </Button>
           ) : null}
         </div>
       ) : null}
@@ -127,11 +126,9 @@ export function CourseBuilder() {
             with those changes.
           </span>
           {can('changeSet.review') ? (
-            <Link to={changesPath}>
-              <Button variant="secondary" size="sm" icon={GitPullRequestArrow}>
-                Review changes
-              </Button>
-            </Link>
+            <Button asChild variant="secondary" size="sm" icon={GitPullRequestArrow}>
+              <Link to={changesPath}>Review changes</Link>
+            </Button>
           ) : null}
         </div>
       ) : null}
