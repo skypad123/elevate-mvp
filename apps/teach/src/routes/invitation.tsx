@@ -1,5 +1,5 @@
 import type { InvitationAccepted } from '@elevate/core'
-import { Badge, Button, Card, EmptyState, Logo, Skeleton } from '@elevate/web-ui'
+import { Badge, Button, Card, EmptyState, Logo, Skeleton, useToast } from '@elevate/web-ui'
 import { usePortalAuth } from '@elevate/web-ui/portal'
 import {
   fillSlots,
@@ -27,6 +27,7 @@ export function InvitationPage() {
   const t = useT()
   const errorMessage = useErrorMessage()
   const formatDate = useFormatDate()
+  const { toast } = useToast()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [accepted, setAccepted] = useState<InvitationAccepted | null>(null)
@@ -39,6 +40,14 @@ export function InvitationPage() {
       if (result.status === 'accepted') {
         // The new profile is in the user's list only once the session is read again.
         await refreshUser()
+        // Say where they are now, and, for a writer, the one rule that will surprise them.
+        toast({
+          tone: 'success',
+          title: t(`invitation.toast.joined.${result.role}`, { profile: result.profileName }),
+          description:
+            result.role === 'writer' ? t('invitation.toast.joined.writer.note') : undefined,
+          durationMs: 9000,
+        })
         navigate(profilePath(result.profileId), { replace: true })
         return
       }
@@ -70,6 +79,13 @@ export function InvitationPage() {
             tone="danger"
             title={t('invitation.notFound.title')}
             body={t('invitation.notFound.body')}
+            action={
+              user ? (
+                <Button asChild variant="secondary">
+                  <Link to="/">{t('invitation.goToTeach')}</Link>
+                </Button>
+              ) : undefined
+            }
           />
         ) : accepted ? (
           <EmptyState
@@ -84,9 +100,9 @@ export function InvitationPage() {
             body={t(`invitation.closed.${invitation.status}.body`)}
             action={
               user ? (
-                <Link to="/">
-                  <Button variant="secondary">{t('invitation.goToTeach')}</Button>
-                </Link>
+                <Button asChild variant="secondary">
+                  <Link to="/">{t('invitation.goToTeach')}</Link>
+                </Button>
               ) : undefined
             }
           />
@@ -143,11 +159,11 @@ export function InvitationPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                <Link to={`/sign-in?redirect=${encodeURIComponent(`/invitations/${token}`)}`}>
-                  <Button size="lg" className="w-full">
+                <Button asChild size="lg" className="w-full">
+                  <Link to={`/sign-in?redirect=${encodeURIComponent(`/invitations/${token}`)}`}>
                     {t('invitation.signInToAccept')}
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
                 <p className="text-small text-ink-tertiary">{t('invitation.newHere')}</p>
               </div>
             )}

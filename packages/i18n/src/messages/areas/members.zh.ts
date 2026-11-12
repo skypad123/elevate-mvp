@@ -55,4 +55,19 @@ export const membersZh = {
   'members.toast.invited': '邀请已发送至 {email}',
   'members.toast.invited.description': '邮件中的链接 7 天内有效。',
   'members.toast.inviteFailed': '发送失败',
+
+  'members.list.changeRole': '更改角色',
+  'members.changeRole.title.manager': '要将 {name} 设为管理员吗？',
+  'members.changeRole.title.writer': '要将 {name} 设为撰稿人吗？',
+  'members.changeRole.confirm.manager': '设为管理员',
+  'members.changeRole.confirm.writer': '设为撰稿人',
+
+  'members.confirmInvite.title': '要授予 {email} 访问权限吗？',
+  'members.confirmInvite.description':
+    '邀请发送至 {invited}，但由 {accepted} 接受。请仅在确认这就是您要邀请的人时再确认。',
+  'members.confirmInvite.description.unknown':
+    '邀请发送至 {invited}，但由另一个邮箱地址接受。请仅在确认接受者身份时再确认。',
+
+  'members.revoke.title': '要撤销发给 {email} 的邀请吗？',
+  'members.revoke.description': '邮件中的链接将立即失效。您之后可以重新邀请对方。',
 } satisfies Record<keyof typeof membersEn, string>

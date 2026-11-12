@@ -86,4 +86,25 @@ export const membersEn = {
   'members.toast.invited.description': 'The link in the email works for 7 days.',
   // An invitation could not be sent. The error itself is shown under this title.
   'members.toast.inviteFailed': 'Could not send',
+
+  // Changing a member's role: a button in the role column, then a confirmation
+  'members.list.changeRole': 'Change role',
+  // {name} is the member's name or email
+  'members.changeRole.title.manager': 'Make {name} a manager?',
+  'members.changeRole.title.writer': 'Make {name} a writer?',
+  'members.changeRole.confirm.manager': 'Make manager',
+  'members.changeRole.confirm.writer': 'Make writer',
+
+  // Confirming an invitation that was accepted from another address
+  'members.confirmInvite.title': 'Give {email} access?',
+  // {invited} is the address the invitation went to, {accepted} the one that used the link
+  'members.confirmInvite.description':
+    'The invitation was sent to {invited} and accepted from {accepted}. Confirm only if you know this is the person you meant to invite.',
+  'members.confirmInvite.description.unknown':
+    'The invitation was sent to {invited} and accepted from another address. Confirm only if you know who accepted it.',
+
+  // Revoking an invitation
+  'members.revoke.title': 'Revoke the invitation to {email}?',
+  'members.revoke.description':
+    'The link in the email stops working at once. You can invite them again later.',
 } as const

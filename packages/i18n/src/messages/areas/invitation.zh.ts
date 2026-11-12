@@ -33,4 +33,9 @@ export const invitationZh = {
   'invitation.signInToAccept': '登录以接受邀请',
   'invitation.newHere': '第一次使用 Elevate？使用邮箱登录即会为您创建账户，无需设置密码。',
   'invitation.expires': '此邀请有效期至 {date}。',
+
+  'invitation.toast.joined.manager': '您已以管理员身份加入 {profile}',
+  'invitation.toast.joined.writer': '您已以撰稿人身份加入 {profile}',
+  'invitation.toast.joined.writer.note':
+    '您对已上线课程所做的修改，需经所有者或管理员批准后学员才能看到。',
 } satisfies Record<keyof typeof invitationEn, string>

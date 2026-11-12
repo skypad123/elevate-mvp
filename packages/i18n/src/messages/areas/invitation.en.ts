@@ -53,4 +53,11 @@ export const invitationEn = {
     'New to Elevate? Signing in with your email creates your account. There is no password to choose.',
   // The last line of the card. {date} is the day the invitation stops working.
   'invitation.expires': 'This invitation expires on {date}.',
+
+  // Toast after accepting. {profile} is the profile's name.
+  'invitation.toast.joined.manager': 'You joined {profile} as a manager',
+  'invitation.toast.joined.writer': 'You joined {profile} as a writer',
+  // The toast's second line, for a writer
+  'invitation.toast.joined.writer.note':
+    'Edits you make to a live course go to the owner or a manager for approval before learners see them.',
 } as const
