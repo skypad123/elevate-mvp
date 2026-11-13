@@ -62,6 +62,15 @@ describe('contrast', () => {
       it('brand foreground on its tint is AA', () => {
         expect(contrast(c.brandFg, c.brandTint)).toBeGreaterThanOrEqual(4.5)
       })
+      it('text on an accent fill (accentInk on accent and accentHover) is AA', () => {
+        expect(contrast(c.accentInk, c.accent)).toBeGreaterThanOrEqual(4.5)
+        expect(contrast(c.accentInk, c.accentHover)).toBeGreaterThanOrEqual(4.5)
+      })
+      it('accent as text on surface, canvas and its tint is AA', () => {
+        expect(contrast(c.accent, c.surface)).toBeGreaterThanOrEqual(4.5)
+        expect(contrast(c.accent, c.canvas)).toBeGreaterThanOrEqual(4.5)
+        expect(contrast(c.accent, c.accentTint)).toBeGreaterThanOrEqual(4.5)
+      })
       it('body ink on canvas and surface is AA', () => {
         expect(contrast(c.ink, c.canvas)).toBeGreaterThanOrEqual(4.5)
         expect(contrast(c.inkSecondary, c.surface)).toBeGreaterThanOrEqual(4.5)
