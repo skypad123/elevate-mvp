@@ -2,6 +2,7 @@ import { Link, usePathname } from 'expo-router'
 import { Compass, GraduationCap, LogIn, type LucideIcon, UserRound } from 'lucide-react-native'
 import { Pressable, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useT } from '@/lib/preferences'
 import { useSession } from '@/lib/session'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Text } from '@/ui/Text'
@@ -20,24 +21,25 @@ export function PillTabBar() {
   const insets = useSafeAreaInsets()
   const pathname = usePathname()
   const { isSignedIn } = useSession()
+  const t = useT()
 
   const items: Item[] = isSignedIn
     ? [
         {
           href: '/',
-          label: 'Explore',
+          label: t('nav.explore'),
           icon: Compass,
           match: (p) => p === '/' || p.startsWith('/course'),
         },
         {
           href: '/learning',
-          label: 'My Learning',
+          label: t('nav.myLearning'),
           icon: GraduationCap,
           match: (p) => p.startsWith('/learning') || p.startsWith('/learn'),
         },
         {
           href: '/profile',
-          label: 'Profile',
+          label: t('nav.profile'),
           icon: UserRound,
           match: (p) => p.startsWith('/profile'),
         },
@@ -45,11 +47,16 @@ export function PillTabBar() {
     : [
         {
           href: '/',
-          label: 'Explore',
+          label: t('nav.explore'),
           icon: Compass,
           match: (p) => p === '/' || p.startsWith('/course'),
         },
-        { href: '/sign-in', label: 'Sign in', icon: LogIn, match: (p) => p.startsWith('/sign-in') },
+        {
+          href: '/sign-in',
+          label: t('nav.signIn'),
+          icon: LogIn,
+          match: (p) => p.startsWith('/sign-in'),
+        },
       ]
 
   return (

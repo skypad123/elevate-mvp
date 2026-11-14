@@ -100,7 +100,7 @@ export function RichTextEditor({
       onClick={run}
       className={cn(
         'rounded-sm p-1.5 text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink disabled:opacity-50',
-        active && 'bg-brand-tint text-brand',
+        active && 'bg-brand-tint text-brand-fg',
       )}
     >
       {icon}

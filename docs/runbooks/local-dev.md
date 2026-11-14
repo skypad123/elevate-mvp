@@ -23,6 +23,23 @@ npm run dev                     # api :4400 · learner web :8081 · teach :5173 
 Magic links are delivered to Mailpit (http://localhost:8025). Each email carries a link (web) and a
 6-digit code (mobile). The seeded super admin can sign in to Elevate Support.
 
+The seed creates four demo teachers, each as an approved personal profile, and their courses. The
+profiles have no payout account, so their paid courses cannot be bought (checkout answers
+`teacher_not_payable`). To try a purchase, sign in to Teach as a demo teacher and connect Stripe,
+or follow `docs/runbooks/money-loop.md` with a new teacher.
+
+It also makes `writer@example.com` a writer on the first demo profile (Mei Lin Tan,
+`meilin@example.com`). Sign in to Teach as the writer and edit one of that profile's live courses:
+the edits wait as changes, and the owner approves or discards them from the course's "Review
+changes" button. To add another member, invite an address from the profile's Members page; the
+invitation email lands in Mailpit like any other.
+
+It also creates one approved company, Kiln & Co Studio (UEN `201912345K`), owned by
+`founder@example.com` with `manager@example.com` as a manager. It has no payout account and no
+courses. To try the whole company journey, apply from Teach's "Create a company profile" entry
+with a new address, then approve it and run the legal-name check in Support
+(`docs/runbooks/stripe.md`, section 7).
+
 ## Ports
 
 | Service            | URL                              |
@@ -45,7 +62,8 @@ create `apps/learner/.env` with `EXPO_PUBLIC_API_URL=http://<lan-ip>:4400`.
 npm run lint                 # Biome
 npx turbo run typecheck test # all packages
 npm run check:dupes          # one React / hono copy
-npm run db:reset             # drop + migrate + seed (local only)
+npm run db:reset             # drop everything (local only); then db:migrate and db:seed
+npm run db:generate -- --name add_x   # new migration; never run drizzle-kit generate directly
 ```
 
 ## Verifying on a phone with Expo Go

@@ -1,5 +1,6 @@
 import { Link, usePathname } from 'expo-router'
 import { Pressable, View } from 'react-native'
+import { useT } from '@/lib/preferences'
 import { useSession } from '@/lib/session'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Avatar } from '@/ui/Avatar'
@@ -14,6 +15,7 @@ export function TopNav() {
   const theme = useTheme()
   const pathname = usePathname()
   const { isSignedIn, user } = useSession()
+  const t = useT()
 
   const link = (href: '/' | '/learning', label: string, active: boolean) => (
     <Link href={href} asChild>
@@ -60,17 +62,19 @@ export function TopNav() {
           </Pressable>
         </Link>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          {link('/', 'Explore', pathname === '/' || pathname.startsWith('/course'))}
-          {isSignedIn ? link('/learning', 'My Learning', pathname.startsWith('/learn')) : null}
+          {link('/', t('nav.explore'), pathname === '/' || pathname.startsWith('/course'))}
+          {isSignedIn
+            ? link('/learning', t('nav.myLearning'), pathname.startsWith('/learn'))
+            : null}
           {isSignedIn ? (
             <Link href="/profile" asChild>
-              <Pressable style={{ marginLeft: 12 }} accessibilityLabel="Profile">
+              <Pressable style={{ marginLeft: 12 }} accessibilityLabel={t('nav.profile')}>
                 <Avatar name={user?.name ?? user?.email} url={user?.avatarUrl} size={36} />
               </Pressable>
             </Link>
           ) : (
             <Link href="/sign-in" asChild>
-              <Button label="Sign in" size="sm" variant="secondary" />
+              <Button label={t('nav.signIn')} size="sm" variant="secondary" />
             </Link>
           )}
         </View>

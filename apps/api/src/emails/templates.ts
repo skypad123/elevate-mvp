@@ -10,23 +10,37 @@ const brand = {
   ember: '#E8603C',
 }
 
+/**
+ * Names, titles and notes are typed by people, and some emails go to addresses that have nothing
+ * to do with Elevate yet (an invitation). Everything that is not markup written in this file
+ * goes through this before it is put into HTML, so it is shown as text and never read as markup.
+ */
+export const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+/** `title` is text; `bodyHtml` is markup built from `para` and `button`. */
 function layout(title: string, bodyHtml: string): string {
   return `<!doctype html><html><body style="margin:0;background:${brand.canvas};font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:${brand.ink}">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${brand.canvas};padding:32px 16px">
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:${brand.surface};border:1px solid ${brand.border};border-radius:16px;padding:32px">
 <tr><td style="font-family:Georgia,serif;font-size:22px;font-weight:600;color:${brand.moss};padding-bottom:16px">Elevate</td></tr>
-<tr><td style="font-family:Georgia,serif;font-size:26px;line-height:32px;font-weight:600;padding-bottom:12px">${title}</td></tr>
+<tr><td style="font-family:Georgia,serif;font-size:26px;line-height:32px;font-weight:600;padding-bottom:12px">${escapeHtml(title)}</td></tr>
 ${bodyHtml}
 <tr><td style="font-size:12px;line-height:18px;color:${brand.inkSecondary};padding-top:24px;border-top:1px solid ${brand.border}">If you did not request this email you can ignore it.</td></tr>
 </table></td></tr></table></body></html>`
 }
 
 const button = (href: string, label: string, colour = brand.moss) =>
-  `<a href="${href}" style="display:inline-block;background:${colour};color:#fff;text-decoration:none;font-weight:600;font-size:16px;padding:14px 22px;border-radius:10px">${label}</a>`
+  `<a href="${escapeHtml(href)}" style="display:inline-block;background:${colour};color:#fff;text-decoration:none;font-weight:600;font-size:16px;padding:14px 22px;border-radius:10px">${escapeHtml(label)}</a>`
 
 const para = (text: string) =>
-  `<tr><td style="font-size:16px;line-height:24px;color:${brand.inkSecondary};padding-bottom:16px">${text}</td></tr>`
+  `<tr><td style="font-size:16px;line-height:24px;color:${brand.inkSecondary};padding-bottom:16px">${escapeHtml(text)}</td></tr>`
 
 export function magicLinkEmail(input: {
   to: string

@@ -1,12 +1,13 @@
 import { sql } from 'drizzle-orm'
-import { boolean, index, integer, jsonb, pgTable, text, unique, uuid } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, jsonb, snakeCase, text, unique, uuid } from 'drizzle-orm/pg-core'
 import { users } from './auth'
 import { citext, createdAt, id, ts, updatedAt } from './columns'
 import { courses } from './courses'
 import { enrollmentModeEnum, enrollmentStatusEnum, paymentStatusEnum, promoTypeEnum } from './enums'
+import { payoutAccounts, profiles } from './profiles'
 
 /** Platform-managed promo codes (not Stripe promotion codes) so the application fee stays exact. */
-export const promoCodes = pgTable('promo_codes', {
+export const promoCodes = snakeCase.table('promo_codes', {
   id: id(),
   code: citext().notNull().unique(),
   type: promoTypeEnum().notNull(),
@@ -30,7 +31,7 @@ export type AttendanceRecord = {
   method: 'qr' | 'gps' | 'manual'
 }
 
-export const enrollments = pgTable(
+export const enrollments = snakeCase.table(
   'enrollments',
   {
     id: id(),
@@ -57,7 +58,7 @@ export const enrollments = pgTable(
   ],
 )
 
-export const payments = pgTable(
+export const payments = snakeCase.table(
   'payments',
   {
     id: id(),
@@ -70,9 +71,14 @@ export const payments = pgTable(
     courseId: uuid()
       .notNull()
       .references(() => courses.id, { onDelete: 'restrict' }),
-    teacherId: uuid()
+    /** The profile at the time of sale, kept for audit. Money queries go by `payoutAccountId`. */
+    profileId: uuid()
       .notNull()
-      .references(() => users.id, { onDelete: 'restrict' }),
+      .references(() => profiles.id, { onDelete: 'restrict' }),
+    /** The account this sale paid. Set once at fulfilment and never updated. */
+    payoutAccountId: uuid()
+      .notNull()
+      .references(() => payoutAccounts.id, { onDelete: 'restrict' }),
     stripeCheckoutSessionId: text().notNull().unique(),
     stripePaymentIntentId: text().unique(),
     stripeChargeId: text(),
@@ -98,7 +104,8 @@ export const payments = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    index().on(t.teacherId, t.paidAt),
+    index().on(t.profileId, t.paidAt),
+    index().on(t.payoutAccountId, t.paidAt),
     index().on(t.courseId),
     index().on(t.userId),
     index().on(t.paidAt),
@@ -106,7 +113,7 @@ export const payments = pgTable(
   ],
 )
 
-export const refunds = pgTable('refunds', {
+export const refunds = snakeCase.table('refunds', {
   id: id(),
   paymentId: uuid()
     .notNull()

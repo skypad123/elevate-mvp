@@ -147,7 +147,7 @@ function PaymentsTable() {
                 <TH>Date</TH>
                 <TH>Learner</TH>
                 <TH>Course</TH>
-                <TH>Teacher</TH>
+                <TH>Profile</TH>
                 <TH className="text-right">Charged</TH>
                 <TH className="text-right">Platform fee</TH>
                 <TH className="text-right">Teacher net</TH>
@@ -166,7 +166,7 @@ function PaymentsTable() {
                   </TD>
                   <TD className="font-mono text-caption">{t.learnerEmail}</TD>
                   <TD className="font-semibold">{t.courseTitle}</TD>
-                  <TD className="text-ink-secondary">{t.teacherName}</TD>
+                  <TD className="text-ink-secondary">{t.profileName}</TD>
                   <TD className="text-right">
                     <Money cents={t.amountCents} />
                   </TD>
@@ -216,14 +216,14 @@ function PayoutLedger() {
       <EmptyState
         icon={Wallet}
         title="No transfers yet"
-        body="Each teacher appears here with the total Stripe has transferred to them."
+        body="Each payout account appears here with the total Stripe has transferred to it."
       />
     )
   return (
     <Table>
       <THead>
         <TR>
-          <TH>Teacher</TH>
+          <TH>Profile</TH>
           <TH>Stripe account</TH>
           <TH>Payouts</TH>
           <TH className="text-right">Transfers</TH>
@@ -233,10 +233,15 @@ function PayoutLedger() {
       </THead>
       <TBody>
         {query.data.map((row) => (
-          <TR key={row.teacherId}>
+          <TR key={row.payoutAccountId}>
             <TD>
-              <p className="font-semibold">{row.teacherName}</p>
-              <p className="text-caption text-ink-tertiary">{row.teacherEmail}</p>
+              <Link
+                to={`/profiles/${row.profileId}`}
+                className="font-semibold text-ink hover:text-brand-fg hover:underline"
+              >
+                {row.profileName}
+              </Link>
+              <p className="text-caption text-ink-tertiary">{row.ownerEmail}</p>
             </TD>
             <TD className="font-mono text-caption">
               {row.stripeAccountId ?? <span className="text-ink-tertiary">Not connected</span>}
@@ -316,6 +321,7 @@ function TransactionView({ t }: { t: TransactionDetail }) {
   }
 
   const ids: Array<[string, string | null]> = [
+    ['Payout account', t.payoutAccountId],
     ['Checkout session', t.stripe.checkoutSessionId],
     ['Payment intent', t.stripe.paymentIntentId],
     ['Charge', t.stripe.chargeId],
@@ -335,7 +341,7 @@ function TransactionView({ t }: { t: TransactionDetail }) {
       <PageHeader
         eyebrow={`Payment · ${formatDate(t.paidAt, dateTime)}`}
         title={t.courseTitle}
-        description={`${t.learnerEmail} · taught by ${t.teacherName}`}
+        description={`${t.learnerEmail} · sold by ${t.profileName}`}
       />
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <Badge tone={statusTone[t.status]}>{statusLabel(t.status)}</Badge>
@@ -343,18 +349,18 @@ function TransactionView({ t }: { t: TransactionDetail }) {
           Enrolment {statusLabel(t.enrollmentStatus).toLowerCase()}
         </Badge>
         {stripeUrl ? (
-          <a href={stripeUrl} target="_blank" rel="noreferrer">
-            <Button variant="secondary" size="sm" icon={ExternalLink}>
+          <Button asChild variant="secondary" size="sm" icon={ExternalLink}>
+            <a href={stripeUrl} target="_blank" rel="noreferrer">
               Open in Stripe
-            </Button>
-          </a>
+            </a>
+          </Button>
         ) : null}
         {t.stripe.receiptUrl ? (
-          <a href={t.stripe.receiptUrl} target="_blank" rel="noreferrer">
-            <Button variant="ghost" size="sm" icon={Receipt}>
+          <Button asChild variant="ghost" size="sm" icon={Receipt}>
+            <a href={t.stripe.receiptUrl} target="_blank" rel="noreferrer">
               Receipt
-            </Button>
-          </a>
+            </a>
+          </Button>
         ) : null}
         {canRefund ? (
           <Button
@@ -496,7 +502,7 @@ function TransactionView({ t }: { t: TransactionDetail }) {
         open={open}
         onOpenChange={(o) => !o && setOpen(false)}
         title="Refund this payment?"
-        description={`${formatSgd(t.amountCents)} goes back to ${t.learnerEmail}. The transfer to ${t.teacherName} is reversed and the learner loses access to the course.`}
+        description={`${formatSgd(t.amountCents)} goes back to ${t.learnerEmail}. The transfer to ${t.profileName} is reversed and the learner loses access to the course.`}
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>

@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { Navigate, useLocation } from 'react-router'
 import { Spinner } from '../components/Spinner'
+import { useT } from '../preferences/PreferencesProvider'
 import { ApiError, type PortalApi, type TokenStore, unwrap } from './api'
 
 export type PortalSession = {
@@ -41,16 +42,23 @@ export function PortalAuthProvider({
   const queryClient = useQueryClient()
 
   const refreshUser = useCallback(async () => {
-    if (!tokenStore.get()) {
+    const token = tokenStore.get()
+    if (!token) {
       setUser(null)
       setStatus('signed_out')
       return
     }
+    // A sign-in can replace the token while this request is in flight (the verify page signs in
+    // while the first refresh is still running). Its answer would then be about the previous
+    // user, so it is dropped.
+    const superseded = () => tokenStore.get() !== token
     try {
       const { user: me } = await unwrap(await api.auth.me.$get())
+      if (superseded()) return
       setUser(me)
       setStatus('signed_in')
     } catch (error) {
+      if (superseded()) return
       if (error instanceof ApiError && error.status === 401) {
         tokenStore.clear()
         setUser(null)
@@ -108,11 +116,12 @@ export function usePortalAuth(): PortalSession {
   return ctx
 }
 
-export function FullPageSpinner({ label = 'Loading…' }: { label?: string }) {
+export function FullPageSpinner({ label }: { label?: string }) {
+  const t = useT()
   return (
     <div className="flex min-h-full flex-col items-center justify-center gap-3 text-ink-secondary">
-      <Spinner className="size-6 text-brand" />
-      <p className="text-small">{label}</p>
+      <Spinner className="size-6 text-brand-fg" />
+      <p className="text-small">{label ?? t('common.loading')}</p>
     </div>
   )
 }

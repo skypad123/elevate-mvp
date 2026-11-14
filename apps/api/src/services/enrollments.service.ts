@@ -1,6 +1,5 @@
 import type { EnrollmentSummary } from '@elevate/core'
-import { schema as s } from '@elevate/db'
-import { asc, desc, eq, inArray } from 'drizzle-orm'
+import { inArray } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { CatalogService } from './catalog.service'
 
@@ -10,20 +9,23 @@ export class EnrollmentsService {
     this.catalog = new CatalogService(deps)
   }
 
+  /** My Learning. Progress counts live artefacts only, so a writer's drafts never move it. */
   async listForUser(userId: string): Promise<EnrollmentSummary[]> {
-    const { db } = this.deps
-    const rows = await db.query.enrollments.findMany({
-      where: eq(s.enrollments.userId, userId),
-      orderBy: [desc(s.enrollments.updatedAt)],
+    const rows = await this.deps.learnerDb.query.enrollments.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
       with: {
         course: {
           with: {
             thumbnail: true,
-            teacher: { with: { teacherProfile: true } },
-            lessons: { columns: { id: true }, with: { artefacts: { columns: { id: true } } } },
+            profile: true,
+            liveLessons: {
+              columns: { id: true },
+              with: { liveArtefacts: { columns: { id: true } } },
+            },
           },
         },
-        progress: { orderBy: [asc(s.artefactProgress.updatedAt)] },
+        progress: { orderBy: { updatedAt: 'asc' } },
         certificate: true,
       },
     })
@@ -31,7 +33,7 @@ export class EnrollmentsService {
     const out: EnrollmentSummary[] = []
     for (const row of visible) {
       if (row.status === 'pending_payment') continue
-      const totalArtefacts = row.course.lessons.reduce((n, l) => n + l.artefacts.length, 0)
+      const totalArtefacts = row.course.liveLessons.reduce((n, l) => n + l.liveArtefacts.length, 0)
       const completedArtefacts = row.progress.filter((p) => p.status === 'completed').length
       const last = row.progress.at(-1)
       out.push({
@@ -54,7 +56,7 @@ export class EnrollmentsService {
 
   async activeCourseIds(userId: string): Promise<Set<string>> {
     const rows = await this.deps.db.query.enrollments.findMany({
-      where: eq(s.enrollments.userId, userId),
+      where: { userId },
       columns: { courseId: true, status: true },
     })
     return new Set(rows.filter((r) => r.status === 'active').map((r) => r.courseId))
@@ -62,7 +64,7 @@ export class EnrollmentsService {
 
   async ensureActive(userId: string, enrollmentId: string) {
     const enrollment = await this.deps.db.query.enrollments.findFirst({
-      where: eq(s.enrollments.id, enrollmentId),
+      where: { id: enrollmentId },
     })
     if (!enrollment || enrollment.userId !== userId) return null
     if (!inArray) return null

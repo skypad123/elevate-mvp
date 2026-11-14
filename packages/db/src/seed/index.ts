@@ -1,16 +1,28 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { quizDefinitionSchema } from '@elevate/core'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { AnyDb } from '../index'
 
 import * as s from '../schema'
 import { type SeedCourse, type SeedTeacher, seedCourses, seedTeachers } from './content'
 
+/** Where the seed writes course thumbnails. `put` has the signature of the API's storage provider. */
+export type SeedStorage = {
+  /** Recorded on the seeded media rows, so the API reads the files from the right place. */
+  provider: 'local' | 's3'
+  put(key: string, body: Uint8Array, mimeType: string): Promise<void>
+}
+
 export type SeedOptions = {
   superAdminEmail: string
-  /** Where local storage lives; thumbnails are written under <dir>/public/seed. Null skips images. */
-  storageDir: string | null
+  /**
+   * `admin-only` creates the super admin and nothing else. `demo` also creates a support agent,
+   * the demo teachers (as approved personal profiles with no payout account, so their courses
+   * cannot be bought), a writer on the first of those profiles, an approved company profile with
+   * a manager, the demo courses, two promo codes and a learner.
+   */
+  mode: 'demo' | 'admin-only'
+  /** Null skips the thumbnail files; the media rows are still created. */
+  storage: SeedStorage | null
   log?: (message: string) => void
 }
 
@@ -49,64 +61,132 @@ async function upsertUser(db: AnyDb, email: string, name: string) {
   return user
 }
 
-async function grantRole(
-  db: AnyDb,
-  userId: string,
-  role: 'teacher' | 'support_agent' | 'super_admin',
-) {
+async function grantRole(db: AnyDb, userId: string, role: 'support_agent' | 'super_admin') {
   await db.insert(s.userRoles).values({ userId, role }).onConflictDoNothing()
 }
 
+/** The teacher's user and their approved personal profile. Re-seeding refreshes the profile text. */
 async function upsertTeacher(db: AnyDb, t: SeedTeacher) {
   const user = await upsertUser(db, t.email, t.name)
-  await grantRole(db, user.id, 'teacher')
-  await db
-    .insert(s.teacherProfiles)
+  const details = {
+    displayName: t.displayName,
+    headline: t.headline,
+    bio: t.bio,
+    credentials: t.credentials,
+  }
+  const existing = await db.query.profiles.findFirst({
+    where: { ownerUserId: user.id, type: 'personal' },
+  })
+  if (existing) {
+    await db.update(s.profiles).set(details).where(eq(s.profiles.id, existing.id))
+    return { userId: user.id, profileId: existing.id }
+  }
+  const [profile] = await db
+    .insert(s.profiles)
     .values({
-      userId: user.id,
-      displayName: t.displayName,
-      headline: t.headline,
-      bio: t.bio,
-      credentials: t.credentials,
+      type: 'personal',
+      ownerUserId: user.id,
+      ...details,
       teachingSampleUrl: 'https://example.com/teaching-sample',
       status: 'approved',
       commissionBps: t.commissionBps,
       reviewedAt: new Date(),
     })
-    .onConflictDoUpdate({
-      target: s.teacherProfiles.userId,
-      set: {
-        displayName: t.displayName,
-        headline: t.headline,
-        bio: t.bio,
-        credentials: t.credentials,
-      },
-    })
-  return user
+    .returning()
+  if (!profile) throw new Error(`failed to create a profile for ${t.email}`)
+  return { userId: user.id, profileId: profile.id }
+}
+
+/** The demo company: made up, with a UEN that has the right format and belongs to no one. */
+const DEMO_COMPANY = {
+  uen: '201912345K',
+  legalName: 'Kiln & Co Studio Pte. Ltd.',
+  displayName: 'Kiln & Co Studio',
+  headline: 'Studio ceramics classes, taught by a team of working potters',
+  bio: 'Kiln & Co is a teaching studio. Its potters run beginner and intermediate classes in wheel throwing, glazing and firing, and build their courses together.',
+  credentials:
+    'A registered studio since 2019. Four resident potters, each with more than five years of teaching.',
+  owner: { email: 'founder@example.com', name: 'Farah Founder' },
+  manager: { email: 'manager@example.com', name: 'Maya Manager' },
+}
+
+/**
+ * An approved corporate profile whose company Support has already verified, with one manager and
+ * no payout account. So it can be shown without a real company, and checkout never sends Stripe
+ * a made-up destination. Re-seeding refreshes its text.
+ */
+async function upsertDemoCompany(db: AnyDb, adminId: string): Promise<string> {
+  const owner = await upsertUser(db, DEMO_COMPANY.owner.email, DEMO_COMPANY.owner.name)
+  const manager = await upsertUser(db, DEMO_COMPANY.manager.email, DEMO_COMPANY.manager.name)
+  const details = {
+    displayName: DEMO_COMPANY.displayName,
+    headline: DEMO_COMPANY.headline,
+    bio: DEMO_COMPANY.bio,
+    credentials: DEMO_COMPANY.credentials,
+  }
+  const now = new Date()
+  let entity = await db.query.legalEntities.findFirst({ where: { uen: DEMO_COMPANY.uen } })
+  if (!entity) {
+    const [created] = await db
+      .insert(s.legalEntities)
+      .values({
+        uen: DEMO_COMPANY.uen,
+        legalName: DEMO_COMPANY.legalName,
+        entityType: 'private_limited',
+        checkStatus: 'verified',
+        checkedBy: adminId,
+        checkedAt: now,
+      })
+      .returning()
+    if (!created) throw new Error('failed to create the demo company')
+    entity = created
+  }
+  let profile = await db.query.profiles.findFirst({ where: { legalEntityId: entity.id } })
+  if (profile) {
+    await db.update(s.profiles).set(details).where(eq(s.profiles.id, profile.id))
+  } else {
+    const [created] = await db
+      .insert(s.profiles)
+      .values({
+        type: 'corporate',
+        ownerUserId: owner.id,
+        legalEntityId: entity.id,
+        ...details,
+        teachingSampleUrl: 'https://example.com/teaching-sample',
+        status: 'approved',
+        reviewedAt: now,
+        reviewedBy: adminId,
+      })
+      .returning()
+    if (!created) throw new Error('failed to create the demo company profile')
+    profile = created
+  }
+  await db
+    .insert(s.profileMemberships)
+    .values({ profileId: profile.id, userId: manager.id, role: 'manager', addedBy: owner.id })
+    .onConflictDoNothing()
+  return profile.id
 }
 
 async function ensureThumbnail(
   db: AnyDb,
-  ownerId: string,
+  owner: { userId: string; profileId: string },
   course: SeedCourse,
-  storageDir: string | null,
+  storage: SeedStorage | null,
 ) {
   const storageKey = `public/seed/${course.slug}.svg`
-  if (storageDir) {
-    const file = join(storageDir, storageKey)
-    mkdirSync(dirname(file), { recursive: true })
-    writeFileSync(file, thumbnailSvg(course))
+  if (storage) {
+    await storage.put(storageKey, Buffer.from(thumbnailSvg(course)), 'image/svg+xml')
   }
-  const existing = await db.query.mediaAssets.findFirst({
-    where: eq(s.mediaAssets.storageKey, storageKey),
-  })
+  const existing = await db.query.mediaAssets.findFirst({ where: { storageKey } })
   if (existing) return existing.id
   const [asset] = await db
     .insert(s.mediaAssets)
     .values({
-      ownerId,
+      uploaderId: owner.userId,
+      profileId: owner.profileId,
       kind: 'image',
-      provider: 'local',
+      provider: storage?.provider ?? 'local',
       status: 'ready',
       storageKey,
       filename: `${course.slug}.svg`,
@@ -121,11 +201,11 @@ async function ensureThumbnail(
 async function seedCourse(
   db: AnyDb,
   course: SeedCourse,
-  teacherId: string,
-  storageDir: string | null,
+  owner: { userId: string; profileId: string },
+  storage: SeedStorage | null,
 ) {
-  const thumbnailMediaId = await ensureThumbnail(db, teacherId, course, storageDir)
-  const existing = await db.query.courses.findFirst({ where: eq(s.courses.slug, course.slug) })
+  const thumbnailMediaId = await ensureThumbnail(db, owner, course, storage)
+  const existing = await db.query.courses.findFirst({ where: { slug: course.slug } })
   const now = new Date()
   const statusFields =
     course.status === 'live'
@@ -158,7 +238,7 @@ async function seedCourse(
   const [created] = await db
     .insert(s.courses)
     .values({
-      teacherId,
+      profileId: owner.profileId,
       title: course.title,
       slug: course.slug,
       summary: course.summary,
@@ -240,21 +320,48 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
   await grantRole(db, admin.id, 'super_admin')
   log(`super admin: ${options.superAdminEmail}`)
 
+  /** Owner email → their personal profile. */
+  const profileIds = new Map<string, string>()
+  const courseIds = new Map<string, string>()
+  if (options.mode === 'admin-only') return { adminId: admin.id, profileIds, courseIds }
+
   const agent = await upsertUser(db, 'support@example.com', 'Sam Support')
   await grantRole(db, agent.id, 'support_agent')
 
-  const teacherIds = new Map<string, string>()
+  const owners = new Map<string, { userId: string; profileId: string }>()
   for (const t of seedTeachers) {
-    const user = await upsertTeacher(db, t)
-    teacherIds.set(t.email, user.id)
+    const owner = await upsertTeacher(db, t)
+    owners.set(t.email, owner)
+    profileIds.set(t.email, owner.profileId)
   }
-  log(`${seedTeachers.length} teachers`)
+  log(`${seedTeachers.length} teacher profiles (no payout accounts: demo courses cannot be bought)`)
 
-  const courseIds = new Map<string, string>()
+  // A writer on the first profile, so there is someone to try member and change-set flows with.
+  const firstTeacher = seedTeachers[0]
+  const firstOwner = firstTeacher ? owners.get(firstTeacher.email) : undefined
+  if (firstTeacher && firstOwner) {
+    const writer = await upsertUser(db, 'writer@example.com', 'Wei Writer')
+    await db
+      .insert(s.profileMemberships)
+      .values({
+        profileId: firstOwner.profileId,
+        userId: writer.id,
+        role: 'writer',
+        addedBy: firstOwner.userId,
+      })
+      .onConflictDoNothing()
+    log(`writer@example.com is a writer on ${firstTeacher.displayName}`)
+  }
+
+  await upsertDemoCompany(db, admin.id)
+  log(
+    `${DEMO_COMPANY.displayName}: a company profile owned by ${DEMO_COMPANY.owner.email}, with ${DEMO_COMPANY.manager.email} as a manager`,
+  )
+
   for (const course of seedCourses) {
-    const teacherId = teacherIds.get(course.teacherEmail)
-    if (!teacherId) throw new Error(`unknown teacher ${course.teacherEmail}`)
-    courseIds.set(course.slug, await seedCourse(db, course, teacherId, options.storageDir))
+    const owner = owners.get(course.teacherEmail)
+    if (!owner) throw new Error(`unknown teacher ${course.teacherEmail}`)
+    courseIds.set(course.slug, await seedCourse(db, course, owner, options.storage))
   }
   log(`${seedCourses.length} courses`)
 
@@ -288,7 +395,7 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
   const sourdoughId = courseIds.get('sourdough-from-scratch')
   if (sourdoughId) {
     const existing = await db.query.enrollments.findFirst({
-      where: and(eq(s.enrollments.userId, learner.id), eq(s.enrollments.courseId, sourdoughId)),
+      where: { userId: learner.id, courseId: sourdoughId },
     })
     if (!existing) {
       const [enrollment] = await db
@@ -301,9 +408,9 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
         })
         .returning()
       const firstLesson = await db.query.lessons.findFirst({
-        where: eq(s.lessons.courseId, sourdoughId),
-        orderBy: (l, { asc }) => [asc(l.position)],
-        with: { artefacts: { orderBy: (a, { asc }) => [asc(a.position)] } },
+        where: { courseId: sourdoughId, changeSetId: { isNull: true } },
+        orderBy: { position: 'asc' },
+        with: { artefacts: { orderBy: { position: 'asc' } } },
       })
       const firstText = firstLesson?.artefacts.find((a) => a.type === 'text')
       if (enrollment && firstText) {
@@ -319,5 +426,5 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
   }
   log('demo learner enrolled in Sourdough from Scratch')
 
-  return { adminId: admin.id, teacherIds, courseIds }
+  return { adminId: admin.id, profileIds, courseIds }
 }

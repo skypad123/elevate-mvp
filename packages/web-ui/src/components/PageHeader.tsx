@@ -22,7 +22,12 @@ export function PageHeader({
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="font-display text-h1 font-semibold text-ink">{title}</h1>
+        <h1
+          tabIndex={-1}
+          className="font-display text-h1 font-semibold text-ink focus:outline-none"
+        >
+          {title}
+        </h1>
         {description ? (
           <div className="mt-2 max-w-2xl text-body text-ink-secondary">{description}</div>
         ) : null}
@@ -43,4 +48,15 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
       {children}
     </p>
   )
+}
+
+/**
+ * After an action removes the button that started it (approve, record a match), focus would fall
+ * to the page body. Call this to put it on the page heading instead, so keyboard and screen-reader
+ * users stay oriented; the toast announces the result.
+ */
+export function focusPageHeading() {
+  window.requestAnimationFrame(() => {
+    document.querySelector<HTMLElement>('main h1')?.focus()
+  })
 }

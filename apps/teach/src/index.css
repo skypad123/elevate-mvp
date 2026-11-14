@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@elevate/tokens/theme.css";
+@import "@elevate/tokens/portal-teach.css";
 @import "@elevate/web-ui/editor.css";
 @source "../../../packages/web-ui/src";
 

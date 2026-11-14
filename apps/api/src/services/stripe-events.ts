@@ -31,7 +31,12 @@ export function createStripeEventHandlers(deps: Deps): Record<string, StripeEven
         null,
       metadata: (session.metadata as Record<string, string> | undefined) ?? {},
     }
-    return payments.fulfilCheckout(input)
+    const outcome = await payments.fulfilCheckout(input)
+    // Thrown so the webhook route stores it with the event: the learner has paid and has no
+    // enrolment until Support acts on it.
+    if (outcome === 'unattributed')
+      throw new Error(`unattributed_checkout: session ${input.sessionId} names no payout account`)
+    return outcome
   }
   return {
     'account.updated': async (event) => connect.applyAccountUpdated(event.data.object),

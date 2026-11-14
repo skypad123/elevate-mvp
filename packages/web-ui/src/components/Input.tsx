@@ -3,7 +3,7 @@ import { useId } from 'react'
 import { cn } from '../lib/cn'
 
 const fieldBase =
-  'w-full rounded-control border border-border-strong bg-surface px-3.5 text-body text-ink placeholder:text-ink-tertiary transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25 disabled:bg-surface-muted disabled:text-ink-tertiary aria-invalid:border-danger aria-invalid:focus:ring-danger/25'
+  'w-full rounded-control border border-border-strong bg-surface px-3.5 text-body text-ink placeholder:text-ink-tertiary transition-colors focus:border-focus focus:outline-none focus:ring-2 focus:ring-focus/25 disabled:bg-surface-muted disabled:text-ink-tertiary aria-invalid:border-danger aria-invalid:focus:ring-danger/25'
 
 export type FieldProps = {
   label?: ReactNode
@@ -147,3 +147,16 @@ export function NativeSelect({
 }
 
 export { fieldBase }
+
+/**
+ * After a submit that came back with errors, bring the first one into view and focus it: on a
+ * long form the errors are otherwise far above the button, and the click seems to do nothing.
+ */
+export function focusFirstInvalid(form: HTMLElement | null) {
+  window.requestAnimationFrame(() => {
+    const field = form?.querySelector<HTMLElement>('[aria-invalid="true"], [role="alert"]')
+    if (!field) return
+    field.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    field.focus({ preventScroll: true })
+  })
+}

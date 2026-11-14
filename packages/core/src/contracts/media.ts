@@ -23,6 +23,8 @@ export const createUploadSchema = z
     filename: z.string().trim().min(1).max(255),
     mimeType: z.string().min(3).max(100),
     sizeBytes: z.number().int().positive(),
+    /** Course media: the profile the file belongs to. The caller needs `media.upload` on it. */
+    profileId: z.string().uuid().optional(),
   })
   .superRefine((v, ctx) => {
     if (!ACCEPTED_MIME[v.kind].includes(v.mimeType)) {

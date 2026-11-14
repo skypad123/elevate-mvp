@@ -1,0 +1,40 @@
+name: Infra
+
+# Static checks for the Terraform in infra/. Applying is a deliberate, manual step
+# (infra/README.md); this workflow has no AWS credentials.
+on:
+  pull_request:
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+  push:
+    branches: [main, v0, staging, production]
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Format
+        run: terraform fmt -check -recursive -diff
+        working-directory: infra/terraform
+
+      - name: Validate
+        working-directory: infra/terraform
+        run: |
+          for dir in bootstrap envs/staging envs/production; do
+            echo "::group::$dir"
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+            echo "::endgroup::"
+          done

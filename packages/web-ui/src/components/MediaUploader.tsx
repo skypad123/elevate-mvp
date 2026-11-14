@@ -14,8 +14,10 @@ import {
 } from 'lucide-react'
 import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '../lib/cn'
-import { errorMessage, type PortalApi, unwrap } from '../portal/api'
-import { Badge, statusLabel, statusTone } from './Badge'
+import { type PortalApi, unwrap } from '../portal/api'
+import { useErrorMessage } from '../preferences/errors'
+import { useT } from '../preferences/PreferencesProvider'
+import { Badge, statusTone } from './Badge'
 import { Button } from './Button'
 
 type Phase =
@@ -30,6 +32,12 @@ export type MediaUploaderProps = {
   kind: MediaKind
   value: MediaAssetView | null
   onChange: (asset: MediaAssetView | null) => void
+  /**
+   * The teaching profile the file belongs to. Set it for a profile's own media (course content,
+   * thumbnails, its avatar), so everyone on the profile can use the file; leave it out for a
+   * person's own files, such as a teaching sample sent with an application.
+   */
+  profileId?: string
   label?: string
   hint?: string
   disabled?: boolean
@@ -38,6 +46,10 @@ export type MediaUploaderProps = {
 
 const KIND_ICON = { video: Film, audio: FileAudio, image: ImageIcon, document: FileText } as const
 
+/**
+ * A failed upload rejects with a plain Error. Its message is for logs, not for the reader:
+ * `errorMessage` shows its own sentence for anything that is not an API error.
+ */
 function putWithProgress(
   url: string,
   file: File,
@@ -68,11 +80,14 @@ export function MediaUploader({
   kind,
   value,
   onChange,
+  profileId,
   label,
   hint,
   disabled,
   className,
 }: MediaUploaderProps) {
+  const t = useT()
+  const errorMessage = useErrorMessage()
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const inputRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<number | null>(null)
@@ -98,7 +113,10 @@ export function MediaUploader({
             onChange(asset)
           } else if (asset.status === 'errored') {
             stopPolling()
-            setPhase({ kind: 'error', message: asset.errorMessage ?? 'Processing failed' })
+            setPhase({
+              kind: 'error',
+              message: asset.errorMessage ?? t('ui.upload.processingFailed'),
+            })
           } else {
             setPhase({ kind: 'processing', asset })
           }
@@ -110,7 +128,7 @@ export function MediaUploader({
       void tick()
       pollRef.current = window.setInterval(tick, 3000)
     },
-    [api, onChange, stopPolling],
+    [api, onChange, stopPolling, t, errorMessage],
   )
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
@@ -121,7 +139,13 @@ export function MediaUploader({
     try {
       const instructions = await unwrap(
         await api.media.uploads.$post({
-          json: { kind, filename: file.name, mimeType: file.type, sizeBytes: file.size },
+          json: {
+            kind,
+            filename: file.name,
+            mimeType: file.type,
+            sizeBytes: file.size,
+            ...(profileId ? { profileId } : {}),
+          },
         }),
       )
       if (instructions.mode === 'put') {
@@ -166,7 +190,7 @@ export function MediaUploader({
           {kind === 'image' && value.url ? (
             <img src={value.url} alt="" className="size-16 rounded-sm object-cover" />
           ) : (
-            <span className="flex size-12 items-center justify-center rounded-sm bg-brand-tint text-brand">
+            <span className="flex size-12 items-center justify-center rounded-sm bg-brand-tint text-brand-fg">
               <Icon className="size-6" />
             </span>
           )}
@@ -174,11 +198,11 @@ export function MediaUploader({
             <p className="truncate text-small-strong font-semibold text-ink">{value.filename}</p>
             <div className="mt-1 flex items-center gap-2">
               <Badge tone={statusTone[value.status] ?? 'neutral'}>
-                {statusLabel(value.status)}
+                {t(`ui.mediaStatus.${value.status}`)}
               </Badge>
               {value.durationSeconds ? (
                 <span className="text-caption text-ink-tertiary">
-                  {Math.round(value.durationSeconds / 60)} min
+                  {t('ui.upload.minutes', { count: Math.round(value.durationSeconds / 60) })}
                 </span>
               ) : null}
             </div>
@@ -189,12 +213,12 @@ export function MediaUploader({
             onClick={() => inputRef.current?.click()}
             disabled={disabled}
           >
-            Replace
+            {t('ui.upload.replace')}
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Remove"
+            aria-label={t('common.remove')}
             onClick={clear}
             disabled={disabled}
           >
@@ -219,7 +243,7 @@ export function MediaUploader({
               setPhase({
                 kind: 'error',
                 message:
-                  (e as CustomEvent<{ message?: string }>).detail?.message ?? 'Upload failed',
+                  (e as CustomEvent<{ message?: string }>).detail?.message ?? t('ui.upload.failed'),
               })
             }
             style={
@@ -229,7 +253,7 @@ export function MediaUploader({
               } as React.CSSProperties
             }
           />
-          <p className="mt-2 text-caption text-ink-tertiary">Uploading to the video pipeline…</p>
+          <p className="mt-2 text-caption text-ink-tertiary">{t('ui.upload.toVideoPipeline')}</p>
         </div>
       ) : (
         <button
@@ -247,24 +271,24 @@ export function MediaUploader({
           )}
         >
           {phase.kind === 'requesting' || phase.kind === 'processing' ? (
-            <Loader2 className="size-6 animate-spin text-brand" />
+            <Loader2 className="size-6 animate-spin text-brand-fg" />
           ) : phase.kind === 'error' ? (
             <CircleAlert className="size-6 text-danger" />
           ) : phase.kind === 'uploading' ? (
-            <Upload className="size-6 text-brand" />
+            <Upload className="size-6 text-brand-fg" />
           ) : (
-            <Icon className="size-6 text-brand" />
+            <Icon className="size-6 text-brand-fg" />
           )}
           <span className="text-small-strong font-semibold text-ink">
             {phase.kind === 'requesting'
-              ? 'Preparing upload…'
+              ? t('ui.upload.preparing')
               : phase.kind === 'uploading'
-                ? `Uploading ${phase.percent}%`
+                ? t('ui.upload.uploading', { percent: phase.percent })
                 : phase.kind === 'processing'
-                  ? 'Processing…'
+                  ? t('ui.upload.processing')
                   : phase.kind === 'error'
                     ? phase.message
-                    : `Upload ${kind}`}
+                    : t(`ui.upload.${kind}`)}
           </span>
           {phase.kind === 'uploading' ? (
             <span className="h-1.5 w-full max-w-xs overflow-hidden rounded-pill bg-surface-sunken">
@@ -275,21 +299,19 @@ export function MediaUploader({
             </span>
           ) : null}
           {phase.kind === 'processing' ? (
-            <span className="text-caption text-ink-tertiary">
-              Transcoding usually takes a minute or two.
-            </span>
+            <span className="text-caption text-ink-tertiary">{t('ui.upload.processing.hint')}</span>
           ) : null}
           {phase.kind === 'idle' && hint ? (
             <span className="text-caption text-ink-tertiary">{hint}</span>
           ) : null}
           {phase.kind === 'error' ? (
-            <span className="text-caption text-ink-secondary">Click to try again</span>
+            <span className="text-caption text-ink-secondary">{t('ui.upload.retry')}</span>
           ) : null}
         </button>
       )}
       {value && phase.kind === 'idle' && value.status === 'ready' ? (
         <p className="flex items-center gap-1 text-caption text-success">
-          <CheckCircle2 className="size-3.5" /> Ready
+          <CheckCircle2 className="size-3.5" /> {t('ui.upload.ready')}
         </p>
       ) : null}
     </div>

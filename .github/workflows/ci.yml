@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, v0, staging, production]
   pull_request:
 
 concurrency:
@@ -34,7 +34,7 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Expo doctor (SDK 57 compatibility of apps/learner)
+      - name: Expo doctor (SDK compatibility of apps/learner)
         run: npx expo-doctor
         working-directory: apps/learner
 

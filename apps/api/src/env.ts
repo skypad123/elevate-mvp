@@ -29,9 +29,12 @@ const envSchema = z.object({
   STORAGE_LOCAL_DIR: z.string().default('.data/storage'),
   S3_BUCKET: z.string().optional(),
   S3_REGION: z.string().default('auto'),
+  /** Only for S3-compatible stores (R2, MinIO); leave unset on AWS. */
   S3_ENDPOINT: z.string().optional(),
+  /** Leave both unset on AWS to use the default credential chain (ECS task role, SSO, …). */
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
+  /** Optional CDN origin for `public/` keys; without it they are served by `/api/files/*`. */
   S3_PUBLIC_BASE_URL: z.string().optional(),
 
   VIDEO_DRIVER: z.enum(['local', 'mux']).default('local'),
@@ -63,6 +66,9 @@ export type Env = z.infer<typeof envSchema> & {
 
 /** apps/api/src → repo root (same depth when bundled to apps/api/dist). */
 export const repoRoot = resolve(import.meta.dirname, '../../..')
+
+/** `apps/api`, from source or from the bundle; `assets/` lives under it in both layouts. */
+export const apiRoot = resolve(repoRoot, 'apps/api')
 
 export function loadEnv(source: Record<string, string | undefined> = process.env): Env {
   const cleaned = Object.fromEntries(

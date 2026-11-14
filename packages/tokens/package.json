@@ -6,14 +6,18 @@
   "exports": {
     ".": "./src/index.ts",
     "./theme.css": "./dist/theme.css",
-    "./tokens.css": "./dist/tokens.css"
+    "./tokens.css": "./dist/tokens.css",
+    "./portal-teach.css": "./dist/portal-teach.css",
+    "./portal-support.css": "./dist/portal-support.css"
   },
   "scripts": {
     "build": "node scripts/build-css.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
     "@elevate/tsconfig": "*",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "5.1.0"
   }
 }

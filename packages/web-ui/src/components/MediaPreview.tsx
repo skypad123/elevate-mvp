@@ -3,7 +3,9 @@ import MuxPlayer from '@mux/mux-player-react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, FileText } from 'lucide-react'
 import { cn } from '../lib/cn'
-import { errorMessage, type PortalApi, unwrap } from '../portal/api'
+import { type PortalApi, unwrap } from '../portal/api'
+import { useErrorMessage } from '../preferences/errors'
+import { useT } from '../preferences/PreferencesProvider'
 import { Skeleton } from './Skeleton'
 
 /** Plays or shows any media asset the viewer may access (owner or staff). */
@@ -16,6 +18,8 @@ export function MediaPreview({
   assetId: string
   className?: string
 }) {
+  const t = useT()
+  const errorMessage = useErrorMessage()
   const query = useQuery({
     queryKey: ['media', 'playback', assetId],
     queryFn: async () =>
@@ -45,8 +49,12 @@ export function MediaPreview({
             playbackId={playback.playbackId}
             tokens={{ playback: playback.tokens.playback, thumbnail: playback.tokens.thumbnail }}
             streamType="on-demand"
-            accentColor="#0F6B52"
-            style={{ aspectRatio: '16 / 9', width: '100%' }}
+            style={{
+              aspectRatio: '16 / 9',
+              width: '100%',
+              // Follows the portal palette instead of a fixed hex.
+              '--media-accent-color': 'var(--brand)',
+            }}
           />
         ) : (
           <video
@@ -84,11 +92,12 @@ export function MediaPreview({
       target="_blank"
       rel="noreferrer"
       className={cn(
-        'inline-flex items-center gap-2 rounded-control border border-border bg-surface px-3 py-2 text-small font-semibold text-brand hover:bg-brand-tint',
+        'inline-flex items-center gap-2 rounded-control border border-border bg-surface px-3 py-2 text-small font-semibold text-brand-fg hover:bg-brand-tint',
         className,
       )}
     >
-      <FileText className="size-4" /> Open document <ExternalLink className="size-3.5" />
+      <FileText className="size-4" /> {t('ui.media.openDocument')}
+      <ExternalLink className="size-3.5" />
     </a>
   )
 }
