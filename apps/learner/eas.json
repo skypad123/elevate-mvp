@@ -9,16 +9,16 @@
       "distribution": "internal",
       "channel": "staging",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.staging.example.com",
-        "EXPO_PUBLIC_WEB_URL": "https://app.staging.example.com"
+        "EXPO_PUBLIC_API_URL": "https://api.staging.elevatelearn.app",
+        "EXPO_PUBLIC_WEB_URL": "https://app.staging.elevatelearn.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.example.com",
-        "EXPO_PUBLIC_WEB_URL": "https://app.example.com"
+        "EXPO_PUBLIC_API_URL": "https://api.elevatelearn.app",
+        "EXPO_PUBLIC_WEB_URL": "https://app.elevatelearn.app"
       }
     }
   },

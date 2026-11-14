@@ -52,3 +52,4 @@ apps/api/assets/fonts/fallback/*
 *.tfvars
 !*.tfvars.example
 crash.log
+.tamagui/
