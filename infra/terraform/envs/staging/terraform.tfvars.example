@@ -13,3 +13,7 @@ integrations = {
 
 # Switch to false once the browser console shows no CSP violations on the three sites.
 csp_report_only = true
+
+# GitHub's OIDC subject for this repo: sub_claim_prefix from
+#   gh api repos/<owner>/<repo>/actions/oidc/customization/sub
+github_oidc_subject_prefix = "repo:skypad123@27288135/elevate-mvp@1356076279"

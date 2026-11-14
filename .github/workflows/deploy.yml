@@ -150,6 +150,7 @@ jobs:
       - name: Build Teach, Support and learner web
         env:
           VITE_API_URL: ${{ vars.API_URL }}
+          VITE_TEACH_URL: ${{ vars.TEACH_URL }}
           VITE_LEARNER_URL: ${{ vars.LEARNER_URL }}
           EXPO_PUBLIC_API_URL: ${{ vars.API_URL }}
           EXPO_PUBLIC_WEB_URL: ${{ vars.LEARNER_URL }}

@@ -24,6 +24,12 @@ variable "github_repo" {
   type        = string
 }
 
+variable "github_oidc_subject_prefix" {
+  description = "Start of the sub claim in GitHub's OIDC token for this repository. With immutable subjects it is repo:<owner>@<owner_id>/<repo>@<repo_id> (see `gh api repos/<owner>/<repo>/actions/oidc/customization/sub`). Defaults to repo:<github_repo>."
+  type        = string
+  default     = null
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the environment's VPC."
   type        = string

@@ -10,7 +10,7 @@
       "channel": "staging",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.staging.elevatelearn.app",
-        "EXPO_PUBLIC_WEB_URL": "https://app.staging.elevatelearn.app"
+        "EXPO_PUBLIC_WEB_URL": "https://staging.elevatelearn.app"
       }
     },
     "production": {
@@ -18,7 +18,7 @@
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.elevatelearn.app",
-        "EXPO_PUBLIC_WEB_URL": "https://app.elevatelearn.app"
+        "EXPO_PUBLIC_WEB_URL": "https://elevatelearn.app"
       }
     }
   },
