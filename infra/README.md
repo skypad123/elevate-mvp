@@ -48,6 +48,15 @@ infra/terraform/
 - [Terraform](https://developer.hashicorp.com/terraform/install) 1.10 or newer, the
   [AWS CLI](https://docs.aws.amazon.com/cli/) v2, the [GitHub CLI](https://cli.github.com/) and `jq`.
 - Admin rights on the GitHub repository.
+- The AWS CLI pointed at `ap-southeast-1`. Terraform and the Deploy workflow set the region
+  themselves, but the `aws` commands below (SSM parameters, logs, one-off tasks) use your default
+  region, and an account can default to another one, such as Sydney. Set it once:
+
+  ```bash
+  aws configure set region ap-southeast-1
+  ```
+
+  or export `AWS_REGION=ap-southeast-1` in the shell you run them from.
 
 ## Setup
 
