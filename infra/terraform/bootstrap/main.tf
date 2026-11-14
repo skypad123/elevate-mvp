@@ -13,12 +13,12 @@ terraform {
 
   # State starts local. After the first apply, uncomment, then run
   #   terraform init -migrate-state -backend-config="bucket=$(terraform output -raw state_bucket)"
-  # backend "s3" {
-  #   key          = "bootstrap/terraform.tfstate"
-  #   region       = "ap-southeast-1"
-  #   encrypt      = true
-  #   use_lockfile = true
-  # }
+  backend "s3" {
+    key          = "bootstrap/terraform.tfstate"
+    region       = "ap-southeast-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {
