@@ -77,7 +77,7 @@ export function SignInPage({
         {sentTo ? (
           <Card as="section" className="space-y-5">
             <div className="space-y-2">
-              <p className="flex items-center gap-2 font-mono text-eyebrow uppercase tracking-[0.08em] text-brand">
+              <p className="flex items-center gap-2 font-mono text-eyebrow uppercase tracking-[0.08em] text-brand-fg">
                 <MailCheck className="size-4" /> Check your inbox
               </p>
               <h1 className="font-display text-h2 font-semibold text-ink">
@@ -151,7 +151,7 @@ export function SignInPage({
             </form>
             <p className="text-small text-ink-tertiary">
               One-time link and code, no passwords.{' '}
-              <Link to="/" className="text-brand underline-offset-2 hover:underline">
+              <Link to="/" className="text-brand-fg underline-offset-2 hover:underline">
                 Back
               </Link>
             </p>

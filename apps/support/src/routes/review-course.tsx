@@ -91,7 +91,7 @@ function ReviewCourseView({ course }: { course: CourseView }) {
         description={
           <span className="flex flex-wrap items-center gap-2">
             <span>
-              by {course.teacher.displayName} · {formatSgd(course.priceCents, { showFree: true })}
+              by {course.profile.displayName} · {formatSgd(course.priceCents, { showFree: true })}
             </span>
             <Badge tone={statusTone[course.status]}>{statusLabel(course.status)}</Badge>
             {course.submittedAt ? (
@@ -192,14 +192,24 @@ function ReviewCourseView({ course }: { course: CourseView }) {
             )}
           </Card>
           <Card as="section">
-            <CardHeader title="Teacher" />
+            <CardHeader title="Profile" />
             <DescriptionList
               items={[
-                { label: 'Name', value: course.teacher.displayName },
-                { label: 'Email', value: course.teacher.email },
                 {
-                  label: 'Stripe',
-                  value: course.teacher.stripeChargesEnabled ? 'Payments enabled' : 'Not enabled',
+                  label: 'Name',
+                  value: (
+                    <Link
+                      to={`/profiles/${course.profile.id}`}
+                      className="font-semibold text-brand-fg hover:underline"
+                    >
+                      {course.profile.displayName}
+                    </Link>
+                  ),
+                },
+                { label: 'Owner', value: course.profile.ownerEmail },
+                {
+                  label: 'Payments',
+                  value: course.profile.payable ? 'Can be paid' : 'Cannot be paid yet',
                 },
                 { label: 'Lessons', value: course.lessons.length },
                 {
@@ -284,7 +294,7 @@ function ArtefactPreview({ artefact }: { artefact: ArtefactView }) {
   return (
     <li className="rounded-card border border-border bg-surface-muted/40 p-4">
       <div className="mb-3 flex items-center gap-2">
-        <Icon className="size-4 text-brand" />
+        <Icon className="size-4 text-brand-fg" />
         <span className="font-semibold text-ink">{artefact.title}</span>
         <Badge>{statusLabel(artefact.type)}</Badge>
         {artefact.media ? (

@@ -25,7 +25,7 @@ describe('media uploads', () => {
     const key = `public/images/${created.body.asset.id}`
     // simulate the PUT by writing straight into fake storage under the asset's key
     const row = await t.db.query.mediaAssets.findFirst({
-      where: (m, { eq }) => eq(m.id, created.body.asset.id),
+      where: { id: created.body.asset.id },
     })
     expect(row?.storageKey?.startsWith('public/images/')).toBe(true)
     await t.storage.put(row?.storageKey as string, new Uint8Array([1, 2, 3]), 'image/png')

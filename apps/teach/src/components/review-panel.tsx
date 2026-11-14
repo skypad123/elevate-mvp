@@ -4,6 +4,7 @@ import { CheckCircle2, ExternalLink, Send, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { useCourseActions } from '../lib/courses'
+import { useCurrentProfile } from '../lib/profile'
 import { useSaveTracker } from '../lib/save-tracker'
 import { learnerUrl } from '../lib/urls'
 
@@ -33,6 +34,7 @@ export function ReviewPanel({
   onGoTo: (tab: Tab) => void
 }) {
   const actions = useCourseActions(course.id)
+  const { path, can } = useCurrentProfile()
   const { track } = useSaveTracker()
   const { toast } = useToast()
   const [busy, setBusy] = useState(false)
@@ -92,11 +94,9 @@ export function ReviewPanel({
                     </span>
                   </span>
                   {target === 'settings' ? (
-                    <Link to="/settings">
-                      <Button variant="ghost" size="sm">
-                        Open settings
-                      </Button>
-                    </Link>
+                    <Button asChild variant="ghost" size="sm">
+                      <Link to={path('/settings')}>Open settings</Link>
+                    </Button>
                   ) : (
                     <Button variant="ghost" size="sm" onClick={() => onGoTo(target)}>
                       Fix
@@ -147,11 +147,11 @@ export function ReviewPanel({
               href={learnerUrl(`/course/${course.slug}`)}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 text-small font-semibold text-brand hover:underline"
+              className="inline-flex items-center gap-2 text-small font-semibold text-brand-fg hover:underline"
             >
               View the live course page <ExternalLink className="size-3.5" />
             </a>
-          ) : (
+          ) : can('course.submit') ? (
             <Button
               variant="accent"
               size="lg"
@@ -163,6 +163,10 @@ export function ReviewPanel({
             >
               Submit for review
             </Button>
+          ) : (
+            <p className="text-small text-ink-secondary">
+              Submitting a course for review is for the owner or a manager.
+            </p>
           )}
         </Card>
       </div>

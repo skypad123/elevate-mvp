@@ -8,7 +8,7 @@ const base = {
   priceCents: 8900,
   hasThumbnail: true,
   hasDescription: true,
-  teacherStripeChargesEnabled: true,
+  payable: true,
   prerequisites: [],
   lessons: [
     {
@@ -38,7 +38,7 @@ describe('validateCourseForSubmission', () => {
       ...base,
       priceCents: 20,
       hasThumbnail: false,
-      teacherStripeChargesEnabled: false,
+      payable: false,
       lessons: [
         {
           id: 'l1',

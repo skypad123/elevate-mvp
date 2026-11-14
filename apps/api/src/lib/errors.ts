@@ -21,6 +21,13 @@ export const errors = {
   unauthorized: (message = 'Sign in to continue') => new HttpError(401, 'unauthorized', message),
   invalidSession: () =>
     new HttpError(401, 'invalid_session', 'Your session has expired. Sign in again.'),
+  /** The session is valid but too old for this action; the client sends the user through sign-in. */
+  reauthRequired: () =>
+    new HttpError(
+      401,
+      'reauth_required',
+      'Sign in again to continue. This step needs a recent sign-in.',
+    ),
   forbidden: (message = 'You do not have access to this') =>
     new HttpError(403, 'forbidden', message),
   notFound: (what = 'Resource') => new HttpError(404, 'not_found', `${what} not found`),

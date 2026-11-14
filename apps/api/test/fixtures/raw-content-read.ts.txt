@@ -1,0 +1,29 @@
+// A fixture for schema-guard.test.ts: a learner-facing service written the wrong way. It is a
+// .txt file so that it is never compiled, linted or shipped. Each block breaks one rule.
+
+// Rule "import": the content tables imported by name.
+import { artefacts, lessons } from '@elevate/db'
+import { schema as s } from '@elevate/db'
+import type { Deps } from '../deps'
+
+export class LeakyService {
+  constructor(private readonly deps: Deps) {}
+
+  // Rule "table": a content table reached through the schema object.
+  async countLessons(courseId: string) {
+    return this.deps.db.select().from(s.lessons).where(eq(s.lessons.courseId, courseId))
+  }
+
+  // Rule "relation": the raw relation keys in a relational query.
+  async outline(courseId: string) {
+    return this.deps.db.query.courses.findFirst({
+      where: { id: courseId },
+      with: {
+        profile: true,
+        lessons: {
+          with: { prerequisites: true, artefacts: { with: { quiz: true } } },
+        },
+      },
+    })
+  }
+}

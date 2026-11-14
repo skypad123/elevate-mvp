@@ -42,12 +42,18 @@ export function DescriptionList({
   )
 }
 
+/**
+ * A date for display. `locale` is a BCP 47 tag; it defaults to English because most pages are
+ * still English. A translated page uses `useFormatDate()` from `@elevate/web-ui/preferences`,
+ * which passes the chosen language.
+ */
 export function formatDate(
   iso: string | null | undefined,
   options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' },
+  locale = 'en-SG',
 ): string {
   if (!iso) return '—'
-  return new Intl.DateTimeFormat('en-SG', options).format(new Date(iso))
+  return new Intl.DateTimeFormat(locale, options).format(new Date(iso))
 }
 
 export function formatBps(bps: number): string {

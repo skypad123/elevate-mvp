@@ -2,16 +2,17 @@ import type {
   Audience,
   AuthUser,
   MagicLinkRequest,
+  ProfileSummary,
   VerifyRequest,
   VerifyResponse,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { magicLinkEmail } from '../emails/templates'
 import { hmacHex, randomCode, randomToken } from '../lib/crypto'
 import { errors } from '../lib/errors'
-import type { SessionUser } from '../middleware/auth'
+import type { ProfileActor, SessionUser } from '../middleware/auth'
 
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000
 const MAGIC_LINK_MAX_PER_WINDOW = 5
@@ -92,14 +93,11 @@ export class AuthService {
     const link =
       'token' in input
         ? await db.query.magicLinks.findFirst({
-            where: and(
-              eq(s.magicLinks.tokenHash, this.hash(input.token)),
-              isNull(s.magicLinks.consumedAt),
-            ),
+            where: { tokenHash: this.hash(input.token), consumedAt: { isNull: true } },
           })
         : await db.query.magicLinks.findFirst({
-            where: and(eq(s.magicLinks.email, input.email), isNull(s.magicLinks.consumedAt)),
-            orderBy: desc(s.magicLinks.createdAt),
+            where: { email: input.email, consumedAt: { isNull: true } },
+            orderBy: { createdAt: 'desc' },
           })
 
     if (!link)
@@ -153,10 +151,10 @@ export class AuthService {
 
   private async findOrCreateUser(email: string) {
     const { db } = this.deps
-    const existing = await db.query.users.findFirst({ where: eq(s.users.email, email) })
+    const existing = await db.query.users.findFirst({ where: { email } })
     if (existing) return existing
     const [created] = await db.insert(s.users).values({ email }).onConflictDoNothing().returning()
-    const user = created ?? (await db.query.users.findFirst({ where: eq(s.users.email, email) }))
+    const user = created ?? (await db.query.users.findFirst({ where: { email } }))
     if (!user) throw new Error('failed to create user')
     await db
       .insert(s.identities)
@@ -172,12 +170,16 @@ export class AuthService {
   ): Promise<{ token: string; expiresAt: string }> {
     const token = randomToken(32)
     const expiresAt = new Date(this.deps.now().getTime() + SESSION_TTL_MS)
+    const now = this.deps.now()
     await this.deps.db.insert(s.sessions).values({
       userId,
       audience,
       tokenHash: this.hash(token),
       userAgent: userAgent?.slice(0, 512) ?? null,
       expiresAt,
+      lastSeenAt: now,
+      // The sign-in time. Written from the app clock, like every check that reads it.
+      createdAt: now,
     })
     return { token, expiresAt: expiresAt.toISOString() }
   }
@@ -186,7 +188,7 @@ export class AuthService {
     const { db, now } = this.deps
     const current = now()
     const session = await db.query.sessions.findFirst({
-      where: and(eq(s.sessions.tokenHash, this.hash(token)), gt(s.sessions.expiresAt, current)),
+      where: { tokenHash: this.hash(token), expiresAt: { gt: current } },
     })
     if (!session) return null
     if (current.getTime() - session.lastSeenAt.getTime() > SESSION_TOUCH_MS) {
@@ -196,7 +198,12 @@ export class AuthService {
         .where(eq(s.sessions.id, session.id))
     }
     const user = await this.buildAuthUser(session.userId)
-    return { ...user, sessionId: session.id, audience: session.audience }
+    return {
+      ...user,
+      sessionId: session.id,
+      audience: session.audience,
+      signedInAt: session.createdAt,
+    }
   }
 
   async signOut(sessionId: string): Promise<void> {
@@ -205,8 +212,21 @@ export class AuthService {
 
   async buildAuthUser(userId: string): Promise<AuthUser> {
     const user = await this.deps.db.query.users.findFirst({
-      where: eq(s.users.id, userId),
-      with: { roles: true, teacherProfile: true },
+      where: { id: userId },
+      with: {
+        roles: true,
+        ownedProfiles: {
+          columns: { id: true, type: true, displayName: true, status: true },
+          orderBy: { appliedAt: 'asc' },
+        },
+        memberships: {
+          columns: { role: true },
+          orderBy: { createdAt: 'asc' },
+          with: {
+            profile: { columns: { id: true, type: true, displayName: true, status: true } },
+          },
+        },
+      },
     })
     if (!user) throw errors.notFound('User')
     return {
@@ -215,17 +235,57 @@ export class AuthService {
       name: user.name,
       avatarUrl: user.avatarUrl,
       roles: user.roles.map((r) => r.role),
-      teacher: user.teacherProfile
-        ? {
-            status: user.teacherProfile.status,
-            displayName: user.teacherProfile.displayName,
-            stripeChargesEnabled: user.teacherProfile.stripeChargesEnabled,
-            stripePayoutsEnabled: user.teacherProfile.stripePayoutsEnabled,
-            stripeDetailsSubmitted: user.teacherProfile.stripeDetailsSubmitted,
-            commissionBps: user.teacherProfile.commissionBps,
-          }
-        : null,
+      // Owned profiles first, then the ones the user is a manager or writer of.
+      profiles: [
+        ...user.ownedProfiles.map((p) => profileSummary(p, 'owner')),
+        ...user.memberships.map((m) => profileSummary(m.profile, m.role)),
+      ],
       createdAt: user.createdAt.toISOString(),
     }
   }
+}
+
+export function profileSummary(
+  profile: Pick<typeof s.profiles.$inferSelect, 'id' | 'type' | 'displayName' | 'status'>,
+  role: ProfileSummary['role'],
+): ProfileSummary {
+  return {
+    id: profile.id,
+    type: profile.type,
+    displayName: profile.displayName,
+    status: profile.status,
+    role,
+  }
+}
+
+/**
+ * Who `user` is on a profile: its owner, a member with a role, or platform staff (`super_admin`)
+ * acting inside it, checked in that order. Returns null when the profile does not exist or the
+ * user has no access, and callers answer 404 for both, so a profile's ID is never confirmed to
+ * someone outside it.
+ */
+export async function loadActor(
+  deps: Deps,
+  user: Pick<AuthUser, 'id' | 'roles'>,
+  profileId: string,
+): Promise<ProfileActor | null> {
+  const profile = await deps.db.query.profiles.findFirst({
+    where: { id: profileId },
+    columns: { id: true, type: true, status: true, ownerUserId: true },
+  })
+  if (!profile) return null
+  const on = {
+    profileId: profile.id,
+    profileType: profile.type,
+    profileStatus: profile.status,
+    userId: user.id,
+  }
+  if (profile.ownerUserId === user.id) return { ...on, role: 'owner' }
+  const membership = await deps.db.query.profileMemberships.findFirst({
+    where: { profileId: profile.id, userId: user.id },
+    columns: { role: true },
+  })
+  if (membership) return { ...on, role: membership.role }
+  if (user.roles.includes('super_admin')) return { ...on, role: 'staff' }
+  return null
 }

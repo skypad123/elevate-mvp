@@ -1,4 +1,5 @@
 import { type CourseCard as CourseCardData, categoryLabel, formatSgd } from '@elevate/core'
+import { typeScale } from '@elevate/tokens'
 import { Image } from 'expo-image'
 import { Link } from 'expo-router'
 import { Users } from 'lucide-react-native'
@@ -26,7 +27,8 @@ export function CourseCard({ course }: { course: CourseCardData }) {
           </View>
           <View style={{ padding: theme.space[4], gap: theme.space[2] }}>
             <Badge label={categoryLabel(course.category)} tone="brand" />
-            <Text variant="h3" numberOfLines={2}>
+            {/* Always two lines tall, so a short title doesn't make a shorter card. */}
+            <Text variant="h3" numberOfLines={2} style={{ minHeight: 2 * typeScale.h3.lineHeight }}>
               {course.title}
             </Text>
             <Text variant="small" tone="secondary" numberOfLines={1}>

@@ -3,12 +3,13 @@ import { Search, SearchX } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
 import { ScrollView, TextInput, View } from 'react-native'
 import { CourseCard } from '@/components/CourseCard'
+import { HeroScene } from '@/components/mascot/HeroScene'
 import { TAB_BAR_HEIGHT } from '@/components/PillTabBar'
 import { errorMessage } from '@/lib/api-error'
 import { useCategories, useCourseList } from '@/lib/catalog'
 import { useBreakpoint } from '@/lib/responsive'
 import { useTheme } from '@/theme/ThemeProvider'
-import { Button, Card, Chip, EmptyState, Screen, Skeleton, Text } from '@/ui'
+import { Button, Card, Chip, EmptyState, Grid, Screen, Skeleton, Text } from '@/ui'
 
 export default function Explore() {
   const theme = useTheme()
@@ -33,17 +34,28 @@ export default function Explore() {
     <Screen bottomInset={isWideWeb ? 0 : TAB_BAR_HEIGHT}>
       <View style={{ gap: theme.space[6] }}>
         {!searching ? (
-          <View style={{ gap: theme.space[3], maxWidth: 720 }}>
-            <Text variant="eyebrow" tone="brand">
-              Elevate
-            </Text>
-            <Text variant={isMd ? 'display' : 'h1'}>
-              Learn a craft from people who practise it.
-            </Text>
-            <Text variant="bodyLg" tone="secondary">
-              Short, serious courses by independent teachers in Singapore. Pay once, learn at your
-              pace, earn a certificate you can verify.
-            </Text>
+          // The hero bounds Pip's scene: no frame of its own, clipped by this view.
+          <View
+            style={{
+              flexDirection: isLg ? 'row' : 'column',
+              alignItems: isLg ? 'center' : 'stretch',
+              gap: isLg ? theme.space[8] : theme.space[4],
+              overflow: 'hidden',
+            }}
+          >
+            <View style={{ gap: theme.space[3], maxWidth: 720, flex: isLg ? 1 : undefined }}>
+              <Text variant="eyebrow" tone="brand">
+                Elevate
+              </Text>
+              <Text variant={isMd ? 'display' : 'h1'}>
+                Learn a craft from people who practise it.
+              </Text>
+              <Text variant="bodyLg" tone="secondary">
+                Short, serious courses by independent teachers in Singapore. Pay once, learn at your
+                pace, earn a certificate you can verify.
+              </Text>
+            </View>
+            <HeroScene style={isLg ? undefined : { alignSelf: 'center' }} />
           </View>
         ) : null}
 
@@ -107,13 +119,9 @@ export default function Explore() {
         </View>
 
         {courses.isPending ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[5] }}>
+          <Grid columns={columns} gap={theme.space[5]}>
             {['a', 'b', 'c'].map((k) => (
-              <Card
-                key={k}
-                padded={false}
-                style={{ flexBasis: `${Math.floor(100 / columns) - 2}%`, flexGrow: 1 }}
-              >
+              <Card key={k} padded={false}>
                 <Skeleton height={180} radius={0} />
                 <View style={{ padding: theme.space[4], gap: theme.space[2] }}>
                   <Skeleton width="40%" height={12} />
@@ -122,7 +130,7 @@ export default function Explore() {
                 </View>
               </Card>
             ))}
-          </View>
+          </Grid>
         ) : courses.isError ? (
           <EmptyState
             tone="danger"
@@ -145,20 +153,11 @@ export default function Explore() {
           />
         ) : (
           <View style={{ gap: theme.space[5] }}>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[5] }}>
+            <Grid columns={columns} gap={theme.space[5]}>
               {items.map((course) => (
-                <View
-                  key={course.id}
-                  style={{
-                    flexBasis: columns === 1 ? '100%' : columns === 2 ? '48%' : '31.5%',
-                    flexGrow: 1,
-                    maxWidth: columns === 1 ? '100%' : 520,
-                  }}
-                >
-                  <CourseCard course={course} />
-                </View>
+                <CourseCard key={course.id} course={course} />
               ))}
-            </View>
+            </Grid>
             {courses.hasNextPage ? (
               <View style={{ alignItems: 'center' }}>
                 <Button

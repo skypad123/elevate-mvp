@@ -61,7 +61,7 @@ export function InsightsPage() {
         <StatCard
           label="Time to first payout"
           value={a.firstPayout.medianDays === null ? '—' : `${a.firstPayout.medianDays} days`}
-          hint={`Median from teacher approval · ${a.firstPayout.teachersPaid} teacher${a.firstPayout.teachersPaid === 1 ? '' : 's'} paid`}
+          hint={`Median from profile approval · ${a.firstPayout.teachersPaid} profile${a.firstPayout.teachersPaid === 1 ? '' : 's'} paid`}
         />
         <StatCard
           label="Drop-off lesson"

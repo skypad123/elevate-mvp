@@ -7,6 +7,7 @@ import { errors } from '../lib/errors'
 import type { SessionUser } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
 import { CoursesService } from './courses.service'
+import { ownerAndManagerEmails } from './recipients'
 
 /** Support-side course review. Approval here is the only way a course becomes live. */
 export class ReviewService {
@@ -16,22 +17,27 @@ export class ReviewService {
   }
 
   async queue(): Promise<CourseSummary[]> {
-    return this.courses.listSummaries(eq(s.courses.status, 'pending_review'), 'submitted')
+    return this.courses.listSummaries({ status: 'pending_review' }, 'submitted')
   }
 
   async all(status?: 'draft' | 'pending_review' | 'live' | 'rejected'): Promise<CourseSummary[]> {
-    return this.courses.listSummaries(status ? eq(s.courses.status, status) : undefined)
+    return this.courses.listSummaries({ status })
   }
 
   async view(courseId: string): Promise<CourseView> {
-    return this.courses.loadCourseView(courseId)
+    return this.courses.loadForSupport(courseId)
+  }
+
+  /** Who hears about a review decision: the profile's owner and its managers. */
+  private reviewRecipients(profile: { id: string }): Promise<string[]> {
+    return ownerAndManagerEmails(this.deps, profile.id)
   }
 
   async approve(actor: SessionUser, courseId: string): Promise<CourseView> {
     const { db, env, mailer } = this.deps
     const course = await db.query.courses.findFirst({
-      where: eq(s.courses.id, courseId),
-      with: { teacher: { with: { teacherProfile: true } } },
+      where: { id: courseId },
+      with: { profile: { with: { owner: true } } },
     })
     if (!course) throw errors.notFound('Course')
     if (course.status !== 'pending_review')
@@ -52,31 +58,34 @@ export class ReviewService {
       action: 'course.approve',
       entityType: 'course',
       entityId: courseId,
+      profileId: course.profileId,
     })
     await trackEvent(this.deps, {
-      userId: course.teacherId,
+      userId: course.profile.ownerUserId,
       name: ANALYTICS_EVENTS.courseApproved,
-      properties: { courseId },
+      properties: { courseId, profileId: course.profileId },
     })
-    await mailer.send(
-      simpleEmail({
-        to: course.teacher.email,
-        title: `"${course.title}" is live on Elevate`,
-        paragraphs: [
-          `Good news, ${course.teacher.teacherProfile?.displayName ?? 'there'}: your course passed review and is now listed for learners.`,
-          'Share the course page to start enrolments. Earnings appear in Elevate Teach as learners pay.',
-        ],
-        cta: { href: `${env.LEARNER_URL}/course/${course.slug}`, label: 'View course page' },
-      }),
-    )
-    return this.courses.loadCourseView(courseId)
+    for (const to of await this.reviewRecipients(course.profile)) {
+      await mailer.send(
+        simpleEmail({
+          to,
+          title: `"${course.title}" is live on Elevate`,
+          paragraphs: [
+            `Good news, ${course.profile.displayName}: your course passed review and is now listed for learners.`,
+            'Share the course page to start enrolments. Earnings appear in Elevate Teach as learners pay.',
+          ],
+          cta: { href: `${env.LEARNER_URL}/course/${course.slug}`, label: 'View course page' },
+        }),
+      )
+    }
+    return this.courses.loadForSupport(courseId)
   }
 
   async reject(actor: SessionUser, courseId: string, reason: string): Promise<CourseView> {
     const { db, env, mailer } = this.deps
     const course = await db.query.courses.findFirst({
-      where: eq(s.courses.id, courseId),
-      with: { teacher: { with: { teacherProfile: true } } },
+      where: { id: courseId },
+      with: { profile: { with: { owner: true } } },
     })
     if (!course) throw errors.notFound('Course')
     if (course.status !== 'pending_review')
@@ -95,25 +104,31 @@ export class ReviewService {
       action: 'course.reject',
       entityType: 'course',
       entityId: courseId,
+      profileId: course.profileId,
       metadata: { reason },
     })
     await trackEvent(this.deps, {
-      userId: course.teacherId,
+      userId: course.profile.ownerUserId,
       name: ANALYTICS_EVENTS.courseRejected,
-      properties: { courseId },
+      properties: { courseId, profileId: course.profileId },
     })
-    await mailer.send(
-      simpleEmail({
-        to: course.teacher.email,
-        title: `Changes requested for "${course.title}"`,
-        paragraphs: [
-          `Our reviewer could not approve the course yet. Their note:`,
-          reason,
-          'Make the changes in Elevate Teach and submit again; most courses are approved on the second pass.',
-        ],
-        cta: { href: `${env.TEACH_URL}/courses/${course.id}`, label: 'Open the course builder' },
-      }),
-    )
-    return this.courses.loadCourseView(courseId)
+    for (const to of await this.reviewRecipients(course.profile)) {
+      await mailer.send(
+        simpleEmail({
+          to,
+          title: `Changes requested for "${course.title}"`,
+          paragraphs: [
+            `Our reviewer could not approve the course yet. Their note:`,
+            reason,
+            'Make the changes in Elevate Teach and submit again; most courses are approved on the second pass.',
+          ],
+          cta: {
+            href: `${env.TEACH_URL}/p/${course.profileId}/courses/${course.id}`,
+            label: 'Open the course builder',
+          },
+        }),
+      )
+    }
+    return this.courses.loadForSupport(courseId)
   }
 }

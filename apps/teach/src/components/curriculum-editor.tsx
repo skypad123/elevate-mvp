@@ -16,7 +16,8 @@ import {
 import { FileAudio, FileText, Film, HelpCircle, type LucideIcon, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
-import { type CourseActions, uploadInlineImage, useCourseActions } from '../lib/courses'
+import { type CourseActions, stableId, uploadInlineImage, useCourseActions } from '../lib/courses'
+import { useCurrentProfile } from '../lib/profile'
 import { useSaveTracker } from '../lib/save-tracker'
 import { useDebounced } from '../lib/use-debounced'
 import { QuizEditor } from './quiz-editor'
@@ -35,43 +36,51 @@ const ARTEFACT_META: Record<
 export function CurriculumEditor({ course, locked }: { course: CourseView; locked: boolean }) {
   const actions = useCourseActions(course.id)
   const { track } = useSaveTracker()
-  const [lessonId, setLessonId] = useState<string | null>(course.lessons[0]?.id ?? null)
-  const [artefactId, setArtefactId] = useState<string | null>(null)
+  // What is selected is remembered by `stableId`, not by `id`: a writer's first edit to a live
+  // course swaps every item for its draft copy, and the selection has to survive that.
+  const firstLesson = course.lessons[0]
+  const [lessonKey, setLessonKey] = useState<string | null>(
+    firstLesson ? stableId(firstLesson) : null,
+  )
+  const [artefactKey, setArtefactKey] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<{
     kind: 'lesson' | 'artefact'
     id: string
+    key: string
     title: string
   } | null>(null)
 
   useEffect(() => {
-    if (lessonId && !course.lessons.some((l) => l.id === lessonId))
-      setLessonId(course.lessons[0]?.id ?? null)
-  }, [course.lessons, lessonId])
-  const lesson = course.lessons.find((l) => l.id === lessonId) ?? null
-  const artefact = lesson?.artefacts.find((a) => a.id === artefactId) ?? null
+    if (lessonKey && !course.lessons.some((l) => stableId(l) === lessonKey)) {
+      const first = course.lessons[0]
+      setLessonKey(first ? stableId(first) : null)
+    }
+  }, [course.lessons, lessonKey])
+  const lesson = course.lessons.find((l) => stableId(l) === lessonKey) ?? null
+  const artefact = lesson?.artefacts.find((a) => stableId(a) === artefactKey) ?? null
 
   const addLesson = async () => {
     const next = await track(actions.addLesson(`Lesson ${course.lessons.length + 1}`))
     const created = next.lessons.at(-1)
     if (created) {
-      setLessonId(created.id)
-      setArtefactId(null)
+      setLessonKey(stableId(created))
+      setArtefactKey(null)
     }
   }
   const addArtefact = async (type: ArtefactView['type']) => {
     if (!lesson) return
     const next = await track(actions.addArtefact(lesson.id, type, ARTEFACT_META[type].defaultTitle))
-    const created = next.lessons.find((l) => l.id === lesson.id)?.artefacts.at(-1)
-    if (created) setArtefactId(created.id)
+    const created = next.lessons.find((l) => stableId(l) === stableId(lesson))?.artefacts.at(-1)
+    if (created) setArtefactKey(stableId(created))
   }
   const remove = async () => {
     if (!confirm) return
     if (confirm.kind === 'lesson') {
       await track(actions.deleteLesson(confirm.id))
-      if (lessonId === confirm.id) setLessonId(null)
+      if (lessonKey === confirm.key) setLessonKey(null)
     } else {
       await track(actions.deleteArtefact(confirm.id))
-      if (artefactId === confirm.id) setArtefactId(null)
+      if (artefactKey === confirm.key) setArtefactKey(null)
     }
     setConfirm(null)
   }
@@ -100,7 +109,7 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
                 <div
                   className={cn(
                     'group flex items-center gap-1 rounded-control border px-1 py-1.5 transition-colors',
-                    l.id === lessonId
+                    stableId(l) === lessonKey
                       ? 'border-brand bg-brand-tint/50'
                       : 'border-transparent hover:bg-surface-muted',
                   )}
@@ -110,8 +119,8 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
                     type="button"
                     className="min-w-0 flex-1 text-left"
                     onClick={() => {
-                      setLessonId(l.id)
-                      setArtefactId(null)
+                      setLessonKey(stableId(l))
+                      setArtefactKey(null)
                     }}
                   >
                     <p className="truncate text-small font-semibold text-ink">{l.title}</p>
@@ -128,7 +137,9 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
                     className="size-7 opacity-0 group-hover:opacity-100 focus:opacity-100"
                     aria-label="Delete lesson"
                     disabled={locked}
-                    onClick={() => setConfirm({ kind: 'lesson', id: l.id, title: l.title })}
+                    onClick={() =>
+                      setConfirm({ kind: 'lesson', id: l.id, key: stableId(l), title: l.title })
+                    }
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
@@ -144,7 +155,12 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
         {lesson ? (
           <>
             <div className="space-y-3 border-b border-border p-4">
-              <LessonFields key={lesson.id} lesson={lesson} actions={actions} locked={locked} />
+              <LessonFields
+                key={stableId(lesson)}
+                lesson={lesson}
+                actions={actions}
+                locked={locked}
+              />
             </div>
             <div className="flex-1 p-3">
               <p className="mb-2 px-1 font-mono text-eyebrow uppercase tracking-[0.08em] text-ink-tertiary">
@@ -165,7 +181,7 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
                       <div
                         className={cn(
                           'group flex items-center gap-1 rounded-control border px-1 py-1.5',
-                          a.id === artefactId
+                          stableId(a) === artefactKey
                             ? 'border-brand bg-brand-tint/50'
                             : 'border-transparent hover:bg-surface-muted',
                         )}
@@ -174,9 +190,9 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
                         <button
                           type="button"
                           className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                          onClick={() => setArtefactId(a.id)}
+                          onClick={() => setArtefactKey(stableId(a))}
                         >
-                          <Icon className="size-4 shrink-0 text-brand" />
+                          <Icon className="size-4 shrink-0 text-brand-fg" />
                           <span className="truncate text-small font-semibold text-ink">
                             {a.title}
                           </span>
@@ -195,7 +211,14 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
                           className="size-7 opacity-0 group-hover:opacity-100 focus:opacity-100"
                           aria-label="Delete item"
                           disabled={locked}
-                          onClick={() => setConfirm({ kind: 'artefact', id: a.id, title: a.title })}
+                          onClick={() =>
+                            setConfirm({
+                              kind: 'artefact',
+                              id: a.id,
+                              key: stableId(a),
+                              title: a.title,
+                            })
+                          }
                         >
                           <Trash2 className="size-3.5" />
                         </Button>
@@ -214,7 +237,7 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
                     type="button"
                     disabled={locked}
                     onClick={() => void addArtefact(type)}
-                    className="flex flex-col items-center gap-1 rounded-control px-2 py-2 text-caption font-semibold text-ink-secondary transition-colors hover:bg-brand-tint hover:text-brand disabled:opacity-50"
+                    className="flex flex-col items-center gap-1 rounded-control px-2 py-2 text-caption font-semibold text-ink-secondary transition-colors hover:bg-brand-tint hover:text-brand-fg disabled:opacity-50"
                   >
                     <meta.icon className="size-4" /> {meta.label}
                   </button>
@@ -234,7 +257,12 @@ export function CurriculumEditor({ course, locked }: { course: CourseView; locke
       {/* editor */}
       <Card className="min-w-0">
         {artefact ? (
-          <ArtefactEditor key={artefact.id} artefact={artefact} actions={actions} locked={locked} />
+          <ArtefactEditor
+            key={stableId(artefact)}
+            artefact={artefact}
+            actions={actions}
+            locked={locked}
+          />
         ) : (
           <EmptyState
             title={lesson ? 'Pick an item to edit' : 'Nothing selected'}
@@ -327,6 +355,7 @@ function ArtefactEditor({
   locked: boolean
 }) {
   const { track } = useSaveTracker()
+  const { profileId } = useCurrentProfile()
   const [title, setTitle] = useState(artefact.title)
   const [quizSaving, setQuizSaving] = useState(false)
   const saveTitle = useDebounced(
@@ -340,7 +369,7 @@ function ArtefactEditor({
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <meta.icon className="size-5 text-brand" />
+        <meta.icon className="size-5 text-brand-fg" />
         <p className="font-mono text-eyebrow uppercase tracking-[0.08em] text-ink-tertiary">
           {meta.label}
         </p>
@@ -357,6 +386,7 @@ function ArtefactEditor({
       {artefact.type === 'video' || artefact.type === 'audio' ? (
         <MediaUploader
           api={api}
+          profileId={profileId}
           kind={artefact.type}
           value={artefact.media}
           disabled={locked}
@@ -377,7 +407,7 @@ function ArtefactEditor({
           disabled={locked}
           placeholder="Write the lesson text. Headings, lists, links and images are supported."
           onChange={saveContent}
-          onPickImage={uploadInlineImage}
+          onPickImage={() => uploadInlineImage(profileId)}
           minHeight={320}
         />
       ) : null}

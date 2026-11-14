@@ -1,0 +1,72 @@
+# Learner app: Preferences persist across a cold relaunch and the resolved theme is applied
+# from the first frame after the splash (the root view carries testID app-root-<scheme>).
+#
+# Run against an iOS simulator or Android emulator with a dev build installed
+# (`npx expo run:ios` / `npx expo run:android` in apps/learner) and the API on :4400:
+#   maestro test .maestro/learner-preferences.yaml
+# Override defaults with -e, e.g. -e APP_ID=host.exp.Exponent for Expo Go (then also open the
+# project URL first) or -e API_URL=http://10.0.2.2:4400 on the Android emulator.
+appId: ${APP_ID}
+env:
+  APP_ID: sg.elevate.learner
+  EMAIL: learner@example.com
+  API_URL: http://localhost:4400
+---
+- launchApp:
+    clearState: true
+# Fresh install: no preference stored, the app follows the OS (the simulator defaults to light).
+- assertVisible:
+    id: "app-root-(light|dark)"
+- runFlow: sign-in.yaml
+
+# --- Appearance -------------------------------------------------------------------------
+- tapOn: "Profile"
+- scrollUntilVisible:
+    element: "Appearance"
+- tapOn: "Dark"
+- assertVisible:
+    id: "app-root-dark"
+- assertVisible:
+    text: "Dark"
+    selected: true
+
+# Cold relaunch: the stored theme must be applied before anything is shown.
+- stopApp
+- launchApp
+- assertVisible:
+    id: "app-root-dark"
+- takeScreenshot: learner-dark-after-relaunch
+
+# Forced light under the same OS setting.
+- tapOn: "Profile"
+- scrollUntilVisible:
+    element: "Appearance"
+- tapOn: "Light"
+- assertVisible:
+    id: "app-root-light"
+- stopApp
+- launchApp
+- assertVisible:
+    id: "app-root-light"
+
+# --- Language ---------------------------------------------------------------------------
+- tapOn: "Profile"
+- scrollUntilVisible:
+    element: "Language"
+- tapOn: "中文"
+- assertVisible: "偏好设置"
+- assertVisible: "我的学习"
+- stopApp
+- launchApp
+- assertVisible: "我的学习"
+- takeScreenshot: learner-zh-after-relaunch
+
+# Restore defaults so the next run starts clean even without clearState.
+- tapOn: "个人资料"
+- scrollUntilVisible:
+    element: "语言"
+- tapOn: "English"
+- tapOn: "System"
+- assertVisible:
+    text: "System"
+    selected: true

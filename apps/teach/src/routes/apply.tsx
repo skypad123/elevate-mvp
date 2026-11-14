@@ -1,29 +1,61 @@
-import type { MediaAssetView, TeacherApplication } from '@elevate/core'
+import type { MediaAssetView, PersonalApplication, ProfileView } from '@elevate/core'
 import {
   Badge,
   Button,
   Card,
+  EmptyState,
   Eyebrow,
+  focusFirstInvalid,
   Input,
   MediaUploader,
+  Skeleton,
   Textarea,
   useToast,
 } from '@elevate/web-ui'
 import { errorMessage, fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { type FormEvent, useRef, useState } from 'react'
+import { Link, Navigate, useNavigate } from 'react-router'
 import { api } from '../lib/api'
-import { teachKeys, useTeacherProfile } from '../lib/queries'
+import { teachKeys } from '../lib/keys'
+import { useProfileView } from '../lib/profile'
+import { profilePath } from '../lib/urls'
 
+/**
+ * The application for a personal profile: one person teaching under their own name. A person has
+ * one, so this page creates it, or reopens it while it is still under review or was rejected.
+ */
 export function ApplyPage() {
+  const { user } = usePortalAuth()
+  const personal = user?.profiles.find((p) => p.type === 'personal' && p.role === 'owner')
+  const existing = useProfileView(personal?.id)
+  if (personal?.status === 'approved') return <Navigate to={profilePath(personal.id)} replace />
+  // Wait for the earlier answers before showing the form, so it opens filled in. If they cannot be
+  // read, say so rather than opening an empty form that would replace them.
+  if (personal && existing.isPending) return <Skeleton className="h-96 w-full" />
+  if (personal && existing.isError)
+    return (
+      <EmptyState
+        tone="danger"
+        title="Could not load your application"
+        body={errorMessage(existing.error)}
+        action={
+          <Button variant="secondary" onClick={() => void existing.refetch()}>
+            Try again
+          </Button>
+        }
+      />
+    )
+  return <ApplicationForm key={existing.data?.id ?? 'new'} existing={existing.data ?? null} />
+}
+
+function ApplicationForm({ existing }: { existing: ProfileView | null }) {
   const { user, refreshUser } = usePortalAuth()
-  const { data: existing } = useTeacherProfile()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const [form, setForm] = useState<TeacherApplication>({
+  const [form, setForm] = useState<PersonalApplication>({
     displayName: existing?.displayName ?? user?.name ?? '',
     headline: existing?.headline ?? '',
     bio: existing?.bio ?? '',
@@ -34,8 +66,9 @@ export function ApplyPage() {
   const [sample, setSample] = useState<MediaAssetView | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
 
-  const set = (key: keyof TeacherApplication) => (e: { target: { value: string } }) =>
+  const set = (key: keyof PersonalApplication) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }))
 
   async function submit(e: FormEvent) {
@@ -43,25 +76,27 @@ export function ApplyPage() {
     setBusy(true)
     setErrors({})
     try {
-      const body: TeacherApplication = {
+      const body: PersonalApplication = {
         ...form,
         teachingSampleUrl: form.teachingSampleUrl?.trim()
           ? form.teachingSampleUrl.trim()
           : undefined,
         teachingSampleMediaId: sample?.id ?? form.teachingSampleMediaId,
       }
-      await unwrap(await api.teach.apply.$post({ json: body }))
-      await queryClient.invalidateQueries({ queryKey: teachKeys.profile })
+      const { profile } = await unwrap(await api.teach.apply.$post({ json: body }))
+      queryClient.setQueryData(teachKeys.profile(profile.id), profile)
       await refreshUser()
       toast({
         tone: 'success',
         title: 'Application sent',
         description: 'We will email you when it has been reviewed.',
       })
-      navigate('/pending', { replace: true })
+      // The profile's own page shows the application status until it is approved.
+      navigate(profilePath(profile.id), { replace: true })
     } catch (error) {
       const fields = fieldErrors(error)
       setErrors(fields)
+      focusFirstInvalid(formRef.current)
       if (Object.keys(fields).length === 0)
         toast({ tone: 'danger', title: 'Could not submit', description: errorMessage(error) })
     } finally {
@@ -83,6 +118,16 @@ export function ApplyPage() {
           few minutes of you teaching. A human reviews every application, usually within two working
           days.
         </p>
+        {existing ? null : (
+          <p className="text-small text-ink-secondary">
+            This application is for a person teaching under their own name, a sole proprietor
+            included. Teaching as a private limited company or an LLP?{' '}
+            <Link to="/apply/company" className="font-semibold text-brand-fg hover:underline">
+              Apply as a company instead
+            </Link>
+            .
+          </p>
+        )}
         {isResubmission && existing?.reviewNote ? (
           <div className="rounded-card border border-warning bg-warning-tint p-4 text-small text-ink">
             <p className="mb-1 flex items-center gap-2 font-semibold">
@@ -93,7 +138,7 @@ export function ApplyPage() {
         ) : null}
       </div>
 
-      <form onSubmit={submit} className="space-y-6">
+      <form ref={formRef} onSubmit={submit} className="space-y-6">
         <Card as="section" className="space-y-5">
           <h2 className="font-display text-h2 font-semibold text-ink">About you</h2>
           <Input
@@ -155,6 +200,11 @@ export function ApplyPage() {
             label="Upload a video"
             hint="MP4 or MOV, up to a few minutes"
           />
+          {existing?.teachingSampleMediaId && !sample ? (
+            <p className="text-small text-ink-tertiary">
+              The video from your last application is kept unless you upload a new one.
+            </p>
+          ) : null}
           <Input
             label="Or a link"
             placeholder="https://youtube.com/…"
@@ -165,12 +215,19 @@ export function ApplyPage() {
           />
         </Card>
 
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-small text-ink-tertiary">
             By applying you agree to the teacher agreement: you own your content; Elevate holds a
             non-exclusive hosting licence while it is listed.
           </p>
-          <Button type="submit" variant="accent" size="lg" loading={busy} iconRight={ArrowRight}>
+          <Button
+            type="submit"
+            variant="accent"
+            size="lg"
+            loading={busy}
+            iconRight={ArrowRight}
+            className="shrink-0"
+          >
             {isResubmission ? 'Resubmit' : 'Submit application'}
           </Button>
         </div>

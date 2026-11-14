@@ -39,7 +39,7 @@ function renderInline(nodes: readonly RichTextInline[] | undefined): ReactNode {
               href={mark.attrs.href}
               target="_blank"
               rel="noreferrer"
-              className="text-brand underline underline-offset-2"
+              className="text-brand-fg underline underline-offset-2"
             >
               {el}
             </a>

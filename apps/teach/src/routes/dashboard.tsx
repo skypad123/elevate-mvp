@@ -7,89 +7,100 @@ import {
   EmptyState,
   formatBps,
   PageHeader,
+  Skeleton,
   StatCard,
-  statusLabel,
   statusTone,
-  useToast,
 } from '@elevate/web-ui'
-import { errorMessage, usePortalAuth } from '@elevate/web-ui/portal'
+import { usePortalAuth } from '@elevate/web-ui/portal'
+import { useErrorMessage, useT } from '@elevate/web-ui/preferences'
 import { ArrowRight, BookOpen, CreditCard, ExternalLink, ShieldCheck } from 'lucide-react'
-import { useState } from 'react'
 import { Link } from 'react-router'
 import { useCourses } from '../lib/courses'
-import {
-  openStripeDashboard,
-  startStripeOnboarding,
-  useEarnings,
-  useStripeStatus,
-  useTeacherProfile,
-} from '../lib/queries'
+import { useCurrentProfile } from '../lib/profile'
+import { useEarnings, useStripeLinks, useStripeStatus } from '../lib/queries'
 
+/** The profile's payout account. Anyone on the profile sees its state; only the owner manages it. */
 export function StripeCard() {
-  const { data: profile } = useTeacherProfile()
-  const stripe = useStripeStatus(!!profile)
-  const { toast } = useToast()
-  const [busy, setBusy] = useState(false)
+  const { profile, can } = useCurrentProfile()
+  const stripe = useStripeStatus()
+  const links = useStripeLinks()
+  const t = useT()
   const status = stripe.data
+  const canManage = can('stripe.links')
 
-  async function run(action: () => Promise<void>) {
-    setBusy(true)
-    try {
-      await action()
-    } catch (error) {
-      toast({ tone: 'danger', title: 'Stripe', description: errorMessage(error) })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const enabled = !!status?.chargesEnabled
+  // Payable: the account is active on our side and Stripe allows charges.
+  const enabled = status?.status === 'active' && status.chargesEnabled
+  // A company whose Stripe side is done but whose legal name Elevate has not matched (again).
+  const awaitingNameCheck =
+    !enabled && status?.businessType === 'company' && status.chargesEnabled && !status.nameVerified
   return (
     <Card as="section">
       <CardHeader
-        title="Payments"
+        title={t('payments.title')}
         description={
           enabled
-            ? 'Learners can pay you. Payouts land in your bank on Stripe’s schedule.'
-            : 'Connect a Stripe account so learners can pay you. Takes about five minutes.'
+            ? t('payments.description.enabled')
+            : awaitingNameCheck
+              ? t('payments.description.nameCheck')
+              : t('payments.description.connect')
         }
         action={
           <Badge tone={enabled ? 'success' : status?.connected ? 'warning' : 'neutral'}>
             {enabled
-              ? 'Payments enabled'
-              : status?.connected
-                ? 'Onboarding incomplete'
-                : 'Not connected'}
+              ? t('payments.badge.enabled')
+              : awaitingNameCheck
+                ? t('payments.badge.nameCheck')
+                : status?.connected
+                  ? t('payments.badge.onboarding')
+                  : t('payments.badge.notConnected')}
           </Badge>
         }
       />
       <div className="flex flex-wrap items-center gap-3">
-        {enabled ? (
+        {awaitingNameCheck ? (
           <>
-            <Button
-              variant="secondary"
-              icon={ExternalLink}
-              loading={busy}
-              onClick={() => run(openStripeDashboard)}
-            >
-              Open Stripe dashboard
-            </Button>
-            <span className="text-small text-ink-tertiary">
-              Commission on your courses: {profile ? formatBps(profile.commissionBps) : '—'}
-            </span>
+            <span className="text-small text-ink-secondary">{t('payments.nameCheck.note')}</span>
+            {canManage ? (
+              <Button
+                variant="secondary"
+                icon={ExternalLink}
+                loading={links.busy}
+                onClick={links.openDashboard}
+              >
+                {t('stripe.openDashboard')}
+              </Button>
+            ) : null}
           </>
+        ) : !canManage ? (
+          <span className="text-small text-ink-secondary">{t('payments.ownerOnly')}</span>
+        ) : enabled ? (
+          <Button
+            variant="secondary"
+            icon={ExternalLink}
+            loading={links.busy}
+            onClick={links.openDashboard}
+          >
+            {t('stripe.openDashboard')}
+          </Button>
         ) : (
           <Button
             variant="accent"
             icon={CreditCard}
-            loading={busy || stripe.isPending}
-            onClick={() => run(startStripeOnboarding)}
+            loading={links.busy || stripe.isPending}
+            onClick={links.connect}
           >
-            {status?.connected ? 'Finish Stripe onboarding' : 'Connect Stripe'}
+            {status?.connected ? t('payments.finishOnboarding') : t('stripe.connect')}
           </Button>
         )}
-        {status && !enabled && status.detailsSubmitted ? (
-          <span className="text-small text-ink-secondary">Stripe is verifying your details.</span>
+        {enabled ? (
+          <span className="text-small text-ink-tertiary">
+            {t('payments.commission', {
+              rate: profile ? formatBps(profile.commissionBps) : '—',
+            })}
+          </span>
+        ) : null}
+        {status && !enabled && !awaitingNameCheck && status.detailsSubmitted ? (
+          <span className="text-small text-ink-secondary">{t('payments.verifying')}</span>
         ) : null}
       </div>
     </Card>
@@ -98,55 +109,109 @@ export function StripeCard() {
 
 export function Dashboard() {
   const { user } = usePortalAuth()
-  const { data: profile } = useTeacherProfile()
+  const { displayName, path, can } = useCurrentProfile()
+  const t = useT()
+  const errorMessage = useErrorMessage()
   const courses = useCourses()
-  const earnings = useEarnings(!!profile)
+  const seesMoney = can('earnings.read')
+  const reviews = can('changeSet.review')
+  const creates = can('course.create')
+  const earnings = useEarnings(seesMoney)
   const list = courses.data ?? []
   const live = list.filter((c) => c.status === 'live').length
+  const waiting = list.filter((c) => c.pendingChanges)
   return (
     <>
       <PageHeader
-        eyebrow="Dashboard"
-        title={profile ? `Welcome, ${profile.displayName}` : 'Welcome'}
+        eyebrow={t('nav.dashboard')}
+        title={t('dashboard.welcome', { name: displayName })}
         description={user?.email}
       />
+      {/* The people who approve a writer's edits learn about them here, not by opening each course. */}
+      {reviews && waiting.length > 0 ? (
+        <Card as="section" className="mb-6 border-warning">
+          <CardHeader
+            title={t('dashboard.review.title')}
+            description={t('dashboard.review.description')}
+          />
+          <ul className="divide-y divide-border">
+            {waiting.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-3 py-3">
+                <span className="min-w-0 truncate font-semibold text-ink">{c.title}</span>
+                <Button asChild variant="secondary" size="sm" iconRight={ArrowRight}>
+                  <Link to={path(`/courses/${c.id}/changes`)}>{t('dashboard.review.action')}</Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
       <div className="grid gap-6 md:grid-cols-3">
         <StatCard
-          label="Live courses"
+          label={t('dashboard.stat.live')}
           value={courses.isPending ? '—' : String(live)}
-          hint="Approved and on sale"
+          hint={t('dashboard.stat.live.hint')}
         />
-        <StatCard
-          label="Sales"
-          value={earnings.data ? String(earnings.data.totals.paymentCount) : '—'}
-          hint="Paid enrolments across your courses"
-        />
-        <Link to="/earnings" className="block">
+        {seesMoney ? (
+          <>
+            <StatCard
+              label={t('dashboard.stat.sales')}
+              value={earnings.data ? String(earnings.data.totals.paymentCount) : '—'}
+              hint={t('dashboard.stat.sales.hint')}
+            />
+            <Link to={path('/earnings')} className="block">
+              <StatCard
+                label={t('dashboard.stat.net')}
+                value={earnings.data ? formatSgd(earnings.data.totals.netCents) : '—'}
+                hint={t('dashboard.stat.net.hint')}
+                className="h-full transition-colors hover:border-brand"
+              />
+            </Link>
+          </>
+        ) : (
           <StatCard
-            label="Net earnings"
-            value={earnings.data ? formatSgd(earnings.data.totals.netCents) : '—'}
-            hint="After Stripe fees and commission · see earnings"
-            className="h-full transition-colors hover:border-brand"
+            label={t('dashboard.stat.waiting')}
+            value={courses.isPending ? '—' : String(waiting.length)}
+            hint={t('dashboard.stat.waiting.hint')}
           />
-        </Link>
+        )}
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <StripeCard />
         <Card as="section">
           <CardHeader
-            title="Courses"
-            description="Author a course, then submit it for review."
-            action={<ShieldCheck className="size-5 text-brand" />}
+            title={t('nav.courses')}
+            description={
+              creates
+                ? t('dashboard.courses.description')
+                : t('dashboard.courses.description.writer')
+            }
+            action={<ShieldCheck className="size-5 text-brand-fg" />}
           />
-          {list.length === 0 ? (
+          {courses.isPending ? (
+            <Skeleton className="h-32 w-full" />
+          ) : courses.isError ? (
+            <EmptyState
+              tone="danger"
+              title={t('dashboard.courses.loadFailed')}
+              body={errorMessage(courses.error)}
+              className="py-8"
+            />
+          ) : list.length === 0 ? (
             <EmptyState
               icon={BookOpen}
-              title="No courses yet"
-              body="Create a course, add lessons and content, then submit it for review."
+              title={t('dashboard.courses.empty.title')}
+              body={
+                creates
+                  ? t('dashboard.courses.empty.body')
+                  : t('dashboard.courses.empty.body.writer')
+              }
               action={
-                <Link to="/courses">
-                  <Button variant="secondary">Go to courses</Button>
-                </Link>
+                creates ? (
+                  <Button asChild variant="secondary">
+                    <Link to={path('/courses')}>{t('dashboard.courses.open')}</Link>
+                  </Button>
+                ) : undefined
               }
               className="py-8"
             />
@@ -155,12 +220,15 @@ export function Dashboard() {
               {list.slice(0, 5).map((c) => (
                 <li key={c.id}>
                   <Link
-                    to={`/courses/${c.id}`}
-                    className="flex items-center justify-between gap-3 py-3 hover:text-brand"
+                    to={path(`/courses/${c.id}`)}
+                    className="flex items-center justify-between gap-3 py-3 hover:text-brand-fg"
                   >
                     <span className="min-w-0 truncate font-semibold">{c.title}</span>
                     <span className="flex shrink-0 items-center gap-2">
-                      <Badge tone={statusTone[c.status]}>{statusLabel(c.status)}</Badge>
+                      {c.pendingChanges ? (
+                        <Badge tone="warning">{t('dashboard.courses.changesWaiting')}</Badge>
+                      ) : null}
+                      <Badge tone={statusTone[c.status]}>{t(`status.course.${c.status}`)}</Badge>
                       <ArrowRight className="size-4 text-ink-tertiary" />
                     </span>
                   </Link>
@@ -168,8 +236,8 @@ export function Dashboard() {
               ))}
               {list.length > 5 ? (
                 <li className="pt-3">
-                  <Link to="/courses" className="text-small font-semibold text-brand">
-                    All {list.length} courses
+                  <Link to={path('/courses')} className="text-small font-semibold text-brand-fg">
+                    {t('dashboard.courses.all', { count: list.length })}
                   </Link>
                 </li>
               ) : null}

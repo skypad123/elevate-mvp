@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { Dialog as RadixDialog } from 'radix-ui'
 import type { ReactNode } from 'react'
 import { cn } from '../lib/cn'
+import { useT } from '../preferences/PreferencesProvider'
 import { Button } from './Button'
 
 export type DialogProps = {
@@ -23,6 +24,7 @@ export function Dialog({
   footer,
   className,
 }: DialogProps) {
+  const t = useT()
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
@@ -45,7 +47,7 @@ export function Dialog({
               ) : null}
             </div>
             <RadixDialog.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t('ui.close')}>
                 <X className="size-5" />
               </Button>
             </RadixDialog.Close>

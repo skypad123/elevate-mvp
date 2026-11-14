@@ -12,7 +12,7 @@
       "!**/dist",
       "!**/.expo",
       "!**/node_modules",
-      "!**/drizzle/meta",
+      "!**/drizzle/*/snapshot.json",
       "!**/*.d.ts",
       "!apps/learner/expo-env.d.ts"
     ]

@@ -1,0 +1,60 @@
+import type { teachShellEn } from './teachShell.en'
+
+export const teachShellZh = {
+  'switcher.label': '教学档案',
+  'switcher.ariaLabel': '切换教学档案',
+  'switcher.placeholder': '您的教学档案…',
+  'switcher.detail.approved': '{role}',
+  'switcher.detail.applied': '{role} · 审核中',
+  'switcher.detail.rejected': '{role} · 未获批准',
+  'switcher.detail.staff': '以 Elevate 员工身份',
+  'switcher.createCompany': '创建公司档案',
+
+  'teachNav.changesWaiting.one': '1 门课程有待批准的更改',
+  'teachNav.changesWaiting.other': '{count} 门课程有待批准的更改',
+
+  'staffBanner.title': '您正在以 Elevate 员工身份操作。',
+  'staffBanner.body':
+    '这是 {name} 的教学档案，不是您自己的。您可以修正内容并查看档案；价格、发布和收款仍由教师负责。您所做的每项更改都会记录在您的名下。',
+  'staffBanner.sentences': '{first}{second}',
+
+  'profileNotFound.title': '未找到教学档案',
+  'profileNotFound.body': '此教学档案不存在，或者您的账户不是其成员。',
+  'profileNotFound.action': '前往您的教学档案',
+
+  'start.eyebrow': 'Elevate Teach',
+  'start.title': '在 Elevate 上授课',
+  'start.left': '您已离开 {name}，目前不属于任何教学档案。',
+  'start.description': '您目前还不属于任何教学档案。您可以申请授课，或加入邀请您的教学档案。',
+  'start.person.title': '以个人名义授课',
+  'start.person.body': '适用于个人，包括独资经营者。',
+  'start.person.action': '以个人身份申请',
+  'start.company.title': '以公司名义授课',
+  'start.company.body': '适用于在新加坡注册的私人有限公司或有限责任合伙企业。',
+  'start.company.action': '以公司身份申请',
+  'start.invited.title': '收到了邀请？',
+  'start.invited.body':
+    '请打开邀请邮件中的链接。如果您是用另一个邮箱地址接受的邀请，需要等教学档案的所有者确认，确认后您会收到邮件。',
+
+  'dashboard.welcome': '欢迎，{name}',
+  'dashboard.stat.live': '已上线课程',
+  'dashboard.stat.live.hint': '已批准并在售',
+  'dashboard.stat.sales': '销量',
+  'dashboard.stat.sales.hint': '您所有课程的付费报名数',
+  'dashboard.stat.net': '净收入',
+  'dashboard.stat.net.hint': '已扣除 Stripe 手续费和佣金 · 查看收入',
+  'dashboard.stat.waiting': '待批准的更改',
+  'dashboard.stat.waiting.hint': '有待批准修改的已上线课程',
+  'dashboard.review.title': '待您批准',
+  'dashboard.review.description': '撰稿人修改了以下已上线课程。您批准后，学员才会看到这些更改。',
+  'dashboard.review.action': '审核更改',
+  'dashboard.courses.description': '编写课程，然后提交审核。',
+  'dashboard.courses.description.writer': '编辑此教学档案的课程。对已上线课程的修改需等待批准。',
+  'dashboard.courses.loadFailed': '无法加载课程',
+  'dashboard.courses.empty.title': '还没有课程',
+  'dashboard.courses.empty.body': '创建课程，添加课时和内容，然后提交审核。',
+  'dashboard.courses.empty.body.writer': '此教学档案还没有课程，课程由所有者或管理员创建。',
+  'dashboard.courses.open': '前往课程',
+  'dashboard.courses.all': '全部 {count} 门课程',
+  'dashboard.courses.changesWaiting': '有待批准的更改',
+} satisfies Record<keyof typeof teachShellEn, string>

@@ -4,11 +4,10 @@ import type {
   MoneyBreakdown,
   ReconciliationView,
 } from '@elevate/core'
-import { schema as s } from '@elevate/db'
-import { and, desc, eq } from 'drizzle-orm'
+import type { schema as s } from '@elevate/db'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
-import type { SessionUser } from '../middleware/auth'
+import type { ProfileActor } from '../middleware/auth'
 
 type PaymentRow = typeof s.payments.$inferSelect
 
@@ -37,30 +36,60 @@ export function breakdown(rows: PaymentRow[]): MoneyBreakdown {
   }
 }
 
-/** Earnings are derived from stored Stripe events (payments + refunds), never settled separately. */
+/**
+ * Earnings are derived from stored Stripe events (payments + refunds), never settled separately.
+ *
+ * Every query here selects payments by payout account, not by profile or by course ownership:
+ * earnings follow the account that was paid.
+ */
 export class EarningsService {
   constructor(private readonly deps: Deps) {}
 
-  async forTeacher(user: SessionUser): Promise<EarningsView> {
+  private async profileWithAccount(profileId: string) {
+    const profile = await this.deps.db.query.profiles.findFirst({
+      where: { id: profileId },
+      with: { payoutAccount: true },
+    })
+    if (!profile) throw errors.notFound('Profile')
+    return profile
+  }
+
+  /** Totals over every payment made to the profile's payout account. */
+  async totalsForProfile(profileId: string): Promise<MoneyBreakdown> {
+    const { payoutAccount } = await this.profileWithAccount(profileId)
+    if (!payoutAccount) return breakdown([])
+    return breakdown(
+      await this.deps.db.query.payments.findMany({ where: { payoutAccountId: payoutAccount.id } }),
+    )
+  }
+
+  async forProfile(actor: ProfileActor): Promise<EarningsView> {
     const { db } = this.deps
-    const profile = await db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, user.id),
-    })
-    const rows = await db.query.payments.findMany({
-      where: eq(s.payments.teacherId, user.id),
-      orderBy: [desc(s.payments.paidAt), desc(s.payments.createdAt)],
-      with: {
-        course: { columns: { id: true, title: true, slug: true, status: true } },
-        user: { columns: { email: true } },
-      },
-    })
+    const profile = await this.profileWithAccount(actor.profileId)
+    const account = profile.payoutAccount
+    const rows = account
+      ? await db.query.payments.findMany({
+          where: { payoutAccountId: account.id },
+          orderBy: { paidAt: 'desc', createdAt: 'desc' },
+          with: {
+            course: { columns: { id: true, title: true, slug: true, status: true } },
+            user: { columns: { email: true } },
+          },
+        })
+      : []
     const byCourse = new Map<string, typeof rows>()
     for (const row of rows) byCourse.set(row.courseId, [...(byCourse.get(row.courseId) ?? []), row])
+
+    // The per-course figures come from the account's payments. The profile's own courses that
+    // have not sold yet are listed too, with zeros, so the page shows every course as before.
+    const listed = new Map(rows.map((row) => [row.courseId, row.course]))
     const ownCourses = await db.query.courses.findMany({
-      where: eq(s.courses.teacherId, user.id),
+      where: { profileId: actor.profileId },
       columns: { id: true, title: true, slug: true, status: true },
     })
-    const courses = ownCourses
+    for (const course of ownCourses) if (!listed.has(course.id)) listed.set(course.id, course)
+
+    const courses = [...listed.values()]
       .map((c) => ({
         ...breakdown(byCourse.get(c.id) ?? []),
         courseId: c.id,
@@ -82,33 +111,38 @@ export class EarningsService {
         paidAt: p.paidAt.toISOString(),
       })),
       stripe: {
-        connected: !!profile?.stripeAccountId,
-        chargesEnabled: profile?.stripeChargesEnabled ?? false,
-        payoutsEnabled: profile?.stripePayoutsEnabled ?? false,
+        connected: !!account?.stripeAccountId,
+        chargesEnabled: account?.chargesEnabled ?? false,
+        payoutsEnabled: account?.payoutsEnabled ?? false,
       },
-      commissionBps: profile?.commissionBps ?? this.deps.env.DEFAULT_COMMISSION_BPS,
+      commissionBps: profile.commissionBps,
     }
   }
 
-  async forCourse(user: SessionUser, courseId: string): Promise<CourseEarningsView> {
+  async forCourse(actor: ProfileActor, courseId: string): Promise<CourseEarningsView> {
     const { db } = this.deps
+    const { payoutAccount } = await this.profileWithAccount(actor.profileId)
     const course = await db.query.courses.findFirst({
-      where: eq(s.courses.id, courseId),
+      where: { id: courseId },
       columns: {
         id: true,
         title: true,
         slug: true,
         status: true,
         priceCents: true,
-        teacherId: true,
+        profileId: true,
       },
     })
-    if (!course || course.teacherId !== user.id) throw errors.notFound('Course')
-    const rows = await db.query.payments.findMany({
-      where: and(eq(s.payments.courseId, courseId), eq(s.payments.teacherId, user.id)),
-      orderBy: [desc(s.payments.paidAt), desc(s.payments.createdAt)],
-      with: { user: { columns: { email: true } }, promoCode: { columns: { code: true } } },
-    })
+    const rows = payoutAccount
+      ? await db.query.payments.findMany({
+          where: { courseId, payoutAccountId: payoutAccount.id },
+          orderBy: { paidAt: 'desc', createdAt: 'desc' },
+          with: { user: { columns: { email: true } }, promoCode: { columns: { code: true } } },
+        })
+      : []
+    // Visible when the profile owns the course, or its account was paid for it.
+    if (!course || (course.profileId !== actor.profileId && rows.length === 0))
+      throw errors.notFound('Course')
     return {
       course: {
         ...breakdown(rows),
@@ -134,19 +168,17 @@ export class EarningsService {
     }
   }
 
-  /** Compares Σ teacher net in our ledger with Stripe's transfers to the connected account. */
-  async reconcile(user: SessionUser): Promise<ReconciliationView> {
-    const profile = await this.deps.db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, user.id),
-    })
-    if (!profile?.stripeAccountId)
+  /** Compares Σ teacher net in our ledger with Stripe's transfers to the payout account. */
+  async reconcile(actor: ProfileActor): Promise<ReconciliationView> {
+    const { payoutAccount } = await this.profileWithAccount(actor.profileId)
+    if (!payoutAccount?.stripeAccountId)
       throw errors.conflict('stripe_not_connected', 'Connect Stripe to reconcile earnings')
     const rows = await this.deps.db.query.payments.findMany({
-      where: eq(s.payments.teacherId, user.id),
+      where: { payoutAccountId: payoutAccount.id },
     })
     const ledgerNetCents = breakdown(rows).netCents
     const stripeTransferTotalCents = await this.deps.payments.listTransferAmountCents(
-      profile.stripeAccountId,
+      payoutAccount.stripeAccountId,
     )
     return {
       stripeTransferTotalCents,

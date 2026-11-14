@@ -41,19 +41,20 @@ export class AnalyticsService {
       .groupBy(s.courses.id, s.courses.title)
       .orderBy(desc(sql`count(${s.enrollments.id})`), asc(s.courses.title))
       .limit(10)
+    // Joined through the live view, so a draft copy of a lesson is never counted.
     const starts = await db
       .select({
-        position: s.lessons.position,
+        position: s.liveLessons.position,
         starts: sql<number>`count(distinct ${s.analyticsEvents.userId})::int`,
       })
       .from(s.analyticsEvents)
       .innerJoin(
-        s.lessons,
-        sql`${s.lessons.id}::text = ${s.analyticsEvents.properties}->>'lessonId'`,
+        s.liveLessons,
+        sql`${s.liveLessons.id}::text = ${s.analyticsEvents.properties}->>'lessonId'`,
       )
       .where(eq(s.analyticsEvents.name, ANALYTICS_EVENTS.lessonStarted))
-      .groupBy(s.lessons.position)
-      .orderBy(asc(s.lessons.position))
+      .groupBy(s.liveLessons.position)
+      .orderBy(asc(s.liveLessons.position))
     const events = await db
       .select({ name: s.analyticsEvents.name, count: sql<number>`count(*)::int` })
       .from(s.analyticsEvents)

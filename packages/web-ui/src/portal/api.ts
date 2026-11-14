@@ -42,12 +42,18 @@ export async function unwrap<
   return (await res.json()) as Exclude<JsonOf<R>, ErrorEnvelope>
 }
 
+/**
+ * What to tell the reader about a failed request: the server's own message when it sent one,
+ * else one of two sentences worded here. A translated page uses `useErrorMessage()` from
+ * `@elevate/web-ui/preferences`, which passes those two sentences in the chosen language.
+ */
 export function errorMessage(
   error: unknown,
   fallback = 'Something went wrong. Try again.',
+  unreachable = 'Cannot reach the Elevate API. Is it running?',
 ): string {
   if (error instanceof ApiError) return error.message
-  if (error instanceof TypeError) return 'Cannot reach the Elevate API. Is it running?'
+  if (error instanceof TypeError) return unreachable
   return fallback
 }
 

@@ -19,10 +19,14 @@ import { BookOpen, Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { courseKeys, createCourse, useCourses } from '../../lib/courses'
+import { useCurrentProfile } from '../../lib/profile'
 
 export function CoursesPage() {
   const courses = useCourses()
+  const { path, can } = useCurrentProfile()
   const [open, setOpen] = useState(false)
+  // Staff fix existing content; starting a course is the teacher's to do.
+  const canCreate = can('course.create')
   return (
     <>
       <PageHeader
@@ -30,9 +34,11 @@ export function CoursesPage() {
         title="Your courses"
         description="Drafts stay private. Submit a course for review when it is ready; approval is the only path to live."
         actions={
-          <Button icon={Plus} onClick={() => setOpen(true)}>
-            New course
-          </Button>
+          canCreate ? (
+            <Button icon={Plus} onClick={() => setOpen(true)}>
+              New course
+            </Button>
+          ) : undefined
         }
       />
       {courses.isPending ? (
@@ -53,15 +59,21 @@ export function CoursesPage() {
           title="No courses yet"
           body="Start with a title and a category. You can change both later."
           action={
-            <Button icon={Plus} onClick={() => setOpen(true)}>
-              Create your first course
-            </Button>
+            canCreate ? (
+              <Button icon={Plus} onClick={() => setOpen(true)}>
+                Create your first course
+              </Button>
+            ) : undefined
           }
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {courses.data.map((c) => (
-            <Link key={c.id} to={`/courses/${c.id}`} className="group focus-visible:outline-none">
+            <Link
+              key={c.id}
+              to={path(`/courses/${c.id}`)}
+              className="group focus-visible:outline-none"
+            >
               <Card
                 padded={false}
                 className="h-full overflow-hidden transition-colors group-hover:border-brand group-focus-visible:border-brand"
@@ -87,7 +99,10 @@ export function CoursesPage() {
                     {c.lessonCount} lesson{c.lessonCount === 1 ? '' : 's'} ·{' '}
                     {formatSgd(c.priceCents, { showFree: true })}
                   </p>
-                  <p className="text-caption text-ink-tertiary">{c.enrolCount} enrolled</p>
+                  <p className="flex flex-wrap items-center gap-2 text-caption text-ink-tertiary">
+                    {c.enrolCount} enrolled
+                    {c.pendingChanges ? <Badge tone="warning">Changes waiting</Badge> : null}
+                  </p>
                 </div>
               </Card>
             </Link>
@@ -108,6 +123,7 @@ function NewCourseDialog({
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { profileId, path } = useCurrentProfile()
   const { toast } = useToast()
   const [form, setForm] = useState<CreateCourse>({ title: '', category: 'craft-making' })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -118,10 +134,10 @@ function NewCourseDialog({
     setBusy(true)
     setErrors({})
     try {
-      const course = await createCourse(form)
-      await queryClient.invalidateQueries({ queryKey: courseKeys.list })
+      const course = await createCourse(profileId, form)
+      await queryClient.invalidateQueries({ queryKey: courseKeys.list(profileId) })
       onOpenChange(false)
-      navigate(`/courses/${course.id}`)
+      navigate(path(`/courses/${course.id}`))
     } catch (error) {
       setErrors(fieldErrors(error))
       toast({ tone: 'danger', title: 'Could not create course', description: errorMessage(error) })

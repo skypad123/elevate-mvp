@@ -1,0 +1,189 @@
+name: Deploy
+
+# Pushing to `staging` or `production` deploys that environment. The branch name is also the name
+# of the GitHub Environment that holds the settings (see infra/README.md): the variables come from
+# `terraform output github_environment_variables`, and `production` requires a reviewer's approval.
+on:
+  push:
+    branches: [staging, production]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # exchange the GitHub OIDC token for the environment's AWS deploy role
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  EXPO_NO_TELEMETRY: "1"
+  CI: "true"
+
+jobs:
+  api:
+    name: API (${{ github.ref_name }})
+    if: github.ref_name == 'staging' || github.ref_name == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ github.ref_name }}
+    env:
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      ECS_TASK_FAMILY: ${{ vars.ECS_TASK_FAMILY }}
+      ECS_CONTAINER: ${{ vars.ECS_CONTAINER }}
+      ECS_SUBNETS: ${{ vars.ECS_SUBNETS }}
+      ECS_SECURITY_GROUP: ${{ vars.ECS_SECURITY_GROUP }}
+      API_LOG_GROUP: ${{ vars.API_LOG_GROUP }}
+      API_URL: ${{ vars.API_URL }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Tags are immutable and named after the commit, so a commit promoted from staging to
+      # production reuses the image that staging already ran.
+      - name: Build and push the API image
+        id: image
+        env:
+          REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          if aws ecr describe-images --repository-name "$REPOSITORY" --image-ids imageTag="$GITHUB_SHA" >/dev/null 2>&1; then
+            echo "Image for $GITHUB_SHA already exists; reusing it."
+          else
+            docker build --file apps/api/Dockerfile --tag "$IMAGE" .
+            docker push "$IMAGE"
+          fi
+          echo "uri=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      # Terraform owns the task definition's configuration; a deploy copies the latest revision
+      # and swaps in the new image.
+      - name: Register the task definition
+        id: taskdef
+        env:
+          IMAGE: ${{ steps.image.outputs.uri }}
+        run: |
+          aws ecs describe-task-definition --task-definition "$ECS_TASK_FAMILY" --query taskDefinition > current.json
+          jq --arg image "$IMAGE" --arg name "$ECS_CONTAINER" '
+            {family, taskRoleArn, executionRoleArn, networkMode, containerDefinitions, volumes,
+             placementConstraints, requiresCompatibilities, cpu, memory, runtimePlatform}
+            | (.containerDefinitions[] | select(.name == $name) | .image) = $image
+          ' current.json > next.json
+          arn=$(aws ecs register-task-definition --cli-input-json file://next.json \
+            --query taskDefinition.taskDefinitionArn --output text)
+          echo "arn=$arn" >> "$GITHUB_OUTPUT"
+
+      - name: Run database migrations
+        env:
+          TASK_DEFINITION: ${{ steps.taskdef.outputs.arn }}
+        run: |
+          overrides=$(jq -cn --arg name "$ECS_CONTAINER" \
+            '{containerOverrides: [{name: $name, command: ["node", "dist/migrate.js"]}]}')
+          task=$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "$TASK_DEFINITION" \
+            --launch-type FARGATE \
+            --started-by "deploy-$GITHUB_SHA" \
+            --network-configuration "awsvpcConfiguration={subnets=[$ECS_SUBNETS],securityGroups=[$ECS_SECURITY_GROUP],assignPublicIp=ENABLED}" \
+            --overrides "$overrides" \
+            --query 'tasks[0].taskArn' --output text)
+          echo "Migration task: $task"
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$task"
+
+          aws logs get-log-events --log-group-name "$API_LOG_GROUP" \
+            --log-stream-name "api/$ECS_CONTAINER/${task##*/}" \
+            --query 'events[].message' --output text || true
+
+          code=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          if [ "$code" != "0" ]; then
+            aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task" \
+              --query 'tasks[0].{stopped:stoppedReason,container:containers[0].reason}'
+            echo "::error::Migrations failed (exit code $code); the running API was left untouched."
+            exit 1
+          fi
+
+      - name: Roll the service
+        env:
+          TASK_DEFINITION: ${{ steps.taskdef.outputs.arn }}
+        run: |
+          aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" \
+            --task-definition "$TASK_DEFINITION" --query 'service.deployments[0].id' --output text
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+
+          # The circuit breaker rolls a failed deployment back, which also ends as "stable".
+          running=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].taskDefinition' --output text)
+          if [ "$running" != "$TASK_DEFINITION" ]; then
+            echo "::error::The new version failed to start and ECS rolled back to $running."
+            exit 1
+          fi
+
+      - name: Health check
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 5 "$API_URL/api/health"
+
+  web:
+    name: Web (${{ github.ref_name }})
+    needs: api
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # The API and learner URLs are compiled into the bundles.
+      - name: Build Teach, Support and learner web
+        env:
+          VITE_API_URL: ${{ vars.API_URL }}
+          VITE_LEARNER_URL: ${{ vars.LEARNER_URL }}
+          EXPO_PUBLIC_API_URL: ${{ vars.API_URL }}
+          EXPO_PUBLIC_WEB_URL: ${{ vars.LEARNER_URL }}
+        run: |
+          npx turbo run build --filter=@elevate/teach --filter=@elevate/support
+          npx turbo run build:web --filter=@elevate/learner
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Publish
+        env:
+          LEARNER_BUCKET: ${{ vars.LEARNER_BUCKET }}
+          TEACH_BUCKET: ${{ vars.TEACH_BUCKET }}
+          SUPPORT_BUCKET: ${{ vars.SUPPORT_BUCKET }}
+          LEARNER_CLOUDFRONT_ID: ${{ vars.LEARNER_CLOUDFRONT_ID }}
+          TEACH_CLOUDFRONT_ID: ${{ vars.TEACH_CLOUDFRONT_ID }}
+          SUPPORT_CLOUDFRONT_ID: ${{ vars.SUPPORT_CLOUDFRONT_ID }}
+        run: |
+          publish() {
+            local dir=$1 bucket=$2 distribution=$3
+            test -f "$dir/index.html"
+            # Fingerprinted files never change: cache them for a year. Older ones are kept so a
+            # browser still holding the previous index.html can finish loading.
+            aws s3 sync "$dir" "s3://$bucket" --exclude '*' --include 'assets/*' --include '_expo/*' \
+              --cache-control 'public,max-age=31536000,immutable'
+            aws s3 sync "$dir" "s3://$bucket" --delete --exclude 'assets/*' --exclude '_expo/*' \
+              --exclude index.html --cache-control 'public,max-age=300'
+            aws s3 cp "$dir/index.html" "s3://$bucket/index.html" --cache-control 'no-cache'
+            aws cloudfront create-invalidation --distribution-id "$distribution" --paths '/*' \
+              --query 'Invalidation.Id' --output text
+          }
+          publish apps/teach/dist "$TEACH_BUCKET" "$TEACH_CLOUDFRONT_ID"
+          publish apps/support/dist "$SUPPORT_BUCKET" "$SUPPORT_CLOUDFRONT_ID"
+          publish apps/learner/dist "$LEARNER_BUCKET" "$LEARNER_CLOUDFRONT_ID"

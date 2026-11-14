@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Pressable, TextInput, View } from 'react-native'
+import { Pressable, TextInput, type TextInputInstance, View } from 'react-native'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Text } from './Text'
 
@@ -14,7 +14,7 @@ export type CodeInputProps = {
 /** Six boxes backed by one hidden input, so paste and autofill work on every platform. */
 export function CodeInput({ length = 6, value, onChange, onComplete, error }: CodeInputProps) {
   const theme = useTheme()
-  const ref = useRef<TextInput>(null)
+  const ref = useRef<TextInputInstance>(null)
   const [focused, setFocused] = useState(false)
   const slots = Array.from({ length }, (_, i) => ({
     id: `slot-${i}`,

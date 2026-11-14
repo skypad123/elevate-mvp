@@ -1,12 +1,19 @@
 import { randomUUID } from 'node:crypto'
-import type { CreateUpload, MediaAssetView, PlaybackInfo, UploadInstructions } from '@elevate/core'
+import {
+  type CreateUpload,
+  can,
+  type MediaAssetView,
+  type PlaybackInfo,
+  type UploadInstructions,
+} from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { eq, or } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
 import { hasRole, type SessionUser } from '../middleware/auth'
 import { extensionFor, isPublicKey } from '../providers/storage'
 import { patchForVideoEvent, type VideoWebhookEvent, videoEventRef } from '../providers/video'
+import { loadActor } from './auth.service'
 
 type MediaAssetRow = typeof s.mediaAssets.$inferSelect
 
@@ -24,8 +31,19 @@ export class MediaService {
       : `${input.kind}/${user.id}/${id}.${ext}`
   }
 
+  /**
+   * With `profileId` the file becomes that profile's course media, which everyone on the profile
+   * can then use; the caller needs `media.upload` there. Without it the file is the caller's own
+   * (an avatar, a teaching sample).
+   */
   async createUpload(user: SessionUser, input: CreateUpload): Promise<UploadInstructions> {
     const { db, storage, video, env } = this.deps
+    const profileId = input.profileId ?? null
+    if (profileId) {
+      const actor = await loadActor(this.deps, user, profileId)
+      if (!actor) throw errors.notFound('Profile')
+      if (!can(actor, 'media.upload')) throw errors.forbidden()
+    }
     const id = randomUUID()
     const storageKey = this.keyFor(user, id, input)
 
@@ -42,7 +60,8 @@ export class MediaService {
         .insert(s.mediaAssets)
         .values({
           id,
-          ownerId: user.id,
+          uploaderId: user.id,
+          profileId,
           kind: 'video',
           provider,
           status: 'pending',
@@ -61,7 +80,8 @@ export class MediaService {
       .insert(s.mediaAssets)
       .values({
         id,
-        ownerId: user.id,
+        uploaderId: user.id,
+        profileId,
         kind: input.kind,
         provider: storage.driver === 's3' ? 's3' : 'local',
         status: 'pending',
@@ -87,7 +107,7 @@ export class MediaService {
     body: ReadableStream<Uint8Array>,
   ): Promise<MediaAssetView> {
     const { db, storage } = this.deps
-    const asset = await db.query.mediaAssets.findFirst({ where: eq(s.mediaAssets.id, assetId) })
+    const asset = await db.query.mediaAssets.findFirst({ where: { id: assetId } })
     if (!asset?.storageKey) throw errors.notFound('Upload')
     if (asset.status === 'ready')
       throw errors.conflict('already_uploaded', 'This file was already uploaded')
@@ -119,7 +139,7 @@ export class MediaService {
     return this.toView(updated)
   }
 
-  /** Owner or staff view; for processing video assets, polls the provider as a webhook fallback. */
+  /** For whoever may use the asset; for processing video assets, polls the provider as a webhook fallback. */
   async getAsset(user: SessionUser, assetId: string): Promise<MediaAssetView> {
     let asset = await this.getOwnedAsset(user, assetId)
     if (
@@ -140,7 +160,7 @@ export class MediaService {
     return this.toView(asset)
   }
 
-  /** Signed playback for the owner or staff. Learner playback is authorised through enrollments. */
+  /** Signed playback for whoever may use the asset. Learner playback is authorised through enrollments. */
   async playback(user: SessionUser, assetId: string): Promise<PlaybackInfo> {
     const asset = await this.getOwnedAsset(user, assetId)
     return this.playbackFor(asset)
@@ -172,15 +192,14 @@ export class MediaService {
   async applyVideoEvent(event: VideoWebhookEvent): Promise<'applied' | 'ignored' | 'unmatched'> {
     const { db } = this.deps
     const ref = videoEventRef(event)
-    const conditions = []
-    if (ref.passthrough && UUID.test(ref.passthrough))
-      conditions.push(eq(s.mediaAssets.id, ref.passthrough))
-    if (ref.uploadId) conditions.push(eq(s.mediaAssets.providerUploadId, ref.uploadId))
-    if (ref.assetId) conditions.push(eq(s.mediaAssets.providerAssetId, ref.assetId))
+    const conditions: Array<
+      { id: string } | { providerUploadId: string } | { providerAssetId: string }
+    > = []
+    if (ref.passthrough && UUID.test(ref.passthrough)) conditions.push({ id: ref.passthrough })
+    if (ref.uploadId) conditions.push({ providerUploadId: ref.uploadId })
+    if (ref.assetId) conditions.push({ providerAssetId: ref.assetId })
     if (conditions.length === 0) return 'unmatched'
-    const asset = await db.query.mediaAssets.findFirst({
-      where: conditions.length === 1 ? conditions[0] : or(...conditions),
-    })
+    const asset = await db.query.mediaAssets.findFirst({ where: { OR: conditions } })
     if (!asset) return 'unmatched'
     const patch = patchForVideoEvent(event, asset)
     if (!patch) return 'ignored'
@@ -188,13 +207,58 @@ export class MediaService {
     return 'applied'
   }
 
-  /** Owner, or staff (support agents review teaching samples and course media). */
+  /**
+   * An asset the user may read. A profile's course media belongs to the profile: everyone on the
+   * profile may read it, and someone who has left it may not, even if they uploaded the file. An
+   * asset with no profile (an avatar, a teaching sample) belongs to whoever uploaded it. Staff
+   * may read any asset, because support agents review teaching samples and course media.
+   *
+   * A company's registry document is the exception among uploads with no profile: once it is on
+   * an application, its uploader can read it only while that application is waiting for review.
+   * After the decision it is for Support alone. It can name the company's officers, and the
+   * person who uploaded it may no longer be the profile's owner.
+   */
   async getOwnedAsset(user: SessionUser, assetId: string): Promise<MediaAssetRow> {
+    const { db } = this.deps
+    const asset = await db.query.mediaAssets.findFirst({ where: { id: assetId } })
+    if (!asset) throw errors.notFound('Asset')
+    if (hasRole(user, 'support_agent')) return asset
+    let allowed: boolean
+    if (asset.profileId !== null) {
+      allowed = (await loadActor(this.deps, user, asset.profileId)) !== null
+    } else {
+      allowed = asset.uploaderId === user.id
+      if (allowed && asset.kind === 'document') {
+        const entity = await db.query.legalEntities.findFirst({
+          where: { registryDocumentMediaId: asset.id },
+          columns: { id: true },
+          with: { profile: { columns: { status: true } } },
+        })
+        if (entity) allowed = entity.profile?.status === 'applied'
+      }
+    }
+    if (!allowed) throw errors.forbidden()
+    return asset
+  }
+
+  /**
+   * An asset to put on a profile's course: it must be that profile's own. Another profile's
+   * asset is reported as not found, even to someone who belongs to both profiles, so one
+   * profile's media cannot be attached to another profile's course.
+   */
+  async getProfileAsset(
+    profileId: string,
+    assetId: string,
+    options: { ready?: boolean; kind?: MediaAssetRow['kind'] } = {},
+  ): Promise<MediaAssetRow> {
     const asset = await this.deps.db.query.mediaAssets.findFirst({
-      where: eq(s.mediaAssets.id, assetId),
+      where: { id: assetId, profileId },
     })
     if (!asset) throw errors.notFound('Asset')
-    if (asset.ownerId !== user.id && !hasRole(user, 'support_agent')) throw errors.forbidden()
+    if (options.ready && asset.status !== 'ready')
+      throw errors.conflict('asset_not_ready', 'That file has not finished uploading')
+    if (options.kind && asset.kind !== options.kind)
+      throw errors.badRequest('wrong_kind', `Expected a ${options.kind}`)
     return asset
   }
 

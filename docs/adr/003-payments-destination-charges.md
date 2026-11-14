@@ -27,3 +27,10 @@
 - `account.updated` events arrive on the Connect scope; local dev needs
   `stripe listen --forward-to … --forward-connect-to …`.
 - Test mode never sends Stripe receipts, so the API sends its own confirmation email.
+
+## Update · 2026-11-12
+
+Teachers became teaching profiles ([ADR 006](006-teacher-profiles.md)). The destination of a
+charge is now the Stripe account of the profile's payout account, and the commission rate is the
+profile's. The fee math is unchanged. How the payee is chosen, recorded and activated is in
+[ADR 007](007-payout-accounts.md).

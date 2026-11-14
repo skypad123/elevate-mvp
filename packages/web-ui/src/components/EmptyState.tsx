@@ -29,7 +29,7 @@ export function EmptyState({
     >
       {Icon ? (
         <Icon
-          className={cn('size-7', tone === 'danger' ? 'text-danger' : 'text-brand')}
+          className={cn('size-7', tone === 'danger' ? 'text-danger' : 'text-brand-fg')}
           strokeWidth={1.8}
         />
       ) : null}

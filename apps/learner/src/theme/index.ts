@@ -38,9 +38,12 @@ function fontFamilyFor(family: 'display' | 'text' | 'mono', weight: number): str
   return fontFaces.text.regular
 }
 
+/** RN 0.87+ types style props as readonly; use this when building a style up field by field. */
+export type MutableTextStyle = { -readonly [K in keyof TextStyle]: TextStyle[K] }
+
 function buildTextStyles(colors: ThemeColors): Record<TypeScaleKey, TextStyle> {
   const entries = Object.entries(typeScale).map(([key, style]) => {
-    const text: TextStyle = {
+    const text: MutableTextStyle = {
       fontFamily: fontFamilyFor(style.family, style.weight),
       fontSize: style.size,
       lineHeight: style.lineHeight,

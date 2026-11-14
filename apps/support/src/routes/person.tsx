@@ -7,25 +7,23 @@ import {
   DescriptionList,
   Dialog,
   EmptyState,
-  formatBps,
   formatDate,
-  Input,
-  MediaPreview,
   PageHeader,
   Skeleton,
   StatCard,
   statusLabel,
   statusTone,
-  Textarea,
   useToast,
 } from '@elevate/web-ui'
 import { errorMessage, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, ExternalLink, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../lib/api'
 import { supportKeys, usePerson } from '../lib/queries'
+
+const ROLE_ON_PROFILE = { owner: 'Owner', manager: 'Manager', writer: 'Writer' } as const
 
 export function Person() {
   const { id = '' } = useParams()
@@ -42,76 +40,39 @@ export function Person() {
   return <PersonView person={query.data} />
 }
 
+/**
+ * Someone with an account. Teaching is not on this page: a person owns or belongs to teaching
+ * profiles, and each profile has its own page with its application, courses and payouts.
+ */
 function PersonView({ person }: { person: PersonDetail }) {
   const { hasRole, user: me } = usePortalAuth()
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const [dialog, setDialog] = useState<'approve' | 'reject' | null>(null)
-  const [note, setNote] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [commission, setCommission] = useState(
-    person.teacherProfile ? (person.teacherProfile.commissionBps / 100).toString() : '15',
-  )
-  const teacher = person.teacherProfile
+  // Each row waits on its own; a change of staff access is confirmed first.
+  const [busy, setBusy] = useState<StaffRole | null>(null)
+  const [confirming, setConfirming] = useState<{ role: StaffRole; grant: boolean } | null>(null)
   const isSuperAdmin = hasRole('super_admin')
 
-  async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: supportKeys.person(person.id) })
-    await queryClient.invalidateQueries({ queryKey: ['support', 'people'] })
-  }
-
-  async function act(label: string, fn: () => Promise<unknown>) {
-    setBusy(true)
+  async function toggleRole(role: StaffRole, grant: boolean) {
+    const label = grant ? 'Role granted' : 'Role revoked'
+    setBusy(role)
     try {
-      await fn()
-      await refresh()
-      toast({ tone: 'success', title: label })
-      setDialog(null)
-      setNote('')
-    } catch (error) {
-      toast({ tone: 'danger', title: `${label} failed`, description: errorMessage(error) })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const approve = () =>
-    act('Teacher approved', async () =>
-      unwrap(
-        await api.support.teachers[':id'].approve.$post({
-          param: { id: person.id },
-          json: note.trim() ? { note: note.trim() } : {},
-        }),
-      ),
-    )
-  const reject = () =>
-    act('Application rejected', async () =>
-      unwrap(
-        await api.support.teachers[':id'].reject.$post({
-          param: { id: person.id },
-          json: { reason: note.trim() },
-        }),
-      ),
-    )
-  const saveCommission = () =>
-    act('Commission updated', async () => {
-      const bps = Math.round(Number.parseFloat(commission) * 100)
-      return unwrap(
-        await api.support.teachers[':id'].commission.$patch({
-          param: { id: person.id },
-          json: { commissionBps: bps },
-        }),
-      )
-    })
-  const toggleRole = (role: 'support_agent' | 'super_admin', grant: boolean) =>
-    act(grant ? 'Role granted' : 'Role revoked', async () =>
-      unwrap(
+      await unwrap(
         await api.support.people[':id'].roles.$post({
           param: { id: person.id },
           json: { role, grant },
         }),
-      ),
-    )
+      )
+      await queryClient.invalidateQueries({ queryKey: supportKeys.person(person.id) })
+      await queryClient.invalidateQueries({ queryKey: ['support', 'people'] })
+      toast({ tone: 'success', title: label })
+      setConfirming(null)
+    } catch (error) {
+      toast({ tone: 'danger', title: `${label} failed`, description: errorMessage(error) })
+    } finally {
+      setBusy(null)
+    }
+  }
 
   return (
     <>
@@ -122,143 +83,75 @@ function PersonView({ person }: { person: PersonDetail }) {
         <ArrowLeft className="size-4" /> People
       </Link>
       <PageHeader
-        eyebrow={teacher ? 'Teacher' : 'Learner'}
-        title={teacher?.displayName ?? person.name ?? person.email}
+        eyebrow={person.roles.length > 0 ? 'Staff' : 'Person'}
+        title={person.name ?? person.email}
         description={
           <span className="flex flex-wrap items-center gap-2">
             <span>{person.email}</span>
             {person.roles.map((r) => (
-              <Badge key={r} tone={r === 'teacher' ? 'accent' : 'info'}>
+              <Badge key={r} tone="info">
                 {statusLabel(r)}
               </Badge>
             ))}
-            {teacher ? (
-              <Badge tone={statusTone[teacher.status]}>{statusLabel(teacher.status)}</Badge>
-            ) : null}
           </span>
-        }
-        actions={
-          teacher && teacher.status !== 'approved' ? (
-            <>
-              <Button variant="secondary" icon={X} onClick={() => setDialog('reject')}>
-                Reject
-              </Button>
-              <Button icon={Check} onClick={() => setDialog('approve')}>
-                Approve
-              </Button>
-            </>
-          ) : null
         }
       />
 
       <div className="grid gap-6 md:grid-cols-3">
         <StatCard label="Active enrolments" value={person.stats.enrollments} />
-        <StatCard
-          label="Courses"
-          value={person.stats.courses}
-          hint={`${person.stats.liveCourses} live`}
-        />
+        <StatCard label="Teaching profiles" value={person.profiles.length} />
         <StatCard label="Joined" value={formatDate(person.createdAt)} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
-          {teacher ? (
-            <>
-              <Card as="section">
-                <CardHeader
-                  title="Application"
-                  description={`Applied ${formatDate(teacher.appliedAt)}${teacher.reviewedAt ? ` · reviewed ${formatDate(teacher.reviewedAt)}` : ''}`}
-                />
-                <DescriptionList
-                  items={[
-                    { label: 'Headline', value: teacher.headline },
-                    { label: 'Bio', value: <p className="whitespace-pre-wrap">{teacher.bio}</p> },
-                    {
-                      label: 'Credentials',
-                      value: <p className="whitespace-pre-wrap">{teacher.credentials}</p>,
-                    },
-                    ...(teacher.reviewNote
-                      ? [{ label: 'Review note', value: teacher.reviewNote }]
-                      : []),
-                  ]}
-                />
-              </Card>
-              <Card as="section">
-                <CardHeader title="Teaching sample" />
-                {teacher.teachingSampleMediaId ? (
-                  <MediaPreview api={api} assetId={teacher.teachingSampleMediaId} />
-                ) : null}
-                {teacher.teachingSampleUrl ? (
-                  <a
-                    href={teacher.teachingSampleUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 inline-flex items-center gap-2 text-small font-semibold text-brand hover:underline"
-                  >
-                    {teacher.teachingSampleUrl} <ExternalLink className="size-3.5" />
-                  </a>
-                ) : null}
-                {!teacher.teachingSampleMediaId && !teacher.teachingSampleUrl ? (
-                  <p className="text-small text-ink-tertiary">No sample provided.</p>
-                ) : null}
-              </Card>
-            </>
-          ) : (
-            <Card as="section">
-              <CardHeader title="Profile" />
-              <DescriptionList
-                items={[
-                  { label: 'Name', value: person.name ?? '—' },
-                  { label: 'Email', value: person.email },
-                ]}
-              />
-            </Card>
-          )}
+          <Card as="section">
+            <CardHeader
+              title="Teaching profiles"
+              description="The profiles this person owns or belongs to. Applications, courses and payouts are on the profile."
+            />
+            {person.profiles.length === 0 ? (
+              <p className="text-small text-ink-tertiary">
+                This person is not part of any teaching profile.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {person.profiles.map((profile) => (
+                  <li key={profile.id}>
+                    <Link
+                      to={`/profiles/${profile.id}`}
+                      className="flex items-center justify-between gap-3 py-3 hover:text-brand-fg"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold">{profile.displayName}</span>
+                        <span className="text-caption text-ink-tertiary">
+                          {profile.type === 'corporate' ? 'Corporate' : 'Personal'} ·{' '}
+                          {ROLE_ON_PROFILE[profile.role]}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <Badge tone={statusTone[profile.status]}>
+                          {statusLabel(profile.status)}
+                        </Badge>
+                        <ArrowRight className="size-4 text-ink-tertiary" />
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+          <Card as="section">
+            <CardHeader title="Account" />
+            <DescriptionList
+              items={[
+                { label: 'Name', value: person.name ?? '—' },
+                { label: 'Email', value: person.email },
+              ]}
+            />
+          </Card>
         </div>
         <div className="space-y-6">
-          {teacher ? (
-            <Card as="section">
-              <CardHeader
-                title="Commission"
-                description="Platform share of each sale after Stripe fees."
-              />
-              <DescriptionList
-                items={[
-                  { label: 'Current', value: formatBps(teacher.commissionBps) },
-                  {
-                    label: 'Stripe',
-                    value: teacher.stripe.chargesEnabled
-                      ? 'Payments enabled'
-                      : teacher.stripe.connected
-                        ? 'Onboarding incomplete'
-                        : 'Not connected',
-                  },
-                ]}
-              />
-              {isSuperAdmin ? (
-                <div className="mt-4 flex items-end gap-2">
-                  <Input
-                    label="New rate (%)"
-                    type="number"
-                    min={0}
-                    max={50}
-                    step={0.5}
-                    value={commission}
-                    onChange={(e) => setCommission(e.target.value)}
-                    wrapperClassName="w-32"
-                  />
-                  <Button variant="secondary" loading={busy} onClick={saveCommission}>
-                    Save
-                  </Button>
-                </div>
-              ) : (
-                <p className="mt-3 text-caption text-ink-tertiary">
-                  Only super admins can change commission.
-                </p>
-              )}
-            </Card>
-          ) : null}
           {isSuperAdmin && person.id !== me?.id ? (
             <Card as="section">
               <CardHeader title="Staff access" />
@@ -270,12 +163,19 @@ function PersonView({ person }: { person: PersonDetail }) {
                       key={role}
                       className="flex items-center justify-between rounded-control border border-border px-3 py-2"
                     >
-                      <span className="text-small font-semibold text-ink">{statusLabel(role)}</span>
+                      <span>
+                        <span className="block text-small font-semibold text-ink">
+                          {statusLabel(role)}
+                        </span>
+                        <span className="block text-caption text-ink-tertiary">
+                          {has ? 'Has this role' : 'Does not have this role'}
+                        </span>
+                      </span>
                       <Button
-                        variant={has ? 'ghost' : 'secondary'}
+                        variant={has ? 'danger' : 'secondary'}
                         size="sm"
-                        loading={busy}
-                        onClick={() => toggleRole(role, !has)}
+                        loading={busy === role}
+                        onClick={() => setConfirming({ role, grant: !has })}
                       >
                         {has ? 'Revoke' : 'Grant'}
                       </Button>
@@ -287,59 +187,49 @@ function PersonView({ person }: { person: PersonDetail }) {
           ) : null}
         </div>
       </div>
-
       <Dialog
-        open={dialog === 'approve'}
-        onOpenChange={(o) => !o && setDialog(null)}
-        title="Approve this teacher?"
-        description="They gain the teacher role immediately and can connect Stripe and build courses."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setDialog(null)}>
-              Cancel
-            </Button>
-            <Button loading={busy} onClick={approve}>
-              Approve
-            </Button>
-          </>
+        open={!!confirming}
+        onOpenChange={(open) => !open && setConfirming(null)}
+        title={
+          confirming
+            ? `${confirming.grant ? 'Grant' : 'Revoke'} ${statusLabel(confirming.role).toLowerCase()} for ${person.name ?? person.email}?`
+            : ''
         }
-      >
-        <Textarea
-          label="Internal note (optional)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={3}
-        />
-      </Dialog>
-      <Dialog
-        open={dialog === 'reject'}
-        onOpenChange={(o) => !o && setDialog(null)}
-        title="Reject this application"
-        description="The reason is emailed to the applicant. They can update and resubmit."
+        description={
+          confirming ? ROLE_EFFECT[confirming.role][confirming.grant ? 'grant' : 'revoke'] : ''
+        }
         footer={
           <>
-            <Button variant="ghost" onClick={() => setDialog(null)}>
+            <Button variant="ghost" onClick={() => setConfirming(null)}>
               Cancel
             </Button>
             <Button
-              variant="danger"
-              loading={busy}
-              disabled={note.trim().length < 10}
-              onClick={reject}
+              variant={confirming?.grant ? 'primary' : 'danger'}
+              loading={!!confirming && busy === confirming.role}
+              onClick={() => confirming && void toggleRole(confirming.role, confirming.grant)}
             >
-              Reject
+              {confirming?.grant ? 'Grant' : 'Revoke'}
             </Button>
           </>
         }
-      >
-        <Textarea
-          label="Reason (sent to the applicant)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={4}
-          required
-        />
-      </Dialog>
+      />
     </>
   )
+}
+
+type StaffRole = 'support_agent' | 'super_admin'
+
+/** What each staff role gives, said before it is granted or taken away. The change is audited. */
+const ROLE_EFFECT: Record<StaffRole, { grant: string; revoke: string }> = {
+  support_agent: {
+    grant:
+      'They can sign in to Support: review courses and profile applications, look up people and transactions, and record legal-name checks. The change is recorded in the audit log.',
+    revoke: 'They lose access to Support at once. The change is recorded in the audit log.',
+  },
+  super_admin: {
+    grant:
+      'On top of Support access, they can change commission, issue refunds, grant and revoke staff roles, recover profile owners and act inside any teaching profile. The change is recorded in the audit log.',
+    revoke:
+      'They keep any Support access they have, but lose the super-admin powers. The change is recorded in the audit log.',
+  },
 }

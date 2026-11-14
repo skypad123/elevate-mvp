@@ -25,7 +25,8 @@ export type SubmissionCourse = {
   hasDescription: boolean
   lessons: SubmissionLesson[]
   prerequisites: PrerequisiteEdge[]
-  teacherStripeChargesEnabled: boolean
+  /** The course's profile has an active payout account that can take charges. */
+  payable: boolean
 }
 
 export type SubmissionProblem = {
@@ -115,7 +116,7 @@ export function validateCourseForSubmission(course: SubmissionCourse): Submissio
   )
   if (!dag.ok) problems.push({ code: 'prerequisites', message: dag.message })
 
-  if (!course.teacherStripeChargesEnabled)
+  if (!course.payable)
     problems.push({
       code: 'stripe',
       message: 'Connect your Stripe account before submitting so learners can pay you.',

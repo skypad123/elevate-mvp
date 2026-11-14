@@ -32,7 +32,7 @@ export function Avatar({
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center rounded-pill bg-brand-tint font-semibold text-brand',
+        'inline-flex items-center justify-center rounded-pill bg-brand-tint font-semibold text-brand-fg',
         dim,
         className,
       )}

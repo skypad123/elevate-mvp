@@ -11,7 +11,7 @@ The product spec is in [`docs/spec.md`](docs/spec.md); architecture decisions ar
 ## Repository
 
 ```
-apps/learner    Elevate — Expo SDK 57 (expo-router) · web + iOS + Android
+apps/learner    Elevate — Expo SDK 58 (expo-router) · web + iOS + Android
 apps/teach      Elevate Teach — Vite + React 19 + React Router 7 + Tailwind v4
 apps/support    Elevate Support — Vite + React 19 (review queue · people · transactions)
 apps/api        Hono API — Drizzle ORM · Postgres · Stripe Connect · Mux · certificates
@@ -42,6 +42,17 @@ npm run dev
 Everything runs locally without third-party accounts (`VIDEO_DRIVER=local`, `STORAGE_DRIVER=local`,
 Mailpit for email). Stripe test keys are needed for the real money loop — see
 [`docs/runbooks/`](docs/runbooks/).
+
+## Environments
+
+| Environment | Branch       | Where                                  |
+| ----------- | ------------ | -------------------------------------- |
+| dev         | `main`, `v0` | local, as in Quick start               |
+| staging     | `staging`    | AWS; every push deploys                |
+| production  | `production` | AWS; every push deploys after approval |
+
+The AWS environments are defined in Terraform. [`infra/README.md`](infra/README.md) covers setup
+and day-to-day use.
 
 ## Scripts
 

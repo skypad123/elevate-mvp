@@ -1,5 +1,4 @@
 import { schema as s } from '@elevate/db'
-import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -19,40 +18,57 @@ const stripePost = (event: unknown, signature = 'fake-valid') =>
   })
 
 describe('stripe webhooks', () => {
-  it('updates teacher Stripe flags on account.updated, dedupes, and ignores unknown types', async () => {
-    const user = await t.grantRole('connect-teacher@example.com', 'teacher')
+  it('updates the payout account on account.updated, dedupes, and ignores unknown types', async () => {
+    const { profile } = await t.createProfile('connect-teacher@example.com', { displayName: 'T' })
+    const [account] = await t.db
+      .insert(s.payoutAccounts)
+      .values({ profileId: profile.id, businessType: 'individual' })
+      .returning()
     const { accountId } = await t.payments.createConnectedAccount({
-      email: user.email,
-      userId: user.id,
+      businessType: 'individual',
+      profileId: profile.id,
+      payoutAccountId: account?.id as string,
+      email: 'connect-teacher@example.com',
       displayName: 'T',
     })
-    await t.db
-      .insert(s.teacherProfiles)
-      .values({ userId: user.id, displayName: 'T', status: 'approved', stripeAccountId: accountId })
+    await t.db.update(s.payoutAccounts).set({ stripeAccountId: accountId })
 
     const event = t.payments.enableAccount(accountId)
     const first = await stripePost(event)
     expect(first.status).toBe(200)
     expect(await first.json()).toMatchObject({ received: true, outcome: 'applied' })
-    const profile = await t.db.query.teacherProfiles.findFirst({
-      where: eq(s.teacherProfiles.userId, user.id),
+    const updated = await t.db.query.payoutAccounts.findFirst({ where: { profileId: profile.id } })
+    expect(updated).toMatchObject({
+      chargesEnabled: true,
+      payoutsEnabled: true,
+      detailsSubmitted: true,
+      // an individual account becomes active the first time charges are enabled
+      status: 'active',
     })
-    expect(profile?.stripeChargesEnabled).toBe(true)
-    expect(profile?.stripePayoutsEnabled).toBe(true)
-    expect(profile?.stripeDetailsSubmitted).toBe(true)
+    expect(updated?.activatedAt).toBeInstanceOf(Date)
 
     const replay = await stripePost(event)
     expect(await replay.json()).toMatchObject({ duplicate: true })
 
     const unknown = await stripePost({ id: 'evt_x', type: 'payout.paid', data: { object: {} } })
     expect(await unknown.json()).toMatchObject({ outcome: 'ignored' })
+  })
 
-    const orphan = await stripePost({
+  it('stores an error for an account.updated about an account it does not know', async () => {
+    const orphan = {
       id: 'evt_y',
       type: 'account.updated',
       data: { object: { id: 'acct_nobody', charges_enabled: true } },
-    })
-    expect(await orphan.json()).toMatchObject({ outcome: 'unmatched' })
+    }
+    const res = await stripePost(orphan)
+    expect(res.status).toBe(500)
+    const [stored] = await t.db.query.webhookEvents.findMany({ where: { eventId: 'evt_y' } })
+    expect(stored?.error).toContain('unknown_account')
+    expect(stored?.error).toContain('acct_nobody')
+    // Stripe retries a failed delivery; the retry is acknowledged as a duplicate
+    const retry = await stripePost(orphan)
+    expect(retry.status).toBe(200)
+    expect(await retry.json()).toMatchObject({ duplicate: true })
   })
 
   it('rejects bad signatures', async () => {
@@ -62,7 +78,7 @@ describe('stripe webhooks', () => {
     )
     expect(res.status).toBe(400)
     const ledger = await t.db.query.webhookEvents.findMany({
-      where: eq(s.webhookEvents.eventId, 'evt_bad'),
+      where: { eventId: 'evt_bad' },
     })
     expect(ledger).toHaveLength(0)
   })

@@ -1,6 +1,5 @@
 import { schema as s } from '@elevate/db'
 import { seedDatabase } from '@elevate/db/seed'
-import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -25,11 +24,11 @@ const progress = (artefactId: string, body: unknown) =>
 
 beforeAll(async () => {
   t = await createTestApp()
-  await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', storageDir: null })
+  await seedDatabase(t.db, { superAdminEmail: 'admin@test.local', mode: 'demo', storage: null })
   const signed = await t.signIn('student@example.com')
   learner = signed.token as string
   const course = await t.db.query.courses.findFirst({
-    where: eq(s.courses.slug, 'sourdough-from-scratch'),
+    where: { slug: 'sourdough-from-scratch' },
   })
   const [enrollment] = await t.db
     .insert(s.enrollments)
@@ -123,7 +122,7 @@ describe('lesson player', () => {
 
     const questions: Array<{ id: string; options: Array<{ id: string }> }> =
       start.body.quiz.questions
-    const quizRow = await t.db.query.quizzes.findFirst({ where: eq(s.quizzes.id, quizId) })
+    const quizRow = await t.db.query.quizzes.findFirst({ where: { id: quizId } })
     const key = new Map(
       quizRow?.questionsJson.map((q) => [q.id, q.options.find((o) => o.correct)?.id]),
     )
@@ -193,7 +192,7 @@ describe('lesson player', () => {
           { token: learner },
         )
         const quizRow = await t.db.query.quizzes.findFirst({
-          where: eq(s.quizzes.id, quizArtefact.quizId),
+          where: { id: quizArtefact.quizId },
         })
         const right = Object.fromEntries(
           (quizRow?.questionsJson ?? []).map((q) => [q.id, q.options.find((o) => o.correct)?.id]),

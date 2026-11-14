@@ -20,8 +20,9 @@ export const colorScales = {
     brandHover: '#0B5742',
     brandTint: '#E1F1EA',
     brandInk: '#FFFFFF',
-    accent: '#E8603C',
-    accentHover: '#D14F2D',
+    brandFg: '#0F6B52',
+    accent: '#B84024',
+    accentHover: '#A83A20',
     accentTint: '#FDE8E0',
     accentInk: '#FFFFFF',
     success: '#1F7A4D',
@@ -50,6 +51,7 @@ export const colorScales = {
     brandHover: '#63C49F',
     brandTint: '#17322A',
     brandInk: '#0E1A15',
+    brandFg: '#4CB58F',
     accent: '#FF7F5E',
     accentHover: '#FF9377',
     accentTint: '#3A1F18',
@@ -69,6 +71,101 @@ export const colorScales = {
 
 export type ColorScheme = keyof typeof colorScales
 export type ColorToken = keyof (typeof colorScales)['light']
+/** A full set of colour tokens (any hex/rgba strings, not the Atelier literals). */
+export type ColorScale = Record<ColorToken, string>
+
+/**
+ * Colour roles, for reference when adding tokens or palettes:
+ * - `brand` / `brandHover` / `brandInk`: filled controls (buttons, logo square) and the text on them.
+ * - `brandFg`: brand used as a foreground — text, icons, links on `surface`/`canvas`/`brandTint`.
+ *   Equal to `brand` in Atelier; split so a palette whose fill is too light for text (Support's
+ *   yellow) can still pass contrast. Use `text-brand-fg`, never `text-brand`, for text.
+ * - `focus`: focus rings; must reach 3:1 against `canvas`.
+ */
+
+export type PortalId = 'teach' | 'support'
+
+/**
+ * Per-portal palette overrides, layered on top of `colorScales` by the generated
+ * `dist/portal-<id>.css` files. The learner app imports `colorScales` directly and keeps Atelier.
+ * Only list the tokens that differ; both schemes should override the same keys.
+ */
+export const portalPalettes = {
+  /** Light blue. */
+  teach: {
+    light: {
+      canvas: '#F5F8FB',
+      surface: '#FFFFFF',
+      surfaceMuted: '#EAF1F8',
+      surfaceSunken: '#E1EAF3',
+      border: '#D6E1EB',
+      borderStrong: '#BBCDDC',
+      ink: '#141A20',
+      inkSecondary: '#4F5B66',
+      inkTertiary: '#7F8B96',
+      inkInverse: '#EEF4F9',
+      brand: '#1F6FB2',
+      brandHover: '#185B93',
+      brandTint: '#E3F0FB',
+      brandInk: '#FFFFFF',
+      brandFg: '#1F6FB2',
+      focus: '#1F6FB2',
+    },
+    dark: {
+      canvas: '#0E1419',
+      surface: '#151C23',
+      surfaceMuted: '#1B242D',
+      surfaceSunken: '#090D11',
+      border: '#273340',
+      borderStrong: '#354453',
+      ink: '#EEF4F9',
+      inkSecondary: '#AEBAC6',
+      inkTertiary: '#7C8894',
+      inkInverse: '#141A20',
+      brand: '#6DB3F2',
+      brandHover: '#8AC3F6',
+      brandTint: '#14304A',
+      brandInk: '#0B1A2B',
+      brandFg: '#8AC3F6',
+      focus: '#6DB3F2',
+    },
+  },
+  /** Yellow. The fill is true yellow with dark text on it; foreground brand is a dark amber. */
+  support: {
+    light: {
+      canvas: '#FDFBF3',
+      surface: '#FFFFFF',
+      surfaceMuted: '#F6F1DF',
+      surfaceSunken: '#F0EAD3',
+      border: '#E8E0C4',
+      borderStrong: '#D6CBA3',
+      brand: '#F5C400',
+      brandHover: '#E0B300',
+      brandTint: '#FFF4C2',
+      brandInk: '#1F1A00',
+      brandFg: '#8A6200',
+      focus: '#8A6200',
+      warning: '#B45309',
+      warningTint: '#FCEBDD',
+    },
+    dark: {
+      canvas: '#121210',
+      surface: '#1B1A16',
+      surfaceMuted: '#23211B',
+      surfaceSunken: '#0C0C0A',
+      border: '#302E26',
+      borderStrong: '#3F3C31',
+      brand: '#F6CB3C',
+      brandHover: '#F8D563',
+      brandTint: '#3A2E08',
+      brandInk: '#1F1A00',
+      brandFg: '#F6CB3C',
+      focus: '#F6CB3C',
+      warning: '#F0A868',
+      warningTint: '#3A2410',
+    },
+  },
+} as const satisfies Record<PortalId, Record<ColorScheme, Partial<ColorScale>>>
 
 /** 4px-based spacing scale. Keys are multiples of 4 (so `space[4]` is 16px). */
 export const space = {

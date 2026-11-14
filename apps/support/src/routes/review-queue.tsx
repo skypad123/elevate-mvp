@@ -46,7 +46,7 @@ export function ReviewQueue() {
           <THead>
             <TR>
               <TH>Course</TH>
-              <TH>Teacher</TH>
+              <TH>Profile</TH>
               <TH>Content</TH>
               <TH>Price</TH>
               <TH>Submitted</TH>
@@ -73,8 +73,8 @@ export function ReviewQueue() {
                   </div>
                 </TD>
                 <TD>
-                  <p className="text-ink">{c.teacherName}</p>
-                  <p className="text-caption text-ink-tertiary">{c.teacherEmail}</p>
+                  <p className="text-ink">{c.profileName}</p>
+                  <p className="text-caption text-ink-tertiary">{c.ownerEmail}</p>
                 </TD>
                 <TD className="text-ink-secondary">
                   {c.lessonCount} lessons · {c.artefactCount} items
