@@ -19,7 +19,7 @@ Per environment, in one AWS account, region `ap-southeast-1`:
 | API             | ECS Fargate, one task, behind an HTTPS Application Load Balancer; logs in CloudWatch           | `api.`                                 |
 | Database        | RDS Postgres 17 in private subnets, reachable only from the API task                           | –                                      |
 | Uploads         | Private S3 bucket (presigned uploads and downloads), accessed through the task's IAM role      | –                                      |
-| Learner web     | S3 + CloudFront, single-page-app fallback                                                      | `app.`                                 |
+| Learner web     | S3 + CloudFront, single-page-app fallback                                                      | `<domain>`                             |
 | Teach, Support  | S3 + CloudFront, single-page-app fallback                                                      | `teach.`, `support.`                   |
 | DNS and TLS     | Route 53 records, ACM certificates (regional for the API, `us-east-1` for CloudFront)          | under `<domain>` or `staging.<domain>` |
 | Configuration   | SSM Parameter Store under `/elevate/<environment>/`                                            | –                                      |
@@ -173,7 +173,7 @@ A deploy:
 curl https://api.staging.<domain>/api/health
 ```
 
-Open `https://app.staging.<domain>`, `https://teach.staging.<domain>` and
+Open `https://staging.<domain>`, `https://teach.staging.<domain>` and
 `https://support.staging.<domain>`. With Resend off, the sign-in link and code are in the API log:
 
 ```bash
