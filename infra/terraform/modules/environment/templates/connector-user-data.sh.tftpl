@@ -1,0 +1,66 @@
+#!/bin/bash
+# First-boot setup for the Tailscale App Connector (rendered by tailscale.tf).
+# Installs Tailscale and a service that joins the tailnet once the auth key is in SSM. The service
+# runs on every boot and returns at once when the node is already logged in.
+set -euxo pipefail
+
+curl -fsSL https://pkgs.tailscale.com/stable/amazon-linux/2023/tailscale.repo \
+  -o /etc/yum.repos.d/tailscale.repo
+dnf install -y tailscale
+
+# An App Connector forwards traffic for the tailnet.
+cat > /etc/sysctl.d/99-tailscale.conf <<'EOF'
+net.ipv4.ip_forward = 1
+net.ipv6.conf.all.forwarding = 1
+EOF
+sysctl -p /etc/sysctl.d/99-tailscale.conf
+
+systemctl enable --now tailscaled
+
+cat > /usr/local/sbin/tailscale-join <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+if tailscale ip -4 >/dev/null 2>&1; then
+  echo "already on the tailnet"
+  exit 0
+fi
+
+# The parameter holds "placeholder" until someone stores a real key (infra/README.md).
+while :; do
+  key=$(aws ssm get-parameter --region '${region}' --name '${key_parameter}' --with-decryption \
+    --query Parameter.Value --output text 2>/dev/null || true)
+  case "$key" in
+    tskey-*) break ;;
+  esac
+  echo "waiting for a Tailscale auth key in ${key_parameter}"
+  sleep 30
+done
+
+tailscale up \
+  --auth-key="$key" \
+  --hostname='${hostname}' \
+  --advertise-tags='${tag}' \
+  --advertise-connector
+tailscale set --auto-update=true || echo "could not turn on Tailscale auto-updates"
+EOF
+chmod 0755 /usr/local/sbin/tailscale-join
+
+cat > /etc/systemd/system/tailscale-join.service <<'EOF'
+[Unit]
+Description=Join the tailnet as an App Connector
+Requires=tailscaled.service
+After=tailscaled.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/tailscale-join
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable tailscale-join.service
+systemctl start --no-block tailscale-join.service

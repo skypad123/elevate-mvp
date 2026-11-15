@@ -22,6 +22,17 @@ locals {
   ])
 }
 
+# Private access: one function shared by the three distributions (see tailscale.tf).
+resource "aws_cloudfront_function" "private_access" {
+  count = var.private_access ? 1 : 0
+
+  name    = "${local.prefix}-private-access"
+  runtime = "cloudfront-js-2.0"
+  comment = "403 unless the viewer comes through the Tailscale connector"
+  publish = true
+  code    = templatefile("${path.module}/templates/private-access.js.tftpl", { allowed_cidrs = local.private_access_cidrs })
+}
+
 module "site" {
   source   = "../static_site"
   for_each = local.site_domains
@@ -37,4 +48,8 @@ module "site" {
   content_security_policy = local.content_security_policy
   csp_report_only         = var.csp_report_only
   force_destroy           = true # contents are build output; the deploy workflow recreates them
+
+  # The connector only has IPv4; over IPv6 a device would reach CloudFront directly instead.
+  ipv6_enabled                 = !var.private_access
+  viewer_request_function_arns = aws_cloudfront_function.private_access[*].arn
 }

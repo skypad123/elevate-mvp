@@ -46,6 +46,23 @@ variable "force_destroy" {
   default = true
 }
 
+variable "ipv6_enabled" {
+  description = "Serve over IPv6 too (an AAAA record and IPv6 on the distribution)."
+  type        = bool
+  default     = true
+}
+
+variable "viewer_request_function_arns" {
+  description = "CloudFront Function to run on every viewer request, as a list of zero or one ARN (a list so its length is known at plan time)."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = length(var.viewer_request_function_arns) <= 1
+    error_message = "CloudFront allows one viewer-request function per cache behaviour."
+  }
+}
+
 data "aws_caller_identity" "current" {}
 
 data "aws_cloudfront_cache_policy" "optimized" {
@@ -122,7 +139,7 @@ resource "aws_cloudfront_response_headers_policy" "site" {
 
 resource "aws_cloudfront_distribution" "site" {
   enabled             = true
-  is_ipv6_enabled     = true
+  is_ipv6_enabled     = var.ipv6_enabled
   comment             = var.name
   aliases             = [var.domain]
   default_root_object = "index.html"
@@ -143,6 +160,15 @@ resource "aws_cloudfront_distribution" "site" {
     compress                   = true
     cache_policy_id            = data.aws_cloudfront_cache_policy.optimized.id
     response_headers_policy_id = aws_cloudfront_response_headers_policy.site.id
+
+    dynamic "function_association" {
+      for_each = var.viewer_request_function_arns
+
+      content {
+        event_type   = "viewer-request"
+        function_arn = function_association.value
+      }
+    }
   }
 
   # SPA fallback. The bucket is private, so a missing key comes back as 403 (or 404).
@@ -197,7 +223,7 @@ resource "aws_s3_bucket_policy" "site" {
 }
 
 resource "aws_route53_record" "site" {
-  for_each = toset(["A", "AAAA"])
+  for_each = toset(var.ipv6_enabled ? ["A", "AAAA"] : ["A"])
 
   zone_id = var.zone_id
   name    = var.domain

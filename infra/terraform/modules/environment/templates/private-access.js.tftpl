@@ -1,0 +1,42 @@
+// CloudFront viewer-request function (rendered by sites.tf when private_access is on).
+// Lets in the Tailscale connector's IP and private_access_extra_cidrs; everyone else gets 403.
+// The distributions have IPv6 switched off, so the viewer's address is always IPv4.
+
+var ALLOWED = ${jsonencode(allowed_cidrs)};
+
+function toNumber(ip) {
+  var parts = ip.split('.');
+  if (parts.length !== 4) return -1;
+  var n = 0;
+  for (var i = 0; i < 4; i++) {
+    var octet = Number(parts[i]);
+    if (!(octet >= 0 && octet <= 255)) return -1;
+    n = n * 256 + octet;
+  }
+  return n;
+}
+
+function inRange(ip, cidr) {
+  var slash = cidr.indexOf('/');
+  var base = toNumber(cidr.slice(0, slash));
+  var size = Math.pow(2, 32 - Number(cidr.slice(slash + 1)));
+  return Math.floor(ip / size) === Math.floor(base / size);
+}
+
+function handler(event) {
+  var ip = toNumber(event.viewer.ip);
+  if (ip >= 0) {
+    for (var i = 0; i < ALLOWED.length; i++) {
+      if (inRange(ip, ALLOWED[i])) return event.request;
+    }
+  }
+  return {
+    statusCode: 403,
+    statusDescription: 'Forbidden',
+    headers: {
+      'content-type': { value: 'text/plain; charset=utf-8' },
+      'cache-control': { value: 'no-store' },
+    },
+    body: { encoding: 'text', data: 'This environment is only reachable over Tailscale.\n' },
+  };
+}

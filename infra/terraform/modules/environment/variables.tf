@@ -120,6 +120,29 @@ variable "protect_data" {
   default     = false
 }
 
+# ── Private access (Tailscale) ──────────────────────────────────────────────
+
+variable "private_access" {
+  description = <<-EOT
+    Serve the three sites and the API only to the tailnet: a Tailscale App Connector instance in
+    this VPC gives the tailnet one fixed public IP, and CloudFront and the load balancer answer 403
+    to everyone else. Stripe and Mux webhooks and /api/health stay public. See infra/README.md.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "private_access_extra_cidrs" {
+  description = "IPv4 CIDRs let in besides the connector, e.g. an office IP as a fallback when the connector is down. At most 4: a load balancer rule holds 5 addresses, one of them the connector's."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = length(var.private_access_extra_cidrs) <= 4 && alltrue([for c in var.private_access_extra_cidrs : can(cidrnetmask(c))])
+    error_message = "private_access_extra_cidrs takes at most 4 IPv4 CIDRs, such as 203.0.113.7/32."
+  }
+}
+
 # ── Static sites ────────────────────────────────────────────────────────────
 
 variable "csp_report_only" {
