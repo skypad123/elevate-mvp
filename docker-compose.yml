@@ -1,3 +1,6 @@
+# Pinned so every entry point (CLI, dev container tooling) uses the same project.
+name: elevate-mvp
+
 services:
   db:
     image: postgres:17

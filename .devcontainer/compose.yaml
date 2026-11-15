@@ -1,0 +1,70 @@
+# Dev container overlay. Used together with the root file (paths below are relative to the repo
+# root, the project directory):
+#   docker compose -f docker-compose.yml -f .devcontainer/compose.yaml up -d --build dev
+# or `npm run container:up`. See docs/runbooks/dev-container.md.
+services:
+  dev:
+    build:
+      context: .devcontainer
+    container_name: elevate-dev
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    ports:
+      - "4400:4400" # API
+      - "5173:5173" # Teach
+      - "5174:5174" # Support
+      - "8081:8081" # Learner (Expo web + Metro)
+      - "${DEV_SSH_PORT:-2222}:22" # SSH into the container (keys only)
+    environment:
+      # Real environment variables win over the repo-root .env (`node --env-file`), so the same
+      # .env works on the host (localhost) and in here (Compose service names).
+      DATABASE_URL: postgres://elevate:elevate@db:5432/elevate
+      SMTP_HOST: mail
+      # DEV_HOST is the name other devices use for this machine (LAN or tailnet hostname).
+      DEV_HOST: ${DEV_HOST:-localhost}
+      API_URL: http://${DEV_HOST:-localhost}:4400
+      LEARNER_URL: http://${DEV_HOST:-localhost}:8081
+      TEACH_URL: http://${DEV_HOST:-localhost}:5173
+      SUPPORT_URL: http://${DEV_HOST:-localhost}:5174
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${DEV_HOST:-localhost}
+      # A host-specific font path from .env would not exist here; use assets/fonts/fallback/.
+      CERTIFICATE_FALLBACK_FONTS: ""
+      # One PGlite database per test worker: a worker per core, next to the other turbo tasks,
+      # gets the API tests OOM-killed in an 8 GB Docker VM. Raise it if the VM has more memory.
+      VITEST_MAX_WORKERS: ${DEV_TEST_WORKERS:-2}
+    volumes:
+      - .:/workspaces/elevate-mvp
+      # Linux-built dependencies stay in volumes so they never mix with the host's node_modules.
+      - dev_node_modules:/workspaces/elevate-mvp/node_modules
+      - dev_nm_api:/workspaces/elevate-mvp/apps/api/node_modules
+      - dev_nm_learner:/workspaces/elevate-mvp/apps/learner/node_modules
+      - dev_nm_support:/workspaces/elevate-mvp/apps/support/node_modules
+      - dev_nm_teach:/workspaces/elevate-mvp/apps/teach/node_modules
+      - dev_nm_core:/workspaces/elevate-mvp/packages/core/node_modules
+      - dev_nm_db:/workspaces/elevate-mvp/packages/db/node_modules
+      - dev_nm_i18n:/workspaces/elevate-mvp/packages/i18n/node_modules
+      - dev_nm_tokens:/workspaces/elevate-mvp/packages/tokens/node_modules
+      - dev_nm_tsconfig:/workspaces/elevate-mvp/packages/tsconfig/node_modules
+      - dev_nm_web_ui:/workspaces/elevate-mvp/packages/web-ui/node_modules
+      - dev_claude:/home/node/.claude
+      - dev_ssh_host_keys:/etc/ssh/host_keys
+      - ${DEV_AUTHORIZED_KEYS:-${HOME}/.ssh/authorized_keys}:/run/host-authorized-keys:ro
+
+volumes:
+  dev_node_modules:
+  dev_nm_api:
+  dev_nm_learner:
+  dev_nm_support:
+  dev_nm_teach:
+  dev_nm_core:
+  dev_nm_db:
+  dev_nm_i18n:
+  dev_nm_tokens:
+  dev_nm_tsconfig:
+  dev_nm_web_ui:
+  dev_claude:
+  dev_ssh_host_keys:

@@ -41,7 +41,8 @@ npm run dev
 
 Everything runs locally without third-party accounts (`VIDEO_DRIVER=local`, `STORAGE_DRIVER=local`,
 Mailpit for email). Stripe test keys are needed for the real money loop — see
-[`docs/runbooks/`](docs/runbooks/).
+[`docs/runbooks/`](docs/runbooks/). To develop inside a container, or remotely against an always-on
+machine, see [`docs/runbooks/dev-container.md`](docs/runbooks/dev-container.md).
 
 ## Environments
 

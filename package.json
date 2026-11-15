@@ -22,7 +22,9 @@
     "db:generate": "npm -w @elevate/db run generate --",
     "db:migrate": "npm -w @elevate/db run migrate",
     "db:seed": "npm -w @elevate/db run seed",
-    "db:reset": "npm -w @elevate/db run reset"
+    "db:reset": "npm -w @elevate/db run reset",
+    "container:up": "docker compose -f docker-compose.yml -f .devcontainer/compose.yaml up -d --build dev",
+    "container:shell": "docker compose -f docker-compose.yml -f .devcontainer/compose.yaml exec -u node dev bash"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",

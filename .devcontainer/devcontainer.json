@@ -1,0 +1,22 @@
+{
+  "name": "Elevate",
+  "dockerComposeFile": ["../docker-compose.yml", "compose.yaml"],
+  "service": "dev",
+  "runServices": ["db", "mail", "dev"],
+  "workspaceFolder": "/workspaces/elevate-mvp",
+  "remoteUser": "node",
+  "overrideCommand": false,
+  "shutdownAction": "none",
+  "postCreateCommand": "npm ci",
+  "forwardPorts": [4400, 5173, 5174, 8081],
+  "portsAttributes": {
+    "4400": { "label": "API" },
+    "5173": { "label": "Teach" },
+    "5174": { "label": "Support" },
+    "8081": { "label": "Learner (Expo)" }
+  },
+  "customizations": {
+    "vscode": { "extensions": ["biomejs.biome", "expo.vscode-expo-tools"] },
+    "zed": { "extensions": ["biome"] }
+  }
+}
