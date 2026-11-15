@@ -48,7 +48,7 @@ machine, see [`docs/runbooks/dev-container.md`](docs/runbooks/dev-container.md).
 
 | Environment | Branch       | Where                                  |
 | ----------- | ------------ | -------------------------------------- |
-| dev         | `main`, `v0` | local, as in Quick start               |
+| dev         | `main`       | local, as in Quick start               |
 | staging     | `staging`    | AWS; every push deploys                |
 | production  | `production` | AWS; every push deploys after approval |
 

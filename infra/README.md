@@ -4,11 +4,11 @@ Terraform for the two AWS environments, plus the steps to stand them up from not
 
 | Environment | Branch       | Where it runs                                  | How it deploys                                                   |
 | ----------- | ------------ | ---------------------------------------------- | ---------------------------------------------------------------- |
-| dev         | `main`, `v0` | your machine (`docker compose`, `npm run dev`) | nothing is deployed; CI runs on every push and pull request      |
+| dev         | `main`       | your machine (`docker compose`, `npm run dev`) | nothing is deployed; CI runs on every push and pull request      |
 | staging     | `staging`    | AWS, `*.staging.<domain>`                      | automatically on every push to `staging`                         |
 | production  | `production` | AWS, `*.<domain>`                              | on every push to `production`, after a reviewer approves the run |
 
-Code moves forward by pull request: feature branch → `main` (or `v0`) → `staging` → `production`.
+Code moves forward by pull request: feature branch → `main` → `staging` → `production`.
 
 ## What gets created
 

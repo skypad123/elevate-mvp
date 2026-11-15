@@ -16,7 +16,7 @@ that hold on any host.
 | `apps/learner` (web)         | Static Expo export (`npm run build:web`, `web.output: single`)       | S3 + CloudFront           |
 | `apps/learner` (iOS/Android) | EAS Build (`eas build`), EAS Update for JS                           | Expo Application Services |
 
-Branches: `main` and `v0` are development (local only), `staging` and `production` deploy on push.
+Branches: `main` is development (local only); `staging` and `production` deploy on push.
 
 ## API
 

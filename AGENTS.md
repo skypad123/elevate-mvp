@@ -17,7 +17,7 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 - `packages/web-ui` — Radix + Tailwind components for the two web portals; `./preferences` holds the
   shared PreferencesProvider/PreferencesCard. `packages/i18n` — typed message catalogs (`en`, `zh`).
 - `infra/terraform` — AWS staging and production (see `infra/README.md`). Branches `staging` and
-  `production` deploy on push via `.github/workflows/deploy.yml`; `main` and `v0` are local-only dev.
+  `production` deploy on push via `.github/workflows/deploy.yml`; `main` is local-only dev.
 - `docs/spec.md` is the product spec; `docs/adr/` records the architecture decisions.
 
 ## Rules

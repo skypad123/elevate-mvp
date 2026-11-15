@@ -10,8 +10,8 @@ create both that place and production.
 
 ## Decision
 
-- **Three environments, mapped to branches.** `main` and `v0` are development branches and run
-  only locally. `staging` and `production` are long-lived branches; a push to either deploys the
+- **Three environments, mapped to branches.** `main` is the development branch and runs only
+  locally. `staging` and `production` are long-lived branches; a push to either deploys the
   AWS environment of the same name. Production deploys wait for a reviewer in GitHub.
 - **AWS, one account, `ap-southeast-1`.** Teachers, learners, the currency and the Stripe country
   are Singaporean. The two environments are separate stacks (VPC, database, buckets, IAM roles)
