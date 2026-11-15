@@ -24,12 +24,14 @@ Per environment, in one AWS account, region `ap-southeast-1`:
 | DNS and TLS     | Route 53 records, ACM certificates (regional for the API, `us-east-1` for CloudFront)          | under `<domain>` or `staging.<domain>` |
 | Configuration   | SSM Parameter Store under `/elevate/<environment>/`                                            | –                                      |
 | Deploy identity | An IAM role that only GitHub Actions jobs in the matching GitHub Environment can assume (OIDC) | –                                      |
+| Private access  | Staging only: a Tailscale App Connector (EC2 `t4g.micro` + Elastic IP); see "Private staging"  | –                                      |
 
 Shared by both (the `bootstrap` stack): the Terraform state bucket, GitHub's OIDC provider, and
 the `elevate-api` image repository in ECR.
 
 Expect very roughly US$55–65 a month per environment at idle (load balancer, one small Fargate
-task, a `t4g` database, public IPv4 addresses). This is an estimate, not a quote.
+task, a `t4g` database, public IPv4 addresses), plus about US$11 for staging's Tailscale connector.
+This is an estimate, not a quote.
 
 ```
 infra/terraform/
@@ -174,7 +176,7 @@ curl https://api.staging.<domain>/api/health
 ```
 
 Open `https://staging.<domain>`, `https://teach.staging.<domain>` and
-`https://support.staging.<domain>`. With Resend off, the sign-in link and code are in the API log:
+`https://support.staging.<domain>` (on staging, with Tailscale on: see "Private staging"). With Resend off, the sign-in link and code are in the API log:
 
 ```bash
 aws logs tail "$(terraform output -raw api_log_group)" --follow
@@ -183,6 +185,103 @@ aws logs tail "$(terraform output -raw api_log_group)" --follow
 The sites send their Content-Security-Policy in report-only mode at first. Click through each
 site with the browser console open; when it reports no violations, set `csp_report_only = false`
 in `terraform.tfvars` and apply.
+
+## Private staging (Tailscale)
+
+Staging answers only to devices on the tailnet. Its module call sets `private_access = true`;
+production leaves it off.
+
+- A Tailscale **App Connector** (`t4g.micro`, Amazon Linux, Elastic IP) runs in staging's VPC.
+  Tailnet devices send traffic for `staging.<domain>` and `*.staging.<domain>` through it, so it
+  arrives at AWS from the connector's Elastic IP. Everything else on those devices is untouched.
+- The three CloudFront sites run a viewer-request function that answers 403 unless the viewer is
+  that IP (or one of `private_access_extra_cidrs`). IPv6 is off on them, because the connector only
+  carries IPv4.
+- The API load balancer answers 403 by default and forwards only the connector's IP, plus two
+  public paths: `/api/webhooks/*` (Stripe and Mux, signature-checked) and `/api/health` (the
+  Deploy workflow checks it from a GitHub runner).
+- Still public, as before: presigned S3 links and Mux playback. The DNS names stay public too;
+  outsiders just get 403.
+
+### Setting it up
+
+1. **Tailscale policy file** (admin console → Access controls). Add the connector's tag, the app,
+   and auto-approval of the routes it advertises. Use your domain; `terraform output
+   tailscale_connector` shows the exact tag and domains.
+
+   ```jsonc
+   "tagOwners": {
+     "tag:elevate-staging-connector": ["autogroup:admin"]
+   },
+   "nodeAttrs": [
+     {
+       "target": ["*"],
+       "app": {
+         "tailscale.com/app-connectors": [
+           {
+             "name": "elevate-staging",
+             "connectors": ["tag:elevate-staging-connector"],
+             "domains": ["staging.<domain>", "*.staging.<domain>"]
+           }
+         ]
+       }
+     }
+   ],
+   "autoApprovers": {
+     "routes": {
+       "0.0.0.0/0": ["tag:elevate-staging-connector"],
+       "::/0": ["tag:elevate-staging-connector"]
+     }
+   }
+   ```
+
+   Merge these into the keys you already have. With the default allow-all policy nothing else is
+   needed; with custom ACLs or grants, make sure your devices may reach the routed addresses.
+2. **Auth key** (admin console → Settings → Keys): one-off (not reusable), not ephemeral,
+   pre-approved, tagged `tag:elevate-staging-connector`. It is used once, to join; tagged nodes do
+   not expire afterwards.
+3. **Apply** in `envs/staging`. From this point outsiders get 403, and so does everyone until the
+   connector has joined.
+4. **Hand the key to the connector.** It checks every 30 seconds and joins within a minute:
+
+   ```bash
+   aws ssm put-parameter --overwrite --type SecureString \
+     --name /elevate/staging-connector/TAILSCALE_AUTH_KEY --value 'tskey-auth-…'
+   ```
+
+   The key lives outside `/elevate/staging/` so the API cannot read it.
+5. **Check it**, with Tailscale on and then off:
+
+   | Request                                            | Tailscale on | Tailscale off                                  |
+   | -------------------------------------------------- | ------------ | ---------------------------------------------- |
+   | `https://staging.<domain>` (and teach, support)    | the app      | `403` with the plain-text message, not the app |
+   | `curl -i https://api.staging.<domain>/api/auth/me` | `401`        | `403`                                          |
+   | `curl https://api.staging.<domain>/api/health`     | `200`        | `200`                                          |
+
+   Then send a test webhook (`stripe trigger …`, or a Mux test upload) and run
+   `gh workflow run deploy.yml --ref staging`; both should still succeed.
+
+Devices need Tailscale's DNS (the default "Use Tailscale DNS" setting), because the connector
+learns which addresses to route from the DNS lookups. Linux devices also need
+`tailscale set --accept-routes`. Phones running the EAS `preview` build just need Tailscale on.
+
+### Running it
+
+- **Connector down?** Open a shell without SSH and look at the join service:
+
+  ```bash
+  aws ssm start-session --target <instance_id from `terraform output tailscale_connector`>
+  sudo journalctl -u tailscale-join -u tailscaled --no-pager | tail -50
+  ```
+
+- **Fallback addresses**: list up to four IPv4 CIDRs in `private_access_extra_cidrs` in
+  `terraform.tfvars` and apply; they are let in alongside the connector.
+- **Replacing the connector** (a new AMI, or the instance is gone): put a new one-off auth key in
+  the parameter first, then
+  `terraform apply -replace='module.environment.aws_instance.connector[0]'`. The Elastic IP stays,
+  so nothing else changes. Remove the old machine from the Tailscale admin console.
+- **Opening staging to everyone again**: set `private_access = false` in `envs/staging/main.tf`
+  and apply.
 
 ## Day to day
 

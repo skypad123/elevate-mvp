@@ -89,6 +89,12 @@ variable "csp_report_only" {
   default = true
 }
 
+variable "private_access_extra_cidrs" {
+  description = "IPv4 CIDRs let into staging besides the Tailscale connector (a fallback, e.g. an office IP)."
+  type        = list(string)
+  default     = []
+}
+
 module "environment" {
   source = "../../modules/environment"
 
@@ -106,6 +112,10 @@ module "environment" {
   integrations           = var.integrations
   seed_super_admin_email = var.seed_super_admin_email
   csp_report_only        = var.csp_report_only
+
+  # Only the tailnet can open staging (infra/README.md, "Private staging").
+  private_access             = true
+  private_access_extra_cidrs = var.private_access_extra_cidrs
 
   # Small and disposable: no deletion protection, one day of backups.
   db_instance_class        = "db.t4g.micro"
@@ -128,6 +138,10 @@ output "manual_parameters" {
 
 output "api_log_group" {
   value = module.environment.api_log_group
+}
+
+output "tailscale_connector" {
+  value = module.environment.tailscale_connector
 }
 
 output "github_environment_variables" {

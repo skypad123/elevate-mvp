@@ -22,6 +22,18 @@ output "api_log_group" {
   value = aws_cloudwatch_log_group.api.name
 }
 
+output "tailscale_connector" {
+  description = "The App Connector that private_access lets in (null when private_access is off)."
+  value = var.private_access ? {
+    public_ip          = aws_eip.connector[0].public_ip
+    instance_id        = aws_instance.connector[0].id
+    hostname           = local.connector_name
+    tag                = local.connector_tag
+    auth_key_parameter = aws_ssm_parameter.tailscale_auth_key[0].name
+    domains            = [local.base_domain, "*.${local.base_domain}"]
+  } : null
+}
+
 output "github_environment_variables" {
   description = "Copy these into the GitHub Environment of the same name; the Deploy workflow reads them as vars.*."
   value = {
