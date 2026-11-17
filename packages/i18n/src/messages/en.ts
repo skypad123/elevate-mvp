@@ -6,9 +6,10 @@
  * together here. Keys are flat, dot-separated and start with their area. `{name}` placeholders
  * are interpolated by `translate`.
  *
- * Translated today: navigation, the Settings/Preferences/Profile screens, and the teaching-profile
+ * Translated today: navigation, the Settings/Preferences/Profile screens, the teaching-profile
  * screens of Teach and Support (the Teach dashboard and start page, members, invitations, held
- * changes, company application and set-up, Support's profile pages). Other pages are still English.
+ * changes, company application and set-up, Support's profile pages), and the learner emails. Other
+ * pages are still English.
  *
  * To add an area: write the two files, then add it to `enAreas` and to `en` below, and to the
  * same two places in `zh.ts`. `test/catalog.test.ts` fails if the two lists disagree or if two
@@ -20,6 +21,7 @@ import { chromeEn } from './areas/chrome.en'
 import { commonEn } from './areas/common.en'
 import { companyApplyEn } from './areas/companyApply.en'
 import { domainEn } from './areas/domain.en'
+import { emailEn } from './areas/email.en'
 import { invitationEn } from './areas/invitation.en'
 import { membersEn } from './areas/members.en'
 import { paymentsEn } from './areas/payments.en'
@@ -49,6 +51,7 @@ export const enAreas: readonly Readonly<Record<string, string>>[] = [
   supportProfileEn,
   supportCompanyEn,
   supportRecoveryEn,
+  emailEn,
 ]
 
 export const en = {
@@ -68,4 +71,5 @@ export const en = {
   ...supportProfileEn,
   ...supportCompanyEn,
   ...supportRecoveryEn,
+  ...emailEn,
 } as const

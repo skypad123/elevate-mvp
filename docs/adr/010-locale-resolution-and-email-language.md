@@ -46,10 +46,11 @@ be told apart from a default nobody chose.
   (`{ locale: <resolved>, localeChosen: false }`). No effect watches the stored language, the
   fill-in never overwrites a language already on the account, and a failed write is ignored and
   not retried.
-- **The four learner emails' languages.** The sign-in code email uses the sign-in request's
+- **The learner emails' languages.** The sign-in code email uses the sign-in request's
   `locale`, else English, because the account may not exist yet; its link gets `&lang=<locale>`
-  only when the request sent one. The receipt, the certificate email and the learner's copy of the
-  refund email use `users.locale`, else English. The teacher's copy of the refund email, and every
+  only when the request sent one. The receipt, the certificate email, the learner's copy of the
+  refund email and the email for an automatically refunded second payment use `users.locale`,
+  else English. The teacher's copy of the refund email, and every
   Teach, Support and teacher email, stay English.
 - **API error messages stay English.** Clients show the API's message as it is, and word in the
   language on screen only the sentences they write themselves (no connection, unknown failure).

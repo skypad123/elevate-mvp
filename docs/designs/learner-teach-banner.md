@@ -131,10 +131,9 @@ the `?lang` hand-off to Teach.
 
 ## Open Questions
 
--   **Question 1 (the Chinese text):** who writes the Chinese text of this design, and who checks
-    it? The author expects the same writer and reviewer as the Chinese design's Question 3,
-    which is also open. Neither pull request can pass its checks or merge until this is
-    answered (see [Order of release](#order-of-release)).
+-   **Question 1 (the Chinese text), answered 2026-11-17:** the author writes and checks it, as
+    for the Chinese design's Question 3. Neither pull request can pass its checks or merge until
+    the author has written it (see [Order of release](#order-of-release)).
 -   **Question 2 (the decision rule):** when is the count of first applications read, and what
     result removes the banner? The count can't test the banner's place, so moving it is a
     judgement.

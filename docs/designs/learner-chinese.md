@@ -106,10 +106,11 @@ Send the language with the requests the app already makes (the sign-in request, 
     Once a person chooses a language, the device setting never overrides it.
 3.  **A signed-out visitor can switch.** A switcher sits on Explore and on the sign-in screen.
     Switching on the sign-in screen keeps the typed email and the code step.
-4.  **The four learner emails follow the language.**
+4.  **The learner emails follow the language.**
     -   The sign-in code email is in the language the visitor was using when they asked for the
         code.
-    -   The receipt, certificate and refund emails are in the language stored on the account.
+    -   The receipt, certificate and refund emails, and the email for an automatically refunded
+        second payment (item 15), are in the language stored on the account.
 5.  **The language survives leaving the app.** These open in the chosen language:
     -   the page the emailed sign-in link opens;
     -   the checkout return pages;
@@ -151,8 +152,10 @@ Send the language with the requests the app already makes (the sign-in request, 
     "later".
 -   **Question 2 (success target):** is there a target for the share of Chinese sign-ins and
     purchases? Or is the first release only meant to establish the baseline?
--   **Question 3 (the Chinese text):** who writes the Chinese text, and who checks it before PR 2
-    and PR 3 merge? The payment, refund and sign-in wording matters most.
+-   **Question 3 (the Chinese text), answered 2026-11-17:** the author writes the Chinese text
+    and checks it. Each PR is built with the English and the code, and leaves its Chinese area
+    as a list of the keys still to write; `test/catalog.test.ts` fails on "are fully
+    translated" until the author fills it in, and the PR doesn't merge before.
 
 This design answers the brief's Questions 1 (variants), 2 (existing installs), 3 and 10 (which
 language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (measurement) and
@@ -390,7 +393,7 @@ language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (me
 ### Emails in the learner's language
 
 -   **The email area.** A new `email` area in `@elevate/i18n` (`email.en.ts`, `email.zh.ts`)
-    holds every sentence of the four learner emails, plus the shared footer.
+    holds every sentence of the learner emails, plus the shared footer.
     -   Each message is a whole sentence with `{placeholders}`, following ADR 008.
     -   The English messages reproduce today's text word for word, because existing tests match
         it.
@@ -406,12 +409,13 @@ language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (me
     requires. The subject and the text part are plain text.
 -   **Which language each email uses:**
 
-    | Email                 | Sent from                                | Language                          |
-    | --------------------- | ---------------------------------------- | --------------------------------- |
-    | Sign-in code          | `AuthService.requestMagicLink`           | the request's `locale`, else `en` |
-    | Receipt               | `PaymentsService` (Stripe webhook)       | `enrollment.user.locale ?? 'en'`  |
-    | Certificate           | `CertificatesService.issueForEnrollment` | `enrollment.user.locale ?? 'en'`  |
-    | Refund (learner copy) | `TransactionsService.sendRefundNotices`  | `p.user.locale ?? 'en'`           |
+    | Email                   | Sent from                                | Language                          |
+    | ----------------------- | ---------------------------------------- | --------------------------------- |
+    | Sign-in code            | `AuthService.requestMagicLink`           | the request's `locale`, else `en` |
+    | Receipt                 | `PaymentsService` (Stripe webhook)       | `enrollment.user.locale ?? 'en'`  |
+    | Certificate             | `CertificatesService.issueForEnrollment` | `enrollment.user.locale ?? 'en'`  |
+    | Refund (learner copy)   | `TransactionsService.sendRefundNotices`  | `p.user.locale ?? 'en'`           |
+    | Second payment refunded | `PaymentsService.refundDuplicate`        | `enrollment.user.locale ?? 'en'`  |
 
     The teacher's copy of the refund email stays English.
 -   **A refund made in the Stripe dashboard** is recorded with the system reason
@@ -537,7 +541,7 @@ language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (me
     -   `users.locale` and `locale_chosen`;
     -   the chosen-or-guessed rule at verify;
     -   the press-only writes and the single fill-in;
-    -   the four learner emails' languages;
+    -   the learner emails' languages;
     -   API error messages staying English;
     -   certificate PDFs staying English;
     -   Teach and Support resolving `system` from the browser;
@@ -1327,7 +1331,7 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
         -   `users.locale` and `locale_chosen`;
         -   the chosen-or-guessed rule at verify;
         -   the press-only writes and the single fill-in;
-        -   the four learner emails' languages;
+        -   the learner emails' languages;
         -   API error messages staying English;
         -   certificate PDFs staying English;
         -   Teach and Support resolving `system` from the browser;
@@ -1347,7 +1351,10 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
         `.text.code`;
     -   `email.receipt.title`, `.paid`, `.stripeReceipt`, `.noReceipt`, `.start`, `.button`;
     -   `email.certificate.title`, `.congrats`, `.verify`, `.button`;
-    -   `email.refund.title`, `.refunded`, `.reason`, `.reasonStripe`, `.accessRemoved`.
+    -   `email.refund.title`, `.refunded`, `.reason`, `.reasonStripe`, `.accessRemoved`;
+    -   `email.duplicate.title`, `.refunded`, `.kept`, `.removed`, `.button`: the email for a
+        second payment that is refunded automatically (item 15), added after this list was
+        first written.
 
     The English text reproduces today's emails word for word, because existing tests match it:
     -   "You're enrolled" in `checkout.test.ts`;
@@ -1397,7 +1404,8 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
         `simpleEmail`:
         -   the receipt and the certificate (`issueForEnrollment`) use
             `enrollment.user.locale ?? 'en'`;
-        -   the learner's refund email uses `p.user.locale ?? 'en'`.
+        -   the learner's refund email uses `p.user.locale ?? 'en'`;
+        -   the duplicate-payment email (item 15) uses `enrollment.user.locale ?? 'en'`.
 
         The queries already load `user: true`, so no query changes.
     -   **The Stripe refund reason:** `transactions.service.ts` exports
@@ -1423,7 +1431,8 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
 -   **Type / Scope**: integration tests.
 -   **Proposed Changes**:
     -   **The code email's language:** it's Chinese for `locale: 'zh'` and English for none.
-    -   **`checkout.test.ts`:** a `zh` user's receipt is Chinese.
+    -   **`checkout.test.ts`:** a `zh` user's receipt is Chinese, and so is the email for their
+        automatically refunded second payment, even when that checkout ran in English.
     -   **`certificates-earnings.test.ts`:**
         -   a `zh` user's certificate and refund emails are Chinese;
         -   a Stripe-dashboard refund shows the translated reason;
@@ -1771,7 +1780,7 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
     -   **API integration tests** against a disposable Postgres, covering:
         -   the verify rule and `PATCH /me`;
         -   the Stripe `locale`, the idempotency key and the return URLs;
-        -   the four emails in both languages.
+        -   the learner emails in both languages.
     -   **A manual walkthrough:**
         -   CUJs 1–5 on learner web (a `zh-CN` browser profile), the iOS simulator and an Android
             emulator;
