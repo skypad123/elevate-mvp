@@ -1,0 +1,30 @@
+# Learner app: switching to Chinese on the sign-in screen keeps the typed email, and the code step
+# then shows no English. Run like sign-in.yaml (see learner-preferences.yaml for the setup):
+#   maestro test .maestro/sign-in-zh.yaml
+appId: ${APP_ID}
+env:
+  APP_ID: sg.elevate.learner
+  EMAIL: learner@example.com
+  API_URL: http://localhost:4400
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "nav-sign-in"
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+- hideKeyboard
+- tapOn:
+    id: "lang-zh"
+# The email typed before the switch is still there.
+- assertVisible: ${EMAIL}
+- tapOn:
+    id: "sign-in-request"
+# The code step's title is Chinese: no Latin letters in it.
+- assertVisible:
+    text: "[^A-Za-z]+"
+    id: "sign-in-code-title"
+- tapOn:
+    id: "lang-en"
+- assertVisible: "Enter the 6-digit code"

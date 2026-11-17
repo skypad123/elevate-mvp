@@ -1,3 +1,4 @@
+import { USER_ERROR_CODES } from '@elevate/core'
 import { describe, expect, it } from 'vitest'
 import {
   catalogs,
@@ -48,6 +49,14 @@ describe('catalogs', () => {
       for (const [key, value] of Object.entries(catalogs[locale]))
         expect(value.trim(), `${locale}:${key}`).not.toBe('')
     }
+  })
+})
+
+describe('API errors', () => {
+  // The learner app words an error only from its code, so every code it can see needs a message.
+  it('have a message for every code a learner can see', () => {
+    const missing = USER_ERROR_CODES.filter((code) => !(`apiError.${code}` in en))
+    expect(missing).toEqual([])
   })
 })
 

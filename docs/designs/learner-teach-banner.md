@@ -138,12 +138,13 @@ the `?lang` hand-off to Teach.
 -   **Question 2 (the decision rule):** when is the count of first applications read, and what
     result removes the banner? The count can't test the banner's place, so moving it is a
     judgement.
--   **Question 3 (the wider error rule):** the author decided, while reviewing this design, that
-    every API error a learner or teacher can see should get a code and a translated message, and
-    that only internal errors stay English. That reverses the brief's decision 8 ("The API
-    stays English", including the error messages it returns) and changes
-    [ADR 008](../adr/008-theming-preferences-i18n.md) and the Chinese design. Which design
-    carries it, and does it land before the Chinese design's PR 3?
+-   **Question 3 (the wider error rule), answered 2026-11-17:** the Chinese design carries it,
+    in its PR 3, for the learner app ([its error rule](learner-chinese.md#the-error-rule)): a
+    `USER_ERROR_CODES` list, an `apiError` area, and distinct codes where one meant several
+    things. That PR splits `link_used` ("That sign-in link was already used.") from
+    `link_invalid`, so this design's Teach PR maps five sign-in codes, not four, and can take its
+    messages from the shared `apiError` area. Teach and Support pages adopt the rule as they are
+    translated.
 
 The brief's Questions 6 (who doesn't see the banner) and 7 (the introduction) are answered in
 [Decisions made while drafting](#decisions-made-while-drafting).

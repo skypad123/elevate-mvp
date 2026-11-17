@@ -16,6 +16,7 @@ import {
   useState,
 } from 'react'
 import { Platform } from 'react-native'
+import { useDeviceLanguages } from './device-languages'
 import { preferencesStorage } from './preferences-storage'
 
 export type PreferencesContextValue = {
@@ -44,20 +45,14 @@ function readLangParam(): string | null {
   }
 }
 
-/** Web: the browser's languages. Native reads none yet. */
-function readDeviceLanguages(): readonly string[] {
-  if (!isWeb() || typeof navigator === 'undefined') return []
-  return navigator.languages ?? []
-}
-
 export function PreferencesProvider({ children }: PropsWithChildren) {
   const initial = useMemo(() => preferencesStorage.readSync(), [])
   const [preferences, setPreferences] = useState<Preferences>(initial ?? defaultPreferences)
   const [ready, setReady] = useState(initial !== null)
   const [account, setAccountLocale] = useState<Locale | null>(null)
-  // Read once when the app first mounts in this tab, and held for the tab's life.
+  // Read once when the app first mounts in this tab, and held in memory until it next loads.
   const [param] = useState(readLangParam)
-  const [deviceLanguages] = useState(readDeviceLanguages)
+  const deviceLanguages = useDeviceLanguages()
 
   useEffect(() => {
     if (initial !== null) return

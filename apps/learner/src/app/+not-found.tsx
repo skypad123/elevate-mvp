@@ -1,20 +1,22 @@
 import { Link } from 'expo-router'
 import { Compass } from 'lucide-react-native'
 import { View } from 'react-native'
+import { useT } from '@/lib/preferences'
 import { Button, EmptyState, Screen } from '@/ui'
 
 export default function NotFound() {
+  const t = useT()
   return (
     <Screen>
       <EmptyState
         icon={Compass}
         eyebrow="404"
-        title="That page is not on the map"
-        body="The link may be old, or the course may have been taken down."
+        title={t('learnerCommon.notFound.title')}
+        body={t('learnerCommon.notFound.body')}
       />
       <View style={{ marginTop: 16, alignItems: 'center' }}>
         <Link href="/" asChild>
-          <Button label="Back to Explore" variant="ghost" />
+          <Button label={t('learnerCommon.notFound.back')} variant="ghost" />
         </Link>
       </View>
     </Screen>

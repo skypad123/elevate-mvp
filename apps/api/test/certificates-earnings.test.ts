@@ -251,10 +251,10 @@ describe('earnings and transactions', () => {
     expect(notices[1]).toMatchObject({ to: 'daniel@example.com' })
     expect(notices[1]?.subject).toContain('was refunded')
     expect(t.payments.refunds).toHaveLength(1)
-    // access is revoked
-    expect(
-      (await t.api('GET', `/api/me/enrollments/${secondEnrollment}`, { token: second })).status,
-    ).toBe(403)
+    // access is revoked, with its own code so the app can word it
+    const revoked = await t.api('GET', `/api/me/enrollments/${secondEnrollment}`, { token: second })
+    expect(revoked.status).toBe(403)
+    expect(revoked.body.error.code).toBe('enrollment_inactive')
     // a second refund is rejected
     const twice = await t.api('POST', `/api/support/transactions/${target.id}/refund`, {
       token: admin,

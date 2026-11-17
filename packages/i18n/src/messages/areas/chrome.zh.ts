@@ -29,7 +29,7 @@ export const chromeZh = {
   'prefs.theme.light': '浅色',
   'prefs.theme.dark': '深色',
   'prefs.language': '语言',
-  'prefs.language.description': '适用于菜单和设置。更多内容将陆续翻译。',
+  'prefs.language.description': '适用于学员应用的所有页面，以及 Teach 和 Support 中已翻译的页面。',
   'prefs.language.system': '跟随设备',
 
   'settings.eyebrow': '设置',

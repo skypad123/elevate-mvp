@@ -87,7 +87,8 @@ describe('checkout', () => {
       body: { courseId: sourdoughId, promoCode: 'CERAMICS20' },
     })
     expect(wrong.status).toBe(400)
-    expect(wrong.body.error.code).toBe('promo_invalid')
+    // each promo failure has its own code, so the app can word it
+    expect(wrong.body.error.code).toBe('promo_wrong_course')
     expect(
       (
         await t.api('POST', '/api/checkout/quote', {
@@ -195,6 +196,37 @@ describe('checkout', () => {
       'figma-to-prototype',
       'sourdough-from-scratch',
     ])
+  })
+})
+
+describe('error codes a learner can see', () => {
+  const quote = (promoCode: string) =>
+    t.api('POST', '/api/checkout/quote', {
+      token: learner,
+      body: { courseId: sourdoughId, promoCode },
+    })
+
+  it('gives a promo code that has not started its own code', async () => {
+    await t.db.insert(s.promoCodes).values({
+      code: 'LATER50',
+      type: 'percent',
+      value: 50,
+      startsAt: new Date('2099-01-01T00:00:00.000Z'),
+    })
+    const res = await quote('LATER50')
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('promo_not_started')
+  })
+
+  it('sends the minimum charge as data when a promo takes the price below it', async () => {
+    await t.db.insert(s.promoCodes).values({ code: 'ALMOSTFREE', type: 'fixed', value: 8850 })
+    const { token } = await t.signIn('below-minimum@example.com')
+    const res = await t.api('POST', `/api/checkout/courses/${sourdoughId}`, {
+      token: token as string,
+      body: { promoCode: 'ALMOSTFREE' },
+    })
+    expect(res.status).toBe(422)
+    expect(res.body.error).toMatchObject({ code: 'below_minimum', details: { minimumCents: 100 } })
   })
 })
 

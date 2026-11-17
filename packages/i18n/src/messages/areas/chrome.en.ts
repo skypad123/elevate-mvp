@@ -32,7 +32,7 @@ export const chromeEn = {
   'prefs.theme.dark': 'Dark',
   'prefs.language': 'Language',
   'prefs.language.description':
-    'Applies to menus and settings. More of Elevate is translated over time.',
+    'Applies to every screen of the learner app, and to the translated pages of Teach and Support.',
   'prefs.language.system': 'Follow device',
 
   // Settings pages

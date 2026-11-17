@@ -1,5 +1,7 @@
 import { Check, Lock, Play } from 'lucide-react-native'
 import { Pressable, View } from 'react-native'
+import { formatList } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Text } from '@/ui/Text'
 
@@ -25,6 +27,7 @@ export function Trail({
   activeId?: string | null
 }) {
   const theme = useTheme()
+  const { t } = usePreferences()
   return (
     <View>
       {items.map((item, index) => {
@@ -111,7 +114,7 @@ export function Trail({
                 ) : null}
                 {item.requires?.length ? (
                   <Text variant="caption" tone="tertiary">
-                    · after {item.requires.join(', ')}
+                    {t('learnerLearn.trail.after', { list: formatList(item.requires, t) })}
                   </Text>
                 ) : null}
               </View>

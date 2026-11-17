@@ -1,4 +1,4 @@
-import { categoryLabel, formatSgd } from '@elevate/core'
+import { formatSgd } from '@elevate/core'
 import { Image } from 'expo-image'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
@@ -8,8 +8,9 @@ import { Platform, Pressable, View } from 'react-native'
 import { TAB_BAR_HEIGHT } from '@/components/PillTabBar'
 import { RichText } from '@/components/RichText'
 import { Trail } from '@/components/Trail'
-import { errorMessage } from '@/lib/api-error'
+import { useErrorMessage } from '@/lib/api-error'
 import { startCheckout, useCourseDetail } from '@/lib/catalog'
+import { categoryName } from '@/lib/categories'
 import { formatMinutes } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { useBreakpoint } from '@/lib/responsive'
@@ -24,10 +25,12 @@ export default function CourseDetail() {
   const router = useRouter()
   const { isWideWeb, isLg } = useBreakpoint()
   const { isSignedIn } = useSession()
-  const { locale } = usePreferences()
+  const { locale, t } = usePreferences()
+  const wordError = useErrorMessage()
   const course = useCourseDetail(slug)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // The error object, worded at render so a language switch rewords it
+  const [error, setError] = useState<unknown>(null)
 
   if (course.isPending) {
     return (
@@ -45,9 +48,9 @@ export default function CourseDetail() {
       <Screen bottomInset={isWideWeb ? 0 : TAB_BAR_HEIGHT}>
         <EmptyState
           tone="danger"
-          title="Course not found"
-          body={errorMessage(course.error)}
-          action={{ label: 'Back to Explore', onPress: () => router.replace('/') }}
+          title={t('learnerCourse.notFound.title')}
+          body={wordError(course.error)}
+          action={{ label: t('learnerCourse.notFound.back'), onPress: () => router.replace('/') }}
         />
       </Screen>
     )
@@ -75,7 +78,7 @@ export default function CourseDetail() {
           router.push(`/learn/${result.enrollmentId}`)
         }
       } catch (e) {
-        setError(errorMessage(e))
+        setError(e)
       } finally {
         setBusy(false)
       }
@@ -85,29 +88,37 @@ export default function CourseDetail() {
       router.push(`/checkout/${c.id}`)
       return
     }
-    await WebBrowser.openBrowserAsync(`${webBaseUrl()}/course/${c.slug}`)
+    await WebBrowser.openBrowserAsync(`${webBaseUrl()}/course/${c.slug}?lang=${locale}`)
   }
 
   const ctaLabel = enrolled
-    ? 'Continue learning'
+    ? t('learnerCourse.cta.continue')
     : c.priceCents === 0
-      ? 'Enrol for free'
+      ? t('learnerCourse.cta.enrolFree')
       : Platform.OS === 'web'
-        ? `Enrol · ${formatSgd(c.priceCents)}`
-        : 'Enrol on the web'
+        ? t('learnerCourse.cta.enrolPrice', { price: formatSgd(c.priceCents) })
+        : t('learnerCourse.cta.enrolOnWeb')
+  const lessonsText = t(
+    c.lessonCount === 1 ? 'learnerCourse.lessons.one' : 'learnerCourse.lessons.other',
+    {
+      count: c.lessonCount,
+    },
+  )
+  const itemsText = (count: number) =>
+    t(count === 1 ? 'learnerCourse.items.one' : 'learnerCourse.items.other', { count })
 
   const cta = (
     <Card style={{ gap: theme.space[4] }} elevated>
       <View style={{ gap: 4 }}>
         <Text variant="eyebrow" tone="tertiary">
-          {enrolled ? 'You are enrolled' : 'One payment, lifetime access'}
+          {enrolled ? t('learnerCourse.cta.eyebrowEnrolled') : t('learnerCourse.cta.eyebrow')}
         </Text>
         <Text variant="display" style={{ fontSize: 36, lineHeight: 40 }}>
-          {formatSgd(c.priceCents, { showFree: true })}
+          {c.priceCents === 0 ? t('learnerCommon.price.free') : formatSgd(c.priceCents)}
         </Text>
         {!enrolled && c.priceCents > 0 ? (
           <Text variant="small" tone="secondary">
-            All fees included. Secure payment by Stripe.
+            {t('learnerCourse.cta.fees')}
           </Text>
         ) : null}
       </View>
@@ -122,30 +133,35 @@ export default function CourseDetail() {
       />
       {checkout === 'cancelled' && !enrolled ? (
         <Text variant="small" tone="warning">
-          Payment was cancelled. You can try again whenever you like.
+          {t('learnerCourse.cta.cancelled')}
         </Text>
       ) : null}
-      {error ? (
+      {error !== null ? (
         <Text variant="small" tone="danger">
-          {error}
+          {wordError(error)}
         </Text>
       ) : null}
       {Platform.OS !== 'web' && !enrolled && c.priceCents > 0 ? (
         <Text variant="caption" tone="tertiary">
-          Checkout opens in your browser; your enrolment appears here afterwards.
+          {t('learnerCourse.cta.nativeNote')}
         </Text>
       ) : null}
       <View style={{ gap: theme.space[2] }}>
         {[
           {
             icon: Layers,
-            text: `${c.lessonCount} lesson${c.lessonCount === 1 ? '' : 's'} · ${c.artefactCount} items`,
+            text: t('learnerCourse.facts.lessonsItems', {
+              lessons: lessonsText,
+              items: itemsText(c.artefactCount),
+            }),
           },
           {
             icon: Clock,
-            text: c.durationSeconds ? `About ${formatMinutes(c.durationSeconds)}` : 'Self-paced',
+            text: c.durationSeconds
+              ? t('learnerCourse.facts.duration', { duration: formatMinutes(c.durationSeconds, t) })
+              : t('learnerCourse.facts.selfPaced'),
           },
-          { icon: Users, text: `${c.enrolCount} enrolled` },
+          { icon: Users, text: t('learnerCourse.facts.enrolled', { count: c.enrolCount }) },
         ].map((row) => (
           <View
             key={row.text}
@@ -170,7 +186,7 @@ export default function CourseDetail() {
           >
             <ArrowLeft size={16} color={theme.colors.inkSecondary} />
             <Text variant="small" tone="secondary">
-              Explore
+              {t('learnerCourse.back')}
             </Text>
           </Pressable>
         </Link>
@@ -196,8 +212,10 @@ export default function CourseDetail() {
             </View>
             <View style={{ gap: theme.space[3] }}>
               <View style={{ flexDirection: 'row', gap: theme.space[2], alignItems: 'center' }}>
-                <Badge label={categoryLabel(c.category)} tone="brand" />
-                {enrolled ? <Badge label="Enrolled" tone="success" /> : null}
+                <Badge label={categoryName(c.category, t)} tone="brand" />
+                {enrolled ? (
+                  <Badge label={t('learnerCourse.badge.enrolled')} tone="success" />
+                ) : null}
               </View>
               <Text variant={isLg ? 'display' : 'h1'}>{c.title}</Text>
               {c.summary ? (
@@ -221,30 +239,39 @@ export default function CourseDetail() {
             {!isLg ? cta : null}
 
             <View style={{ gap: theme.space[4] }}>
-              <Text variant="h2">What you will learn</Text>
+              <Text variant="h2">{t('learnerCourse.learn.title')}</Text>
               <Trail
-                items={c.lessons.map((l) => ({
-                  id: l.id,
-                  title: l.title,
-                  summary: l.summary,
-                  meta: `${l.artefacts.length} item${l.artefacts.length === 1 ? '' : 's'}${formatMinutes(l.artefacts.reduce((n, a) => n + (a.durationSeconds ?? 0), 0)) ? ` · ${formatMinutes(l.artefacts.reduce((n, a) => n + (a.durationSeconds ?? 0), 0))}` : ''}`,
-                  requires: l.prerequisiteIds
-                    .map((id) => lessonTitle.get(id) ?? '')
-                    .filter(Boolean),
-                }))}
+                items={c.lessons.map((l) => {
+                  const items = itemsText(l.artefacts.length)
+                  const duration = formatMinutes(
+                    l.artefacts.reduce((n, a) => n + (a.durationSeconds ?? 0), 0),
+                    t,
+                  )
+                  return {
+                    id: l.id,
+                    title: l.title,
+                    summary: l.summary,
+                    meta: duration
+                      ? t('learnerCourse.lesson.itemsDuration', { items, duration })
+                      : items,
+                    requires: l.prerequisiteIds
+                      .map((id) => lessonTitle.get(id) ?? '')
+                      .filter(Boolean),
+                  }
+                })}
               />
             </View>
 
             {c.descriptionJson ? (
               <View style={{ gap: theme.space[4] }}>
-                <Text variant="h2">About this course</Text>
+                <Text variant="h2">{t('learnerCourse.about.title')}</Text>
                 <RichText doc={c.descriptionJson} />
               </View>
             ) : null}
 
             <Card style={{ gap: theme.space[3] }} muted>
               <Text variant="eyebrow" tone="tertiary">
-                Your teacher
+                {t('learnerCourse.teacher.eyebrow')}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[3] }}>
                 <Avatar name={c.teacher.displayName} url={c.teacher.avatarUrl} size={56} />

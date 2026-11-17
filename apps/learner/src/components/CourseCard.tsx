@@ -1,9 +1,11 @@
-import { type CourseCard as CourseCardData, categoryLabel, formatSgd } from '@elevate/core'
+import { type CourseCard as CourseCardData, formatSgd } from '@elevate/core'
 import { typeScale } from '@elevate/tokens'
 import { Image } from 'expo-image'
 import { Link } from 'expo-router'
 import { Users } from 'lucide-react-native'
 import { Pressable, View } from 'react-native'
+import { categoryName } from '@/lib/categories'
+import { usePreferences } from '@/lib/preferences'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Badge } from '@/ui/Badge'
 import { Card } from '@/ui/Card'
@@ -11,6 +13,7 @@ import { Text } from '@/ui/Text'
 
 export function CourseCard({ course }: { course: CourseCardData }) {
   const theme = useTheme()
+  const { t } = usePreferences()
   return (
     <Link href={`/course/${course.slug}`} asChild>
       <Pressable accessibilityRole="link" style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}>
@@ -26,7 +29,7 @@ export function CourseCard({ course }: { course: CourseCardData }) {
             ) : null}
           </View>
           <View style={{ padding: theme.space[4], gap: theme.space[2] }}>
-            <Badge label={categoryLabel(course.category)} tone="brand" />
+            <Badge label={categoryName(course.category, t)} tone="brand" />
             {/* Always two lines tall, so a short title doesn't make a shorter card. */}
             <Text variant="h3" numberOfLines={2} style={{ minHeight: 2 * typeScale.h3.lineHeight }}>
               {course.title}
@@ -42,12 +45,20 @@ export function CourseCard({ course }: { course: CourseCardData }) {
                 marginTop: theme.space[1],
               }}
             >
-              <Text variant="price">{formatSgd(course.priceCents, { showFree: true })}</Text>
+              <Text variant="price">
+                {course.priceCents === 0
+                  ? t('learnerCommon.price.free')
+                  : formatSgd(course.priceCents)}
+              </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Users size={14} color={theme.colors.inkTertiary} />
                 <Text variant="caption" tone="tertiary">
-                  {course.enrolCount} · {course.lessonCount} lesson
-                  {course.lessonCount === 1 ? '' : 's'}
+                  {t(
+                    course.lessonCount === 1
+                      ? 'learnerExplore.card.meta.one'
+                      : 'learnerExplore.card.meta.other',
+                    { enrolled: course.enrolCount, count: course.lessonCount },
+                  )}
                 </Text>
               </View>
             </View>

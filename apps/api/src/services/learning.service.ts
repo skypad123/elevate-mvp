@@ -18,7 +18,7 @@ import {
 import { schema as s } from '@elevate/db'
 import { and, eq } from 'drizzle-orm'
 import type { Deps } from '../deps'
-import { errors } from '../lib/errors'
+import { errors, HttpError } from '../lib/errors'
 import type { SessionUser } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
 import { quizFromRow } from './courses.service'
@@ -73,7 +73,8 @@ export class LearningService {
       },
     })
     if (!enrollment || enrollment.userId !== user.id) throw errors.notFound('Enrollment')
-    if (enrollment.status !== 'active') throw errors.forbidden('This enrollment is not active')
+    if (enrollment.status !== 'active')
+      throw new HttpError(403, 'enrollment_inactive', 'This enrollment is not active')
     return enrollment
   }
 
@@ -168,13 +169,13 @@ export class LearningService {
     const state = st.lessons.find((l) => l.id === lessonId)
     if (state?.status === 'locked') {
       const titles = new Map(lessons.map((l) => [l.id, l.title]))
-      throw new (await import('../lib/errors')).HttpError(
+      const blockedByTitles = state.blockedBy.map((id) => titles.get(id) ?? '')
+      throw new HttpError(
         403,
         'lesson_locked',
-        `Finish ${state.blockedBy.map((id) => titles.get(id) ?? 'the previous lesson').join(' and ')} first`,
-        {
-          blockedBy: state.blockedBy,
-        },
+        `Finish ${blockedByTitles.map((title) => title || 'the previous lesson').join(' and ')} first`,
+        // The titles travel as data, so a client can word the sentence in its own language.
+        { blockedBy: state.blockedBy, blockedByTitles },
       )
     }
     const byArtefact = new Map(enrollment.progress.map((p) => [p.artefactId, p]))
@@ -276,7 +277,7 @@ export class LearningService {
     if (!lesson || !artefact) throw errors.notFound('Artefact')
     const st = this.states(enrollment)
     if (st.lessons.find((l) => l.id === lesson.id)?.status === 'locked')
-      throw errors.forbidden('This lesson is locked')
+      throw new HttpError(403, 'lesson_locked', 'This lesson is locked')
     if (artefact.type === 'quiz' && input.status === 'completed')
       throw errors.badRequest('quiz_completion', 'Quizzes are completed by passing them')
 
@@ -324,7 +325,7 @@ export class LearningService {
     if (!lesson || !artefact?.liveQuiz) throw errors.notFound('Quiz')
     const st = this.states(enrollment)
     if (st.lessons.find((l) => l.id === lesson.id)?.status === 'locked')
-      throw errors.forbidden('This lesson is locked')
+      throw new HttpError(403, 'lesson_locked', 'This lesson is locked')
     const quiz = quizFromRow(artefact.liveQuiz)
     if (!quiz.questions.length)
       throw errors.conflict('quiz_empty', 'This quiz has no questions yet')
@@ -431,12 +432,9 @@ export class LearningService {
     const progress = await this.recomputeCompletion(user, enrollmentId)
     const used = enrollment.attempts.filter((x) => x.quizId === quizId && x.submittedAt).length + 1
     if (expired)
-      throw new (await import('../lib/errors')).HttpError(
-        409,
-        'attempt_expired',
-        'Time ran out for this attempt',
-        { attemptsRemaining: Math.max(0, quiz.maxAttempts - used) },
-      )
+      throw new HttpError(409, 'attempt_expired', 'Time ran out for this attempt', {
+        attemptsRemaining: Math.max(0, quiz.maxAttempts - used),
+      })
     return {
       grade,
       passed: grade.passed,

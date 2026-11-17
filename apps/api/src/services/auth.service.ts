@@ -137,7 +137,7 @@ export class AuthService {
       .where(and(eq(s.magicLinks.id, link.id), isNull(s.magicLinks.consumedAt)))
       .returning()
     if (consumed.length === 0)
-      throw errors.badRequest('link_invalid', 'That sign-in link was already used.')
+      throw errors.badRequest('link_used', 'That sign-in link was already used.')
 
     const user = await this.findOrCreateUser(link.email)
     // A chosen language overwrites the account's; a guess only fills one that is empty or guessed.

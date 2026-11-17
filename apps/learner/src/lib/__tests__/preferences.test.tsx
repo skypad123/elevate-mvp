@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { Platform, Pressable, Text, useColorScheme } from 'react-native'
 import { PreferencesProvider, usePreferences } from '@/lib/preferences'
 import { preferencesStorage } from '@/lib/preferences-storage'
+import { setMockDeviceLanguages } from '@/test-utils/device-languages'
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
 
 /** Renders provider state as text so tests can read it, and exposes a setter button. */
@@ -150,12 +151,32 @@ describe('ThemeProvider', () => {
 })
 
 describe('the resolved locale', () => {
-  it('is English under "system" on native, which reads no device languages yet', async () => {
+  it('follows an English phone under "system"', async () => {
+    setMockDeviceLanguages(['en-SG', 'zh-SG'])
     await renderApp()
     await waitFor(() => expect(text('ready')).toBe('true'))
     expect(text('locale')).toBe('system')
     expect(text('resolved')).toBe('en')
     expect(text('label')).toBe('Settings')
+  })
+
+  it('follows a Chinese phone on first launch, Traditional included, without storing it', async () => {
+    setMockDeviceLanguages(['zh-Hant-TW', 'en'])
+    await renderApp()
+    await waitFor(() => expect(text('ready')).toBe('true'))
+    expect(text('resolved')).toBe('zh')
+    expect(text('label')).toBe('设置')
+    expect(JSON.parse((await AsyncStorage.getItem(PREFERENCES_STORAGE_KEY)) ?? '{}').locale).toBe(
+      'system',
+    )
+  })
+
+  it('keeps a stored English on a Chinese phone', async () => {
+    setMockDeviceLanguages(['zh-CN'])
+    await seed('{"locale":"en"}')
+    await renderApp()
+    await waitFor(() => expect(text('ready')).toBe('true'))
+    expect(text('resolved')).toBe('en')
   })
 
   it('follows a stored choice over the account', async () => {
@@ -188,13 +209,13 @@ describe('the resolved locale on web', () => {
   const setWeb = (search: string, languages: readonly string[]) => {
     restoreOS = jest.replaceProperty(Platform, 'OS', 'web').restore
     Object.defineProperty(window, 'location', { value: { search }, configurable: true })
-    Object.defineProperty(navigator, 'languages', { value: languages, configurable: true })
+    // Jest resolves the native modules, so the browser's languages come through the same mock.
+    setMockDeviceLanguages(languages)
   }
 
   afterEach(() => {
     restoreOS()
     Reflect.deleteProperty(window, 'location')
-    Reflect.deleteProperty(navigator, 'languages')
   })
 
   it('guesses from the browser languages', async () => {

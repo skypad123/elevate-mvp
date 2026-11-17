@@ -33,11 +33,15 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
   Never `text-brand` (Support's yellow fails contrast as text). See `docs/adr/008-*`.
 - New user preference = a field with a `.default()` in `packages/core/src/contracts/preferences.ts`
   plus a row in `PreferenceRows` (web) and the learner Profile card.
-- Translated pages (navigation, Settings/Preferences/Profile, the Teach dashboard and start page,
-  and the teaching-profile screens of Teach and Support) have no English literals: a new string there is a key in that page's area,
+- Translated pages (the whole learner app, navigation, Settings/Preferences/Profile, the Teach
+  dashboard and start page, and the teaching-profile screens of Teach and Support) have no English
+  literals: a new string there is a key in that page's area (a learner screen's in a `learner*` area),
   `packages/i18n/src/messages/areas/<area>.en.ts` and `<area>.zh.ts`. A message is a whole sentence;
   enum labels, plurals, sentences with links, dates, lists and error text (`useErrorMessage()`)
   follow the patterns in `docs/adr/008-*`. Other pages are English until one is translated whole.
+- The learner app words API errors from their codes, never from the API's English `message`: an
+  error a learner can reach has a code in `USER_ERROR_CODES` (`packages/core/src/contracts/errors.ts`)
+  and a message `apiError.<code>`, one code per meaning, with variable parts in `details` (ADR 010).
 - No inline `<script>` in a portal's `index.html`: the deployed sites send `script-src 'self'`.
   The pre-paint theme script is `public/preferences-init.js`.
 - Learner unit tests use jest-expo (`npm -w @elevate/learner test`, files under `src/**/__tests__`); the

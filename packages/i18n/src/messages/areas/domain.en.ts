@@ -45,4 +45,16 @@ export const domainEn = {
   'stripe.account': 'Stripe account',
   'stripe.connect': 'Connect Stripe',
   'stripe.openDashboard': 'Open Stripe dashboard',
+
+  // A course's category, by its slug in COURSE_CATEGORIES (@elevate/core)
+  'category.arts-culture': 'Arts & Culture',
+  'category.business': 'Business',
+  'category.craft-making': 'Craft & Making',
+  'category.design': 'Design',
+  'category.food-drink': 'Food & Drink',
+  'category.language': 'Language',
+  'category.music': 'Music',
+  'category.photography-film': 'Photography & Film',
+  'category.technology': 'Technology',
+  'category.wellness': 'Wellness',
 } as const
