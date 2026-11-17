@@ -3,7 +3,7 @@ import type { Translator } from '@elevate/i18n'
 import { CheckCircle2, CircleAlert, Clock, HelpCircle, Trophy, XCircle } from 'lucide-react-native'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { useErrorMessage } from '@/lib/api-error'
+import { ApiError, useErrorMessage } from '@/lib/api-error'
 import { startQuiz, submitQuiz } from '@/lib/learning'
 import { usePreferences } from '@/lib/preferences'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -59,14 +59,22 @@ function introText(
   )
 }
 
+/** The attempt is over on the server: time ran out, or another submit got there first. */
+const attemptOver = (error: unknown) =>
+  error instanceof ApiError &&
+  (error.code === 'attempt_expired' || error.code === 'already_submitted')
+
 export function QuizRunner({
   enrollmentId,
   artefact,
   onUpdated,
+  onAttemptEnded,
 }: {
   enrollmentId: string
   artefact: QuizArtefact
   onUpdated: (result: QuizSubmitResult) => void
+  /** An attempt ended without a result (it ran out of time): reload the attempts left. */
+  onAttemptEnded?: () => void
 }) {
   const theme = useTheme()
   const { t } = usePreferences()
@@ -110,17 +118,28 @@ export function QuizRunner({
       onUpdated(result)
     } catch (e) {
       setError({ error: e })
+      // Submitting again would only answer already_submitted: the attempt is over, so go back to
+      // the start, where the error says why and the attempts left are reloaded.
+      if (attemptOver(e)) {
+        setPhase({ kind: 'intro' })
+        onAttemptEnded?.()
+      }
     } finally {
       setBusy(false)
     }
   }
 
-  // Auto-submit when the time limit runs out; a ref keeps the latest submit without re-running the effect.
+  // Auto-submit when the time limit runs out, once per attempt: a failed submit must not run again
+  // when `busy` flips back. A ref keeps the latest submit without re-running the effect.
   const submitRef = useRef(submit)
   submitRef.current = submit
+  const autoSubmitted = useRef<string | null>(null)
+  const takingId = phase.kind === 'taking' ? phase.attemptId : null
   useEffect(() => {
-    if (phase.kind === 'taking' && secondsLeft === 0 && !busy) void submitRef.current()
-  }, [secondsLeft, phase.kind, busy])
+    if (takingId === null || secondsLeft !== 0 || busy || autoSubmitted.current === takingId) return
+    autoSubmitted.current = takingId
+    void submitRef.current()
+  }, [secondsLeft, takingId, busy])
 
   const total = artefact.quiz?.questions.length ?? 0
   const answered = useMemo(
