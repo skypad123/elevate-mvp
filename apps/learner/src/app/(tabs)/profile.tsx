@@ -15,7 +15,7 @@ import { Avatar, Badge, Button, Card, Chip, Input, Screen, Text } from '@/ui'
 export default function Profile() {
   const theme = useTheme()
   const { isWideWeb } = useBreakpoint()
-  const { user, signOut, refreshUser } = useSession()
+  const { user, signOut, refreshUser, chooseLocale } = useSession()
   const { preferences, setPreference, t } = usePreferences()
   const [name, setName] = useState(user?.name ?? '')
   const [saving, setSaving] = useState(false)
@@ -118,13 +118,13 @@ export default function Profile() {
               accessibilityLabel={t('prefs.language')}
               style={{ flexDirection: 'row', gap: theme.space[2], flexWrap: 'wrap' }}
             >
-              {supportedLocales.map((locale) => (
+              {([...supportedLocales, 'system'] as const).map((option) => (
                 <Chip
-                  key={locale}
+                  key={option}
                   role="radio"
-                  label={localeNames[locale]}
-                  selected={preferences.locale === locale}
-                  onPress={() => setPreference('locale', locale)}
+                  label={option === 'system' ? t('prefs.language.system') : localeNames[option]}
+                  selected={preferences.locale === option}
+                  onPress={() => chooseLocale(option)}
                 />
               ))}
             </View>

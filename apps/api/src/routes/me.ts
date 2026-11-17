@@ -23,6 +23,8 @@ export const meRoutes = (deps: Deps) => {
       const body = c.req.valid('json')
       const patch: Partial<typeof s.users.$inferInsert> = {}
       if (body.name !== undefined) patch.name = body.name
+      if (body.locale !== undefined) patch.locale = body.locale
+      if (body.localeChosen !== undefined) patch.localeChosen = body.localeChosen
       if (body.avatarMediaId === null) patch.avatarUrl = null
       else if (body.avatarMediaId) {
         const asset = await media.getOwnedReadyAsset(user, body.avatarMediaId, 'image')

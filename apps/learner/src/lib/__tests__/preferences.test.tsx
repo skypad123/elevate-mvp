@@ -1,26 +1,30 @@
 import { defaultPreferences, PREFERENCES_STORAGE_KEY } from '@elevate/core'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native'
-import { Pressable, Text, useColorScheme } from 'react-native'
+import { Platform, Pressable, Text, useColorScheme } from 'react-native'
 import { PreferencesProvider, usePreferences } from '@/lib/preferences'
 import { preferencesStorage } from '@/lib/preferences-storage'
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
 
 /** Renders provider state as text so tests can read it, and exposes a setter button. */
 function Probe() {
-  const { preferences, ready, setPreference, t } = usePreferences()
+  const { preferences, ready, setPreference, locale, setAccountLocale, t } = usePreferences()
   const theme = useTheme()
   return (
     <>
       <Text testID="ready">{String(ready)}</Text>
       <Text testID="theme">{preferences.theme}</Text>
       <Text testID="locale">{preferences.locale}</Text>
+      <Text testID="resolved">{locale}</Text>
       <Text testID="scheme">{theme.scheme}</Text>
       <Text testID="system">{useColorScheme() ?? 'null'}</Text>
       <Text testID="label">{t('nav.settings')}</Text>
       <Pressable testID="go-dark" onPress={() => setPreference('theme', 'dark')} />
       <Pressable testID="go-zh" onPress={() => setPreference('locale', 'zh')} />
       <Pressable testID="go-light" onPress={() => setPreference('theme', 'light')} />
+      <Pressable testID="go-system" onPress={() => setPreference('locale', 'system')} />
+      <Pressable testID="account-zh" onPress={() => setAccountLocale('zh')} />
+      <Pressable testID="account-none" onPress={() => setAccountLocale(null)} />
     </>
   )
 }
@@ -35,6 +39,10 @@ function renderApp() {
   )
 }
 
+const press = (id: string) =>
+  act(async () => {
+    fireEvent.press(screen.getByTestId(id))
+  })
 const text = (id: string) => screen.getByTestId(id).props.children as string
 const seed = (value: string) => AsyncStorage.setItem(PREFERENCES_STORAGE_KEY, value)
 // The official mock's methods are jest.fn()s; call them directly. Do not jest.spyOn/mockRestore them:
@@ -138,5 +146,100 @@ describe('ThemeProvider', () => {
       fireEvent.press(screen.getByTestId('go-light'))
     })
     expect(text('scheme')).toBe('light')
+  })
+})
+
+describe('the resolved locale', () => {
+  it('is English under "system" on native, which reads no device languages yet', async () => {
+    await renderApp()
+    await waitFor(() => expect(text('ready')).toBe('true'))
+    expect(text('locale')).toBe('system')
+    expect(text('resolved')).toBe('en')
+    expect(text('label')).toBe('Settings')
+  })
+
+  it('follows a stored choice over the account', async () => {
+    await seed('{"locale":"en"}')
+    await renderApp()
+    await waitFor(() => expect(text('ready')).toBe('true'))
+    await press('account-zh')
+    expect(text('resolved')).toBe('en')
+    await press('go-zh')
+    expect(text('resolved')).toBe('zh')
+  })
+
+  it('follows the account under "system" until it is cleared, without storing it', async () => {
+    await renderApp()
+    await waitFor(() => expect(text('ready')).toBe('true'))
+    await press('account-zh')
+    expect(text('locale')).toBe('system')
+    expect(text('resolved')).toBe('zh')
+    expect(text('label')).toBe('设置')
+    await press('account-none')
+    expect(text('resolved')).toBe('en')
+    expect(JSON.parse((await AsyncStorage.getItem(PREFERENCES_STORAGE_KEY)) ?? '{}').locale).toBe(
+      'system',
+    )
+  })
+})
+
+describe('the resolved locale on web', () => {
+  let restoreOS: () => void = () => {}
+  const setWeb = (search: string, languages: readonly string[]) => {
+    restoreOS = jest.replaceProperty(Platform, 'OS', 'web').restore
+    Object.defineProperty(window, 'location', { value: { search }, configurable: true })
+    Object.defineProperty(navigator, 'languages', { value: languages, configurable: true })
+  }
+
+  afterEach(() => {
+    restoreOS()
+    Reflect.deleteProperty(window, 'location')
+    Reflect.deleteProperty(navigator, 'languages')
+  })
+
+  it('guesses from the browser languages', async () => {
+    setWeb('', ['zh-TW', 'en'])
+    await renderApp()
+    await waitFor(() => expect(text('ready')).toBe('true'))
+    expect(text('resolved')).toBe('zh')
+  })
+
+  it('uses ?lang over the browser, never stores it, and keeps it after the URL changes', async () => {
+    setWeb('?lang=zh', ['en-SG'])
+    await renderApp()
+    await waitFor(() => expect(text('ready')).toBe('true'))
+    expect(text('resolved')).toBe('zh')
+    Object.defineProperty(window, 'location', { value: { search: '' }, configurable: true })
+    await press('go-dark')
+    expect(text('resolved')).toBe('zh')
+    expect(JSON.parse((await AsyncStorage.getItem(PREFERENCES_STORAGE_KEY)) ?? '{}').locale).toBe(
+      'system',
+    )
+  })
+
+  it('lets a stored choice beat ?lang', async () => {
+    setWeb('?lang=zh', [])
+    await seed('{"locale":"en"}')
+    await renderApp()
+    await waitFor(() => expect(text('ready')).toBe('true'))
+    expect(text('resolved')).toBe('en')
+    await press('go-system')
+    expect(text('resolved')).toBe('zh')
+  })
+
+  it('lets a chosen account beat ?lang', async () => {
+    setWeb('?lang=en', [])
+    await renderApp()
+    await waitFor(() => expect(text('ready')).toBe('true'))
+    expect(text('resolved')).toBe('en')
+    await press('account-zh')
+    expect(text('resolved')).toBe('zh')
+  })
+
+  it('ignores an unsupported ?lang', async () => {
+    setWeb('?lang=klingon', ['en'])
+    await renderApp()
+    await waitFor(() => expect(text('ready')).toBe('true'))
+    expect(text('resolved')).toBe('en')
   })
 })

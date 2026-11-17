@@ -1,12 +1,25 @@
-import { index, integer, primaryKey, snakeCase, text, unique, uuid } from 'drizzle-orm/pg-core'
+import {
+  boolean,
+  index,
+  integer,
+  primaryKey,
+  snakeCase,
+  text,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core'
 import { citext, createdAt, id, ts, updatedAt } from './columns'
-import { audienceEnum, identityProviderEnum, userRoleEnum } from './enums'
+import { audienceEnum, identityProviderEnum, localeEnum, userRoleEnum } from './enums'
 
 export const users = snakeCase.table('users', {
   id: id(),
   email: citext().notNull().unique(),
   name: text(),
   avatarUrl: text(),
+  /** The account's language, for emails and Stripe. Null until a device sends one (ADR 010). */
+  locale: localeEnum(),
+  /** True when a person picked `locale`; false when a device guessed it. */
+  localeChosen: boolean().notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })

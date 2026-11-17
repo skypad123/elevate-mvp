@@ -1,4 +1,4 @@
-import type { PreferenceKey, Preferences } from '@elevate/core'
+import { type Locale, type PreferenceKey, type Preferences, resolveLocale } from '@elevate/core'
 import { createTranslator, type Translator } from '@elevate/i18n'
 import type { ColorScheme } from '@elevate/tokens'
 import {
@@ -18,6 +18,8 @@ export type PreferencesContextValue = {
   setPreference: <K extends PreferenceKey>(key: K, value: Preferences[K]) => void
   /** The scheme actually on screen: the explicit choice, or the OS scheme under `system`. */
   resolvedScheme: ColorScheme
+  /** The language actually on screen: the stored choice, or the browser's language under `system`. */
+  locale: Locale
   t: Translator
 }
 
@@ -32,17 +34,20 @@ const subscribeSystemScheme = (onChange: () => void) => {
 const getSystemScheme = (): ColorScheme => (darkQuery().matches ? 'dark' : 'light')
 const getServerScheme = (): ColorScheme => 'light'
 
+const deviceLanguages = (): readonly string[] =>
+  typeof navigator === 'undefined' ? [] : navigator.languages
+
 /**
  * Applies `data-theme` and `lang` to <html>. `system` removes the attribute so the
  * `prefers-color-scheme` rules in tokens.css take over. The pre-paint script
  * (`public/preferences-init.js` in each portal) does the same before React loads; this keeps it
  * in sync afterwards.
  */
-function applyToDocument(preferences: Preferences) {
+function applyToDocument(theme: Preferences['theme'], locale: Locale) {
   const root = document.documentElement
-  if (preferences.theme === 'system') root.removeAttribute('data-theme')
-  else root.dataset.theme = preferences.theme
-  root.lang = preferences.locale
+  if (theme === 'system') root.removeAttribute('data-theme')
+  else root.dataset.theme = theme
+  root.lang = locale
 }
 
 const defaultStore = createPreferencesStore()
@@ -56,12 +61,17 @@ export function PreferencesProvider({
 }) {
   const [preferences, setPreferences] = useState<Preferences>(() => store.read())
   const systemScheme = useSyncExternalStore(subscribeSystemScheme, getSystemScheme, getServerScheme)
+  // Teach and Support have no account language yet, so `system` follows the browser (ADR 010).
+  const locale = useMemo(
+    () => resolveLocale({ stored: preferences.locale, deviceLanguages: deviceLanguages() }),
+    [preferences.locale],
+  )
 
   // Persist after every change (also normalises whatever was stored before) and apply to <html>.
   useEffect(() => {
     store.write(preferences)
-    applyToDocument(preferences)
-  }, [preferences, store])
+    applyToDocument(preferences.theme, locale)
+  }, [preferences, locale, store])
 
   // Another tab changed the stored value: follow it.
   useEffect(() => {
@@ -78,16 +88,17 @@ export function PreferencesProvider({
 
   // `t` changes only with the language, so an effect or callback that depends on it is not re-run
   // by a theme change.
-  const t = useMemo(() => createTranslator(preferences.locale), [preferences.locale])
+  const t = useMemo(() => createTranslator(locale), [locale])
 
   const value = useMemo<PreferencesContextValue>(
     () => ({
       preferences,
       setPreference,
       resolvedScheme: preferences.theme === 'system' ? systemScheme : preferences.theme,
+      locale,
       t,
     }),
-    [preferences, setPreference, systemScheme, t],
+    [preferences, setPreference, systemScheme, locale, t],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
@@ -99,7 +110,7 @@ export function usePreferences(): PreferencesContextValue {
   return ctx
 }
 
-/** Translator bound to the current language preference. */
+/** Translator bound to the language on screen. */
 export function useT(): Translator {
   return usePreferences().t
 }

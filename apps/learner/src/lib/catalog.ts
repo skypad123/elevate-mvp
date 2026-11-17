@@ -6,6 +6,7 @@ import type {
   CourseCard,
   CoursePublicView,
   EnrollmentSummary,
+  Locale,
   Page,
   QuoteResponse,
 } from '@elevate/core'
@@ -71,14 +72,15 @@ export async function fetchQuote(courseId: string, promoCode?: string): Promise<
   )) as QuoteResponse
 }
 
+/** `locale` is the language on screen; Stripe's page and the return URLs follow it. */
 export async function startCheckout(
   courseId: string,
-  promoCode?: string,
+  { locale, promoCode }: { locale: Locale; promoCode?: string },
 ): Promise<CheckoutStartResponse> {
   return (await unwrap(
     await api.checkout.courses[':id'].$post({
       param: { id: courseId },
-      json: promoCode ? { promoCode } : {},
+      json: { locale, ...(promoCode ? { promoCode } : {}) },
     }),
   )) as CheckoutStartResponse
 }

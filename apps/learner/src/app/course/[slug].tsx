@@ -11,6 +11,7 @@ import { Trail } from '@/components/Trail'
 import { errorMessage } from '@/lib/api-error'
 import { startCheckout, useCourseDetail } from '@/lib/catalog'
 import { formatMinutes } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { useBreakpoint } from '@/lib/responsive'
 import { useSession } from '@/lib/session'
 import { webBaseUrl } from '@/lib/web-url'
@@ -23,6 +24,7 @@ export default function CourseDetail() {
   const router = useRouter()
   const { isWideWeb, isLg } = useBreakpoint()
   const { isSignedIn } = useSession()
+  const { locale } = usePreferences()
   const course = useCourseDetail(slug)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -67,7 +69,7 @@ export default function CourseDetail() {
     if (c.priceCents === 0) {
       setBusy(true)
       try {
-        const result = await startCheckout(c.id)
+        const result = await startCheckout(c.id, { locale })
         if (result.kind === 'enrolled') {
           await course.refetch()
           router.push(`/learn/${result.enrollmentId}`)

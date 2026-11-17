@@ -1,0 +1,111 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "184fcaf0-7268-4232-b289-8bbacdd0def2",
+  "prevIds": [
+    "a4748bbd-0527-4d42-a3b3-0e80826eaa51"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "public",
+        "locale"
+      ],
+      "writes": [
+        "s|enum|public.locale",
+        "n|enum|public.locale",
+        "e|enum|public.locale",
+        "n|type|public.locale"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "users",
+        "locale"
+      ],
+      "writes": [
+        "s|col|public.users.locale",
+        "n|col|public.users.locale",
+        "e|col|public.users.locale"
+      ],
+      "reads": [
+        "n|tbl|public.users",
+        "n|sch|public",
+        "n|enum|public.locale"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "users",
+        "locale_chosen"
+      ],
+      "writes": [
+        "s|col|public.users.locale_chosen",
+        "n|col|public.users.locale_chosen",
+        "e|col|public.users.locale_chosen"
+      ],
+      "reads": [
+        "n|tbl|public.users",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "locale",
+        "values": [
+          "en",
+          "zh"
+        ],
+        "entityType": "enums"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "users",
+        "name": "locale",
+        "type": "locale",
+        "typeSchema": "public",
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "users",
+        "name": "locale_chosen",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

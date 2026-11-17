@@ -1,10 +1,11 @@
-import { emailSchema } from '@elevate/core'
+import { emailSchema, isChosen } from '@elevate/core'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { ArrowRight, MailCheck } from 'lucide-react-native'
 import { useState } from 'react'
 import { Platform, View } from 'react-native'
 import { api } from '@/lib/api'
 import { errorMessage, unwrap } from '@/lib/api-error'
+import { usePreferences } from '@/lib/preferences'
 import { useSession } from '@/lib/session'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Button, Card, CodeInput, Input, Logo, Screen, Text } from '@/ui'
@@ -15,6 +16,7 @@ export default function SignIn() {
   const theme = useTheme()
   const router = useRouter()
   const { signIn } = useSession()
+  const { locale, preferences } = usePreferences()
   const { redirect } = useLocalSearchParams<{ redirect?: string }>()
   const [step, setStep] = useState<Step>({ kind: 'email' })
   const [email, setEmail] = useState('')
@@ -36,7 +38,7 @@ export default function SignIn() {
     try {
       await unwrap(
         await api.auth['magic-link'].$post({
-          json: { email: parsed.data, audience: 'learner', redirectPath },
+          json: { email: parsed.data, audience: 'learner', redirectPath, locale },
         }),
       )
       setStep({ kind: 'code', email: parsed.data })
@@ -54,7 +56,14 @@ export default function SignIn() {
     setError(null)
     try {
       const result = await unwrap(
-        await api.auth.verify.$post({ json: { email: step.email, code: value } }),
+        await api.auth.verify.$post({
+          json: {
+            email: step.email,
+            code: value,
+            locale,
+            localeChosen: isChosen(preferences.locale),
+          },
+        }),
       )
       await signIn(result.token, result.user)
       router.replace((result.redirectPath ?? redirectPath ?? '/') as never)

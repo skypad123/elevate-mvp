@@ -1,3 +1,4 @@
+import type { Locale } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { createPgliteDb } from '@elevate/db/pglite'
 import { eq } from 'drizzle-orm'
@@ -67,12 +68,21 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     return { status: res.status, body: body as T, res }
   }
 
-  async function signIn(email: string, audience: 'learner' | 'teach' | 'support' = 'learner') {
-    const requested = await api('POST', '/api/auth/magic-link', { body: { email, audience } })
+  /** Signs in by code. `opts` is the device's language, sent as the learner app sends it. */
+  async function signIn(
+    email: string,
+    audience: 'learner' | 'teach' | 'support' = 'learner',
+    opts: { locale?: Locale; localeChosen?: boolean } = {},
+  ) {
+    const requested = await api('POST', '/api/auth/magic-link', {
+      body: { email, audience, locale: opts.locale },
+    })
     if (requested.status !== 200)
       throw new Error(`magic link request failed: ${JSON.stringify(requested.body)}`)
     const code = requested.body.dev.code as string
-    const verified = await api('POST', '/api/auth/verify', { body: { email, code } })
+    const verified = await api('POST', '/api/auth/verify', {
+      body: { email, code, locale: opts.locale, localeChosen: opts.localeChosen },
+    })
     return {
       status: verified.status,
       body: verified.body,
