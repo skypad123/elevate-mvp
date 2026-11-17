@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { uuidSchema } from './common'
+import { localeSchema } from './preferences'
 
 export const promoCodeInputSchema = z
   .string()
@@ -17,6 +18,8 @@ export type QuoteRequest = z.infer<typeof quoteRequestSchema>
 
 export const checkoutRequestSchema = z.object({
   promoCode: promoCodeInputSchema.optional(),
+  /** The language on screen; Stripe Checkout and the return pages follow it. */
+  locale: localeSchema.optional(),
 })
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>
 

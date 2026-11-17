@@ -33,6 +33,7 @@ export const chromeEn = {
   'prefs.language': 'Language',
   'prefs.language.description':
     'Applies to menus and settings. More of Elevate is translated over time.',
+  'prefs.language.system': 'Follow device',
 
   // Settings pages
   'settings.eyebrow': 'Settings',

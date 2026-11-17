@@ -7,6 +7,17 @@ import {
 } from '../src/contracts/preferences'
 
 describe('parseStoredPreferences', () => {
+  it('defaults the language to system, which means not chosen on this device', () => {
+    expect(defaultPreferences.locale).toBe('system')
+    expect(parseStoredPreferences({}).locale).toBe('system')
+  })
+
+  it('keeps a language stored before system existed, as a choice', () => {
+    expect(parseStoredPreferences({ locale: 'en' }).locale).toBe('en')
+    expect(parseStoredPreferences({ locale: 'zh' }).locale).toBe('zh')
+    expect(parseStoredPreferences({ locale: 'system' }).locale).toBe('system')
+  })
+
   it('returns defaults for nothing stored', () => {
     expect(parseStoredPreferences(null)).toEqual(defaultPreferences)
     expect(parseStoredPreferences(undefined)).toEqual(defaultPreferences)
@@ -40,7 +51,7 @@ describe('parseStoredPreferences', () => {
     })
     expect(parseStoredPreferences({ theme: 'dark', locale: 'klingon' })).toEqual({
       theme: 'dark',
-      locale: 'en',
+      locale: 'system',
     })
   })
 

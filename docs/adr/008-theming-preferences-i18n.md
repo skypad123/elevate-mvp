@@ -51,9 +51,10 @@ cannot corrupt what users already have stored.
   The native read and the ready gate are unit-tested with jest-expo and the AsyncStorage mock
   (`apps/learner/src/lib/__tests__/preferences.test.tsx`); `.maestro/learner-preferences.yaml` checks a
   cold relaunch on a simulator via the `app-root-<scheme>` testID on the root view.
-- Not synced to the account for now. If that is wanted later: add `users.preferences jsonb`,
-  `updateMeSchema.preferences = preferencesSchema.partial()`, and merge server values through the
-  same `parseStoredPreferences` — the UI does not change.
+- Not synced to the account for now (amended by
+  [ADR 010](010-locale-resolution-and-email-language.md)). If that is wanted later: add
+  `users.preferences jsonb`, `updateMeSchema.preferences = preferencesSchema.partial()`, and merge
+  server values through the same `parseStoredPreferences` — the UI does not change.
 
 ### i18n is a small typed catalog package, `@elevate/i18n`
 

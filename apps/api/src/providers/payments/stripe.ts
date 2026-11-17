@@ -109,6 +109,7 @@ export class StripePaymentsProvider implements PaymentsProvider {
         metadata: input.metadata,
         success_url: input.successUrl,
         cancel_url: input.cancelUrl,
+        ...(input.locale ? { locale: input.locale } : {}),
         expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       },
       { idempotencyKey: checkoutIdempotencyKey(input) },

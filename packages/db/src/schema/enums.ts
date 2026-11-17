@@ -1,7 +1,13 @@
+import type { supportedLocales } from '@elevate/core'
 import { pgEnum } from 'drizzle-orm/pg-core'
 
 export const identityProviderEnum = pgEnum('identity_provider', ['email', 'singpass'])
 export const audienceEnum = pgEnum('audience', ['learner', 'teach', 'support'])
+/**
+ * The account's language (ADR 010). Typecheck fails until this list matches `supportedLocales`;
+ * a new language also needs `npm run db:generate` for its migration.
+ */
+export const localeEnum = pgEnum('locale', ['en', 'zh'] as const satisfies typeof supportedLocales)
 /** Platform staff roles. Teaching is not a role: it comes from owning or belonging to a profile. */
 export const userRoleEnum = pgEnum('user_role', ['support_agent', 'super_admin'])
 export const profileStatusEnum = pgEnum('profile_status', ['applied', 'approved', 'rejected'])

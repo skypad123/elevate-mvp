@@ -3,6 +3,8 @@ import {
   type CheckoutStartResponse,
   type CheckoutSyncResponse,
   formatSgd,
+  type Locale,
+  localeSchema,
   type PromoDiscount,
   type QuoteResponse,
   quote,
@@ -14,6 +16,7 @@ import { simpleEmail } from '../emails/templates'
 import { errors } from '../lib/errors'
 import { isPayable } from '../lib/payout'
 import type { SessionUser } from '../middleware/auth'
+import type { CheckoutSessionResult } from '../providers/payments/types'
 import { recordAudit, trackEvent } from './audit.service'
 import { MediaService } from './media.service'
 
@@ -100,7 +103,7 @@ export class PaymentsService {
   async startCheckout(
     user: SessionUser,
     courseId: string,
-    promoCode?: string,
+    { promoCode, locale }: { promoCode?: string; locale?: Locale } = {},
   ): Promise<CheckoutStartResponse> {
     const { db, env, payments } = this.deps
     const course = await this.loadCourse(courseId)
@@ -152,7 +155,7 @@ export class PaymentsService {
       await trackEvent(this.deps, {
         userId: user.id,
         name: ANALYTICS_EVENTS.checkoutCompleted,
-        properties: { courseId, free: true },
+        properties: { courseId, free: true, locale: locale ?? null },
       })
       return { kind: 'enrolled', enrollmentId }
     }
@@ -195,6 +198,8 @@ export class PaymentsService {
 
     // The payee is fixed here, when checkout starts, and travels in the session's metadata.
     // Fulfilment reads it from there, never from the course as it is later.
+    // The return pages open in the language checkout started in.
+    const lang = locale ? `&lang=${locale}` : ''
     const session = await payments.createCheckoutSession({
       enrollmentId,
       payoutAccountId: account.id,
@@ -206,8 +211,9 @@ export class PaymentsService {
       applicationFeeCents: q.applicationFeeCents,
       destinationAccountId: account.stripeAccountId,
       customerEmail: user.email,
-      successUrl: `${env.LEARNER_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${env.LEARNER_URL}/course/${course.slug}?checkout=cancelled`,
+      successUrl: `${env.LEARNER_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}${lang}`,
+      cancelUrl: `${env.LEARNER_URL}/course/${course.slug}?checkout=cancelled${lang}`,
+      locale,
       metadata: {
         enrollmentId,
         courseId,
@@ -222,6 +228,7 @@ export class PaymentsService {
         commissionCents: String(q.commissionCents),
         applicationFeeCents: String(q.applicationFeeCents),
         teacherNetCents: String(q.teacherNetCents),
+        ...(locale ? { locale } : {}),
       },
     })
     await db
@@ -231,22 +238,50 @@ export class PaymentsService {
     await trackEvent(this.deps, {
       userId: user.id,
       name: ANALYTICS_EVENTS.checkoutStarted,
-      properties: { courseId, amountCents: q.amountCents },
+      properties: { courseId, amountCents: q.amountCents, locale: locale ?? null },
     })
     return { kind: 'redirect', url: session.url, sessionId: session.id }
+  }
+
+  /**
+   * The enrolment a Checkout session belongs to. Starting checkout again (in another language, or
+   * with another promo code) opens a new session and points the enrolment at it, but the older
+   * session stays payable until it expires. So a session the enrolment no longer points at is
+   * matched through its metadata, and only to the learner who started it.
+   */
+  private async enrollmentForSession(sessionId: string, metadata: Record<string, string>) {
+    const { db } = this.deps
+    const current = await db.query.enrollments.findFirst({
+      where: { stripeCheckoutSessionId: sessionId },
+      with: { course: true, user: true },
+    })
+    if (current) return current
+    const enrollmentId = metadata.enrollmentId
+    if (!enrollmentId || !UUID.test(enrollmentId)) return undefined
+    const earlier = await db.query.enrollments.findFirst({
+      where: { id: enrollmentId },
+      with: { course: true, user: true },
+    })
+    return earlier && earlier.userId === metadata.userId ? earlier : undefined
   }
 
   /** Success-page poll and no-webhook fallback: re-read the session and run the same fulfilment. */
   async syncSession(user: SessionUser, sessionId: string): Promise<CheckoutSyncResponse> {
     const { db, payments } = this.deps
-    const enrollment = await db.query.enrollments.findFirst({
+    let session: CheckoutSessionResult | null = null
+    let enrollment = await db.query.enrollments.findFirst({
       where: { stripeCheckoutSessionId: sessionId },
-      with: { course: true },
+      with: { course: true, user: true },
     })
+    if (!enrollment) {
+      // An earlier session of a checkout that was started again.
+      session = await payments.retrieveCheckoutSession(sessionId).catch(() => null)
+      if (session) enrollment = await this.enrollmentForSession(sessionId, session.metadata)
+    }
     if (!enrollment || enrollment.userId !== user.id) throw errors.notFound('Checkout session')
     if (enrollment.status === 'active')
       return { status: 'paid', enrollmentId: enrollment.id, courseSlug: enrollment.course.slug }
-    const session = await payments.retrieveCheckoutSession(sessionId)
+    session ??= await payments.retrieveCheckoutSession(sessionId)
     if (session.paymentStatus === 'paid') {
       const outcome = await this.fulfilCheckout({
         sessionId,
@@ -273,10 +308,7 @@ export class PaymentsService {
       where: { stripeCheckoutSessionId: input.sessionId },
     })
     if (already) return 'ignored'
-    const enrollment = await db.query.enrollments.findFirst({
-      where: { stripeCheckoutSessionId: input.sessionId },
-      with: { course: true, user: true },
-    })
+    const enrollment = await this.enrollmentForSession(input.sessionId, input.metadata)
     if (!enrollment) return 'unmatched'
     if (!input.paymentIntentId)
       throw new Error(`checkout session ${input.sessionId} has no payment intent`)
@@ -305,6 +337,8 @@ export class PaymentsService {
     const applicationFeeCents = num('applicationFeeCents', stripeFeeEstimateCents + commissionCents)
     const teacherNetCents = num('teacherNetCents', amountCents - applicationFeeCents)
     const promoCodeId = m.promoCodeId || enrollment.promoCodeId || null
+    const parsedLocale = localeSchema.safeParse(m.locale)
+    const locale = parsedLocale.success ? parsedLocale.data : null
     const now = this.deps.now()
 
     try {
@@ -361,7 +395,7 @@ export class PaymentsService {
     await trackEvent(this.deps, {
       userId: enrollment.userId,
       name: ANALYTICS_EVENTS.checkoutCompleted,
-      properties: { courseId: enrollment.courseId, amountCents },
+      properties: { courseId: enrollment.courseId, amountCents, locale },
     })
     await recordAudit(this.deps, {
       actorId: null,

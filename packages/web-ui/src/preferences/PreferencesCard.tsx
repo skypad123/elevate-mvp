@@ -1,4 +1,9 @@
-import { supportedLocales, type ThemePreference, themePreferenceSchema } from '@elevate/core'
+import {
+  type LocalePreference,
+  supportedLocales,
+  type ThemePreference,
+  themePreferenceSchema,
+} from '@elevate/core'
 import { localeNames } from '@elevate/i18n'
 import type { LucideIcon } from 'lucide-react'
 import { Monitor, Moon, Settings2, Sun } from 'lucide-react'
@@ -80,10 +85,9 @@ export function PreferenceRows() {
             aria-labelledby={labelId}
             wrapperClassName="sm:w-48"
             value={preferences.locale}
-            onChange={(e) =>
-              setPreference('locale', e.target.value as (typeof supportedLocales)[number])
-            }
+            onChange={(e) => setPreference('locale', e.target.value as LocalePreference)}
           >
+            <option value="system">{t('prefs.language.system')}</option>
             {supportedLocales.map((locale) => (
               <option key={locale} value={locale} lang={locale}>
                 {localeNames[locale]}

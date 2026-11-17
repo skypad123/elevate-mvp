@@ -9,19 +9,28 @@ import { z } from 'zod'
  *   no longer validates (e.g. a removed enum member) falls back to that field's default.
  * - To add a preference: add one field here with a default, then a control in the shared
  *   PreferencesCard (web) and the Profile Preferences card (learner). Nothing else changes.
- * - To add a language: append to `supportedLocales` and add a catalog in `@elevate/i18n`.
+ * - To add a language: append to `supportedLocales`, add a catalog in `@elevate/i18n`, add it to
+ *   the `locale` Postgres enum in `@elevate/db` and generate a migration.
+ *
+ * `locale` holds what this device chose. `system` means "not chosen on this device": the language
+ * is then resolved from the account, then `?lang`, then the device (`resolveLocale`, ADR 010). An
+ * `en` or `zh` stored before `system` existed still counts as a choice.
  */
 
 export const supportedLocales = ['en', 'zh'] as const
 export const localeSchema = z.enum(supportedLocales)
 export type Locale = z.infer<typeof localeSchema>
 
+/** What a device stores: a chosen language, or `system` for "follow the account and device". */
+export const localePreferenceSchema = z.enum(['system', ...supportedLocales])
+export type LocalePreference = z.infer<typeof localePreferenceSchema>
+
 export const themePreferenceSchema = z.enum(['system', 'light', 'dark'])
 export type ThemePreference = z.infer<typeof themePreferenceSchema>
 
 export const preferencesSchema = z.object({
   theme: themePreferenceSchema.default('system'),
-  locale: localeSchema.default('en'),
+  locale: localePreferenceSchema.default('system'),
 })
 export type Preferences = z.infer<typeof preferencesSchema>
 export type PreferenceKey = keyof Preferences

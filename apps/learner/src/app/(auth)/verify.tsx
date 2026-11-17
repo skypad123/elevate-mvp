@@ -1,9 +1,11 @@
+import { isChosen } from '@elevate/core'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { ShieldAlert } from 'lucide-react-native'
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, View } from 'react-native'
 import { api } from '@/lib/api'
 import { errorMessage, unwrap } from '@/lib/api-error'
+import { usePreferences } from '@/lib/preferences'
 import { useSession } from '@/lib/session'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Button, EmptyState, Screen, Text } from '@/ui'
@@ -13,6 +15,8 @@ export default function Verify() {
   const theme = useTheme()
   const router = useRouter()
   const { signIn } = useSession()
+  const { locale, preferences } = usePreferences()
+  const localeChosen = isChosen(preferences.locale)
   const { token, redirect } = useLocalSearchParams<{ token?: string; redirect?: string }>()
   const [error, setError] = useState<string | null>(null)
   const started = useRef(false)
@@ -26,7 +30,9 @@ export default function Verify() {
     }
     ;(async () => {
       try {
-        const result = await unwrap(await api.auth.verify.$post({ json: { token } }))
+        const result = await unwrap(
+          await api.auth.verify.$post({ json: { token, locale, localeChosen } }),
+        )
         await signIn(result.token, result.user)
         const target =
           result.redirectPath ??
@@ -36,7 +42,7 @@ export default function Verify() {
         setError(errorMessage(e))
       }
     })()
-  }, [token, redirect, router, signIn])
+  }, [token, redirect, router, signIn, locale, localeChosen])
 
   return (
     <Screen maxWidth={520} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>

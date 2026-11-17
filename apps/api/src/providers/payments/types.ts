@@ -1,3 +1,5 @@
+import type { Locale } from '@elevate/core'
+
 export type ConnectedAccountStatus = {
   accountId: string
   detailsSubmitted: boolean
@@ -34,21 +36,25 @@ export type CheckoutSessionInput = {
   customerEmail: string
   successUrl: string
   cancelUrl: string
+  /** The language on the learner's screen; Stripe Checkout shows it. Part of the idempotency key. */
+  locale?: Locale
   /** Written to the session and its payment intent as given; the caller builds it. */
   metadata: Record<string, string>
 }
 
 /**
- * A retried checkout for the same enrolment, amount and payee returns the same Stripe session. A
- * different payee is a different session, so a learner is never sent to pay an account that is no
- * longer the course's.
+ * A retried checkout for the same enrolment, amount, payee and language returns the same Stripe
+ * session. A different payee is a different session, so a learner is never sent to pay an account
+ * that is no longer the course's; a different language is one too, so a retry after a switch opens
+ * a session in the new language.
  */
 export function checkoutIdempotencyKey(input: {
   enrollmentId: string
   amountCents: number
   payoutAccountId: string
+  locale?: Locale
 }): string {
-  return `checkout:${input.enrollmentId}:${input.amountCents}:${input.payoutAccountId}`
+  return `checkout:${input.enrollmentId}:${input.amountCents}:${input.payoutAccountId}:${input.locale ?? 'none'}`
 }
 
 export type CheckoutSessionResult = {

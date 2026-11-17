@@ -20,11 +20,11 @@ export const checkoutRoutes = (deps: Deps) => {
       },
     )
     .post('/courses/:id', requireUser(), validate('json', checkoutRequestSchema), async (c) => {
-      const result = await payments.startCheckout(
-        ensureUser(c.get('user')),
-        c.req.param('id'),
-        c.req.valid('json').promoCode,
-      )
+      const body = c.req.valid('json')
+      const result = await payments.startCheckout(ensureUser(c.get('user')), c.req.param('id'), {
+        promoCode: body.promoCode,
+        locale: body.locale,
+      })
       return c.json(result, 200)
     })
     .get('/sessions/:id/sync', requireUser(), async (c) => {

@@ -585,6 +585,9 @@ language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (me
     chosen is then pinned to English until its user switches. This is accepted: shipping
     tolerance for `system` in an earlier release would cost a release for a case that needs a
     rollback to happen at all.
+-   **An open tab can do the same during a deploy.** A Teach or Support tab still running the old
+    bundle reads another tab's newly stored `system` through the `storage` event, falls back to
+    `en` and writes that back, until it reloads. This is accepted for the same reason.
 
 ## Alternatives Considered
 
@@ -1017,6 +1020,12 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
         `locale` is set.
     -   **Reading it back:** `fulfilCheckout` reads
         `localeSchema.safeParse(m.locale).success ? m.locale : null`.
+    -   **An earlier session stays payable.** A new locale gives a new idempotency key, so
+        starting checkout again in another language opens a second Stripe session and points the
+        enrolment at it, while the first stays open until it expires. `fulfilCheckout` and
+        `syncSession` therefore match a session the enrolment no longer points at through its
+        `metadata.enrollmentId`, and only when `metadata.userId` is that enrolment's learner.
+        Without this, paying in the first tab took the money and enrolled nobody.
     -   **Events:**
         -   `checkout_started` adds `locale ?? null`;
         -   `checkout_completed` on the webhook and `sync` paths, which share `fulfilCheckout`,

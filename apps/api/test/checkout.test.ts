@@ -1,3 +1,4 @@
+import { ANALYTICS_EVENTS, type AnalyticsEventName } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { seedDatabase } from '@elevate/db/seed'
 import { eq } from 'drizzle-orm'
@@ -194,5 +195,136 @@ describe('checkout', () => {
       'figma-to-prototype',
       'sourdough-from-scratch',
     ])
+  })
+})
+
+describe('checkout language', () => {
+  async function buyer(email: string) {
+    const r = await t.signIn(email)
+    return { token: r.token as string, userId: r.body.user.id as string }
+  }
+
+  async function start(token: string, courseId: string, body: Record<string, unknown>) {
+    const r = await t.api('POST', `/api/checkout/courses/${courseId}`, { token, body })
+    expect(r.status, JSON.stringify(r.body)).toBe(200)
+    return r.body
+  }
+
+  async function eventProps(userId: string, name: AnalyticsEventName) {
+    const events = await t.db.query.analyticsEvents.findMany({ where: { name, userId } })
+    expect(events).toHaveLength(1)
+    return events[0]?.properties
+  }
+
+  it('sends the language to Stripe, the metadata and both return URLs', async () => {
+    const { token, userId } = await buyer('zh-buyer@example.com')
+    const { sessionId } = await start(token, sourdoughId, { locale: 'zh' })
+    const session = t.payments.sessions.get(sessionId)
+    expect(session?.locale).toBe('zh')
+    expect(session?.metadata.locale).toBe('zh')
+    expect(session?.successUrl).toMatch(/\?session_id=\{CHECKOUT_SESSION_ID\}&lang=zh$/)
+    expect(session?.cancelUrl).toMatch(/\?checkout=cancelled&lang=zh$/)
+    expect(await eventProps(userId, ANALYTICS_EVENTS.checkoutStarted)).toMatchObject({
+      locale: 'zh',
+    })
+
+    // completed by the webhook: the language comes back from the session's metadata
+    expect(await (await stripePost(t.payments.completeCheckout(sessionId))).json()).toMatchObject({
+      outcome: 'applied',
+    })
+    expect(await eventProps(userId, ANALYTICS_EVENTS.checkoutCompleted)).toMatchObject({
+      locale: 'zh',
+    })
+  })
+
+  it('adds no language when the request sends none', async () => {
+    const { token, userId } = await buyer('no-locale-buyer@example.com')
+    const { sessionId } = await start(token, sourdoughId, {})
+    const session = t.payments.sessions.get(sessionId)
+    expect(session?.locale).toBeUndefined()
+    expect(session?.metadata).not.toHaveProperty('locale')
+    expect(session?.successUrl).not.toContain('lang=')
+    expect(session?.cancelUrl).not.toContain('lang=')
+    expect(await eventProps(userId, ANALYTICS_EVENTS.checkoutStarted)).toMatchObject({
+      locale: null,
+    })
+    await stripePost(t.payments.completeCheckout(sessionId))
+    expect(await eventProps(userId, ANALYTICS_EVENTS.checkoutCompleted)).toMatchObject({
+      locale: null,
+    })
+  })
+
+  it('opens a new Stripe session when the language changes between attempts', async () => {
+    const { token } = await buyer('switcher@example.com')
+    const zh = await start(token, sourdoughId, { locale: 'zh' })
+    const en = await start(token, sourdoughId, { locale: 'en' })
+    expect(en.sessionId).not.toBe(zh.sessionId)
+    const first = t.payments.sessions.get(zh.sessionId)
+    const second = t.payments.sessions.get(en.sessionId)
+    expect(second?.enrollmentId).toBe(first?.enrollmentId)
+    expect(second?.idempotencyKey).not.toBe(first?.idempotencyKey)
+    // the same language again reuses the open session
+    expect((await start(token, sourdoughId, { locale: 'en' })).sessionId).toBe(en.sessionId)
+  })
+
+  it('fulfils an earlier session that is paid after checkout was started again', async () => {
+    const { token, userId } = await buyer('pays-first-tab@example.com')
+    const zh = await start(token, sourdoughId, { locale: 'zh' })
+    const en = await start(token, sourdoughId, { locale: 'en' })
+    // the learner pays in the first tab, which is still open
+    t.payments.completeCheckout(zh.sessionId)
+    const synced = await t.api('GET', `/api/checkout/sessions/${zh.sessionId}/sync`, { token })
+    expect(synced.body.status).toBe('paid')
+    const enrollmentId = t.payments.sessions.get(en.sessionId)?.enrollmentId
+    expect(enrollmentId).toBeDefined()
+    const enrollment = await t.db.query.enrollments.findFirst({
+      where: { id: enrollmentId as string },
+    })
+    expect(enrollment?.status).toBe('active')
+    expect(await eventProps(userId, ANALYTICS_EVENTS.checkoutCompleted)).toMatchObject({
+      locale: 'zh',
+    })
+  })
+
+  it('fulfils an earlier session through the webhook as well', async () => {
+    const { token } = await buyer('pays-first-tab-webhook@example.com')
+    const zh = await start(token, sourdoughId, { locale: 'zh' })
+    await start(token, sourdoughId, { locale: 'en' })
+    const hook = await stripePost(t.payments.completeCheckout(zh.sessionId))
+    expect(((await hook.json()) as { outcome: string }).outcome).toBe('applied')
+  })
+
+  it("does not match another learner's earlier session", async () => {
+    const { token: ownerToken } = await buyer('session-owner@example.com')
+    const first = await start(ownerToken, sourdoughId, { locale: 'zh' })
+    await start(ownerToken, sourdoughId, { locale: 'en' })
+    const { token: otherToken } = await buyer('session-snooper@example.com')
+    t.payments.completeCheckout(first.sessionId)
+    const res = await t.api('GET', `/api/checkout/sessions/${first.sessionId}/sync`, {
+      token: otherToken,
+    })
+    expect(res.status).toBe(404)
+  })
+
+  it('records the language when sync completes a paid checkout', async () => {
+    const { token, userId } = await buyer('sync-buyer@example.com')
+    const { sessionId } = await start(token, sourdoughId, { locale: 'en' })
+    t.payments.completeCheckout(sessionId)
+    const synced = await t.api('GET', `/api/checkout/sessions/${sessionId}/sync`, { token })
+    expect(synced.body.status).toBe('paid')
+    expect(await eventProps(userId, ANALYTICS_EVENTS.checkoutCompleted)).toMatchObject({
+      locale: 'en',
+    })
+  })
+
+  it("records the request's language for a free enrolment", async () => {
+    const { profile } = await t.createProfile('free-teacher@example.com')
+    const free = await t.createCourse(profile.id, { status: 'live', priceCents: 0 })
+    const { token, userId } = await buyer('free-buyer@example.com')
+    expect((await start(token, free.courseId, { locale: 'zh' })).kind).toBe('enrolled')
+    expect(await eventProps(userId, ANALYTICS_EVENTS.checkoutCompleted)).toMatchObject({
+      free: true,
+      locale: 'zh',
+    })
   })
 })

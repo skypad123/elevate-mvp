@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { errorMessage } from '@/lib/api-error'
 import { fetchQuote, startCheckout } from '@/lib/catalog'
+import { usePreferences } from '@/lib/preferences'
 import { useSession } from '@/lib/session'
 import { webBaseUrl } from '@/lib/web-url'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -17,6 +18,7 @@ export default function Checkout() {
   const theme = useTheme()
   const router = useRouter()
   const { isSignedIn, isLoading } = useSession()
+  const { locale } = usePreferences()
   const [quote, setQuote] = useState<QuoteResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [promo, setPromo] = useState('')
@@ -53,7 +55,7 @@ export default function Checkout() {
     setPaying(true)
     setPayError(null)
     try {
-      const result = await startCheckout(courseId, quote.promo?.code)
+      const result = await startCheckout(courseId, { locale, promoCode: quote.promo?.code })
       if (result.kind === 'enrolled') {
         router.replace(`/learn/${result.enrollmentId}`)
         return
