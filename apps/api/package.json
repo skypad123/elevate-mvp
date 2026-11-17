@@ -24,6 +24,7 @@
     "@aws-sdk/s3-request-presigner": "3.1164.0",
     "@elevate/core": "*",
     "@elevate/db": "*",
+    "@elevate/i18n": "*",
     "@hono/node-server": "2.1.6",
     "@hono/zod-validator": "0.9.1",
     "@mux/mux-node": "15.5.0",

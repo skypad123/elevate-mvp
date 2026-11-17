@@ -80,6 +80,8 @@ export class AuthService {
         code,
         portalName: PORTAL_NAMES[input.audience],
         expiresMinutes: MAGIC_LINK_TTL_MS / 60000,
+        // In the language of the page that asked, which has no account language to go by yet.
+        locale: input.locale ?? 'en',
       }),
     )
 

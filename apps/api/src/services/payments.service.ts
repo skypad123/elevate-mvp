@@ -11,6 +11,7 @@ import {
   quote,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
+import { translate } from '@elevate/i18n'
 import { and, eq, ne, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { simpleEmail } from '../emails/templates'
@@ -535,6 +536,7 @@ export class PaymentsService {
         courseTitle: enrollment.course.title,
         enrollmentId: enrollment.id,
         userId: enrollment.userId,
+        locale: enrollment.user.locale,
       })
 
     await trackEvent(this.deps, {
@@ -572,18 +574,29 @@ export class PaymentsService {
         },
       })
     }
+    // In the account's language, like every learner email (ADR 010).
+    const lang = enrollment.user.locale ?? 'en'
+    const course = enrollment.course.title
     await mailer.send(
       simpleEmail({
         to: input.customerEmail ?? enrollment.user.email,
-        title: `You're enrolled: ${enrollment.course.title}`,
+        locale: lang,
+        title: translate(lang, 'email.receipt.title', { course }),
         paragraphs: [
-          `Thanks for your purchase. You paid ${formatSgd(amountCents)} for "${enrollment.course.title}" by ${profile.displayName}.`,
+          translate(lang, 'email.receipt.paid', {
+            amount: formatSgd(amountCents),
+            course,
+            teacher: profile.displayName,
+          }),
           details.receiptUrl
-            ? `Your Stripe receipt: ${details.receiptUrl}`
-            : 'A receipt is available from your Stripe payment confirmation.',
-          'Start whenever you like; your progress is saved as you go.',
+            ? translate(lang, 'email.receipt.stripeReceipt', { url: details.receiptUrl })
+            : translate(lang, 'email.receipt.noReceipt'),
+          translate(lang, 'email.receipt.start'),
         ],
-        cta: { href: `${env.LEARNER_URL}/learn/${enrollment.id}`, label: 'Start learning' },
+        cta: {
+          href: `${env.LEARNER_URL}/learn/${enrollment.id}`,
+          label: translate(lang, 'email.receipt.button'),
+        },
       }),
     )
     return 'applied'
@@ -617,6 +630,7 @@ export class PaymentsService {
       courseTitle: enrollment.course.title,
       enrollmentId: enrollment.id,
       userId: enrollment.userId,
+      locale: enrollment.user.locale,
     })
   }
 
@@ -636,6 +650,8 @@ export class PaymentsService {
     courseTitle: string
     enrollmentId: string
     userId: string
+    /** The learner's account language, for the email. */
+    locale: Locale | null
   }): Promise<FulfilmentOutcome> {
     const { env, payments, mailer, log } = this.deps
     const reason = 'Duplicate payment: already enrolled through another checkout'
@@ -692,21 +708,25 @@ export class PaymentsService {
       where: { id: input.enrollmentId },
     })
     const kept = enrollment?.status === 'active'
+    const lang = input.locale ?? 'en'
+    const course = input.courseTitle
     await mailer.send(
       simpleEmail({
         to: input.to,
-        title: `Refund issued: you paid twice for ${input.courseTitle}`,
+        locale: lang,
+        title: translate(lang, 'email.duplicate.title', { course }),
         paragraphs: [
-          `You paid twice for "${input.courseTitle}", so we have refunded your second payment of ${formatSgd(refund.amountCents)} to your original payment method. It can take 5–10 working days to appear.`,
-          kept
-            ? 'Your enrolment and your progress are not affected.'
-            : 'Your other payment for this course has been refunded too, so access to the course has been removed.',
+          translate(lang, 'email.duplicate.refunded', {
+            course,
+            amount: formatSgd(refund.amountCents),
+          }),
+          translate(lang, kept ? 'email.duplicate.kept' : 'email.duplicate.removed'),
         ],
         ...(kept
           ? {
               cta: {
                 href: `${env.LEARNER_URL}/learn/${input.enrollmentId}`,
-                label: 'Go to the course',
+                label: translate(lang, 'email.duplicate.button'),
               },
             }
           : {}),

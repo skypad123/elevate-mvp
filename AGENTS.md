@@ -67,6 +67,9 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
   profile's owner changes only through `RecoveryService` (Support, `super_admin`).
 - Text that a person typed (names, titles, notes) goes into an email only through `simpleEmail`,
   which escapes it. Invitations reach addresses that are not Elevate users yet.
+- Learner emails: the receipt, certificate, refund and second-payment refund emails use
+  `users.locale ?? 'en'`; the sign-in code email uses the request's `locale`. See ADR 010. A new
+  string in a learner email is a key in the `email` area. Teacher and Support emails stay English.
 - Run `npm run lint` (Biome) and `npx turbo run typecheck test` before committing.
 
 ## Expo conventions (apps/learner)
