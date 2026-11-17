@@ -90,9 +90,9 @@ describe('who a sale pays', () => {
     )
   })
 
-  it('builds the idempotency key from the enrolment, the amount, the payout account and the language', () => {
+  it('builds the idempotency key from the enrolment, the amount, the payout account, the language and the replaced session', () => {
     const base = { enrollmentId: 'enr_1', amountCents: 8000, payoutAccountId: 'acc_1' }
-    expect(checkoutIdempotencyKey(base)).toBe('checkout:enr_1:8000:acc_1:none')
+    expect(checkoutIdempotencyKey(base)).toBe('checkout:enr_1:8000:acc_1:none:none')
     // a different payee is a different key, so a retry never reuses a session that pays the old one
     expect(checkoutIdempotencyKey({ ...base, payoutAccountId: 'acc_2' })).not.toBe(
       checkoutIdempotencyKey(base),
@@ -102,6 +102,10 @@ describe('who a sale pays', () => {
     )
     // a language switch is a different key, so the retry opens Stripe in the new language
     expect(checkoutIdempotencyKey({ ...base, locale: 'zh' })).not.toBe(checkoutIdempotencyKey(base))
+    // a key is never sent again once its session has been replaced
+    expect(checkoutIdempotencyKey({ ...base, locale: 'zh', replacesSessionId: 'cs_2' })).toBe(
+      'checkout:enr_1:8000:acc_1:zh:cs_2',
+    )
   })
 
   it('writes the payee from the checkout, not from the course as it is at payment time', async () => {

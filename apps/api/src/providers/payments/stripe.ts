@@ -82,38 +82,50 @@ export class StripePaymentsProvider implements PaymentsProvider {
     return `https://dashboard.stripe.com/${test ? 'test/' : ''}connect/accounts/${accountId}`
   }
 
+  /**
+   * A key is refused when it comes back with a different request (a session replaced and later
+   * pointed at again, or a retry after 30 minutes), because `expires_at` always differs. Such a
+   * start is not a double submit, so it gets one fresh key.
+   */
   async createCheckoutSession(input: CheckoutSessionInput): Promise<{ id: string; url: string }> {
-    const session = await this.stripe.checkout.sessions.create(
-      {
-        mode: 'payment',
-        line_items: [
-          {
-            quantity: 1,
-            price_data: {
-              currency: input.currency,
-              unit_amount: input.amountCents,
-              product_data: {
-                name: input.courseTitle,
-                ...(input.courseImageUrl ? { images: [input.courseImageUrl] } : {}),
-              },
+    const params: Stripe.Checkout.SessionCreateParams = {
+      mode: 'payment',
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: input.currency,
+            unit_amount: input.amountCents,
+            product_data: {
+              name: input.courseTitle,
+              ...(input.courseImageUrl ? { images: [input.courseImageUrl] } : {}),
             },
           },
-        ],
-        payment_intent_data: {
-          application_fee_amount: input.applicationFeeCents,
-          transfer_data: { destination: input.destinationAccountId },
-          metadata: input.metadata,
         },
-        customer_email: input.customerEmail,
-        client_reference_id: input.enrollmentId,
+      ],
+      payment_intent_data: {
+        application_fee_amount: input.applicationFeeCents,
+        transfer_data: { destination: input.destinationAccountId },
         metadata: input.metadata,
-        success_url: input.successUrl,
-        cancel_url: input.cancelUrl,
-        ...(input.locale ? { locale: input.locale } : {}),
-        expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
       },
-      { idempotencyKey: checkoutIdempotencyKey(input) },
-    )
+      customer_email: input.customerEmail,
+      client_reference_id: input.enrollmentId,
+      metadata: input.metadata,
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+      ...(input.locale ? { locale: input.locale } : {}),
+      expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+    }
+    const key = checkoutIdempotencyKey(input)
+    let session: Stripe.Checkout.Session
+    try {
+      session = await this.stripe.checkout.sessions.create(params, { idempotencyKey: key })
+    } catch (error) {
+      if (!(error instanceof Stripe.errors.StripeIdempotencyError)) throw error
+      session = await this.stripe.checkout.sessions.create(params, {
+        idempotencyKey: `${key}:${Date.now()}`,
+      })
+    }
     if (!session.url) throw new Error('Stripe did not return a Checkout URL')
     return { id: session.id, url: session.url }
   }
@@ -131,6 +143,16 @@ export class StripePaymentsProvider implements PaymentsProvider {
       customerEmail: s.customer_details?.email ?? s.customer_email ?? null,
       metadata: (s.metadata ?? {}) as Record<string, string>,
     }
+  }
+
+  async expireCheckoutSession(sessionId: string): Promise<CheckoutSessionResult> {
+    try {
+      await this.stripe.checkout.sessions.expire(sessionId)
+    } catch (error) {
+      // Stripe refuses to expire a session that is not open; the retrieve below says why.
+      if (!(error instanceof Stripe.errors.StripeInvalidRequestError)) throw error
+    }
+    return this.retrieveCheckoutSession(sessionId)
   }
 
   async retrievePaymentDetails(paymentIntentId: string): Promise<PaymentDetails> {
@@ -166,17 +188,21 @@ export class StripePaymentsProvider implements PaymentsProvider {
     paymentIntentId: string
     reason?: string
     metadata?: Record<string, string>
+    idempotencyKey?: string
   }): Promise<RefundResult> {
-    const refund = await this.stripe.refunds.create({
-      payment_intent: input.paymentIntentId,
-      reverse_transfer: true,
-      refund_application_fee: true,
-      reason: 'requested_by_customer',
-      metadata: {
-        ...(input.metadata ?? {}),
-        ...(input.reason ? { elevateReason: input.reason.slice(0, 500) } : {}),
+    const refund = await this.stripe.refunds.create(
+      {
+        payment_intent: input.paymentIntentId,
+        reverse_transfer: true,
+        refund_application_fee: true,
+        reason: 'requested_by_customer',
+        metadata: {
+          ...(input.metadata ?? {}),
+          ...(input.reason ? { elevateReason: input.reason.slice(0, 500) } : {}),
+        },
       },
-    })
+      input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
+    )
     return { refundId: refund.id, amountCents: refund.amount, status: refund.status ?? 'pending' }
   }
 

@@ -64,7 +64,7 @@ be told apart from a default nobody chose.
   `system` or missing, they write it into `elevate.preferences` (keeping the theme), and either way
   remove `lang` from the address bar, keeping the hash. The parameter arrives there once, on a site
   that has no language of its own yet. The learner web app never stores `?lang`: it holds it in
-  memory for the tab, because it arrives on every sign-in and checkout link and storing it would
+  memory until the app next loads, because it arrives on every sign-in and checkout link and storing it would
   turn a guess into a lasting choice. In both, a language already stored is never overwritten.
 
 ## Consequences
@@ -80,3 +80,8 @@ be told apart from a default nobody chose.
   rollback pins devices that hadn't chosen to English, and during a deploy a Teach or Support tab
   still running the old bundle can turn another tab's "Follow device" into English through the
   browser's `storage` event, until it reloads. Both are accepted.
+- The language is part of the checkout idempotency key, so starting checkout again after a
+  language switch opens a second Stripe session. The older one is expired when that happens, and
+  an enrolment is fulfilled once: a second payment that gets through (paid before the old session
+  could be closed) is refunded automatically and the learner is told. A refund of that second
+  payment never removes the course.

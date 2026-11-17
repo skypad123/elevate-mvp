@@ -333,8 +333,9 @@ language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (me
 -   **`?lang` on the learner web app is never stored.**
     -   It's read once from `window.location` when the app first mounts in a tab, from whatever
         page the tab opened on.
-    -   It's held in memory for the tab's life, so it survives in-app redirects, such as the
-        success page sending a signed-out visitor to sign-in.
+    -   It's held in memory until the app next loads, so it survives in-app navigation and
+        redirects, such as a signed-out visitor on a protected route being sent to Explore. A
+        reload after the address has lost `?lang` falls back to the device.
     -   A stored choice and a chosen account language both beat it.
     -   The native app takes no `?lang`: the emailed links and Stripe's return URLs are web
         pages, and the app claims no web links.
@@ -989,24 +990,44 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
 -   **Type / Scope**: provider interface.
 -   **Proposed Changes**:
     -   `CheckoutSessionInput.locale?: Locale`.
-    -   `checkoutIdempotencyKey`'s parameter gains `locale?: Locale`. The key becomes
-        `checkout:<enrollment>:<amount>:<payoutAccount>:<locale>`, with `<locale>` being the
-        locale, or `none` when unset. A retry after a language switch then makes a new Stripe
-        session.
+    -   `checkoutIdempotencyKey`'s parameter gains `locale?: Locale` and `replacesSessionId?:
+        string`. The key becomes
+        `checkout:<enrollment>:<amount>:<payoutAccount>:<locale>:<replaced>`, each of the last two
+        being `none` when unset. A retry after a language switch then makes a new Stripe session.
+        The key only guards one start against a double submit: Stripe refuses a repeated key whose
+        request differs (`expires_at` always does), and replays a closed session for one that
+        matches. Naming the replaced session keeps restarts from repeating a key; when one still
+        repeats (the enrolment points again at a session it once replaced, or a retry comes after
+        30 minutes), the Stripe provider retries once with a fresh key (item 14). Reusing an open
+        session on a later retry is the payments service's job (item 15).
     -   Both callers, `stripe.ts:114` and `fake.ts:133`, already pass the whole
         `CheckoutSessionInput`, so they pick up `locale` with no change.
+    -   **`expireCheckoutSession(sessionId)`** closes an open session and returns it as it then
+        is; a session that is no longer open (paid first, or expired) is left alone.
+        `UnconfiguredPaymentsProvider` refuses it like the other methods.
+    -   **`createRefund`** takes an optional `idempotencyKey`, so a retried refund returns the
+        first one.
 
 ##### 14. Stripe provider
 
 -   **Files**: `apps/api/src/providers/payments/stripe.ts` (Modify).
 -   **Type / Scope**: Stripe provider.
 -   **Proposed Changes**: pass `locale: input.locale` to `checkout.sessions.create` when set.
-    `FakePaymentsProvider` (`fake.ts`) needs no change: it stores `...input`, so it records
-    `locale` once the type has it.
+    When Stripe refuses the key with `StripeIdempotencyError`, `createCheckoutSession` tries once
+    more with the key plus `:<time>`; other errors are thrown as before.
+    `expireCheckoutSession` calls `checkout.sessions.expire`, treats Stripe's refusal (a session
+    that is not open) as no error, and retrieves the session. `createRefund` passes
+    `idempotencyKey` to `refunds.create`. `FakePaymentsProvider` (`fake.ts`) records `locale`
+    from `...input` and, like Stripe, stores no metadata key whose value is empty; it gains an
+    `expired` flag that `expireCheckoutSession` sets on an unpaid
+    session, after which the session is not reused and cannot be paid, and it returns the first
+    refund for a repeated `idempotencyKey`.
 
 ##### 15. Payments service
 
--   **Files**: `apps/api/src/services/payments.service.ts` (Modify).
+-   **Files**: `apps/api/src/services/payments.service.ts`,
+    `apps/api/src/services/transactions.service.ts` and `apps/api/src/services/stripe-events.ts`
+    (Modify).
 -   **Type / Scope**: API service.
 -   **Proposed Changes**:
     -   **The signature:** `startCheckout(user, courseId, { promoCode, locale })`, with both
@@ -1020,12 +1041,75 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
         `locale` is set.
     -   **Reading it back:** `fulfilCheckout` reads
         `localeSchema.safeParse(m.locale).success ? m.locale : null`.
-    -   **An earlier session stays payable.** A new locale gives a new idempotency key, so
-        starting checkout again in another language opens a second Stripe session and points the
-        enrolment at it, while the first stays open until it expires. `fulfilCheckout` and
-        `syncSession` therefore match a session the enrolment no longer points at through its
-        `metadata.enrollmentId`, and only when `metadata.userId` is that enrolment's learner.
-        Without this, paying in the first tab took the money and enrolled nobody.
+    -   **Starting again reads the session the enrolment points at.**
+        -   Paid: that payment stands. It is fulfilled and the response is
+            `{ kind: 'enrolled' }`; nothing new is opened.
+        -   Open, with the same enrolment, payee, promo code, amount and locale in its metadata:
+            the learner goes back to it.
+        -   Otherwise a new session is opened, with `replacesSessionId` set to the old one, and
+            the old one is closed with `expireCheckoutSession` before the enrolment is pointed at
+            the new one. If the old one turns out paid by then, it is fulfilled, the new one is
+            expired and the response is `enrolled`. A failure to close it is logged and checkout
+            goes on; the bullets below catch a second payment. The free path closes the old
+            session the same way before enrolling.
+        -   The writes to the enrolment (back to `pending_payment`, the new pointer, or the free
+            enrolment) apply only `WHERE status <> 'active'`. When none applies, a payment
+            activated the enrolment meanwhile: the new session is expired and the response is
+            `enrolled`.
+    -   **An earlier session is still matched.** One paid before it could be closed is matched
+        through its `metadata.enrollmentId`, and only when `metadata.userId` is that enrolment's
+        learner. Without this, paying in the first tab took the money and enrolled nobody.
+    -   **An enrolment is fulfilled once.** In one transaction, `fulfilCheckout` first locks the
+        enrolment row `FOR UPDATE`, so fulfilments of one enrolment queue (locking after the
+        insert deadlocks against the insert's foreign-key lock). It then inserts the payment with
+        `onConflictDoNothing()` over every unique index (no row: a concurrent fulfilment of the
+        same session won, so `ignored`, where the old message check answered 500). The payment's
+        promo code is the session's own `metadata.promoCodeId`, not the enrolment's, which a
+        restart may have changed. Stripe stores no empty metadata value, so a session with
+        `elevatePayoutAccountId` and no `promoCodeId` had no promo code; only an older session
+        without a payee falls back to the enrolment's.
+        -   Not yet active: activate it, point it at the paying session, count the enrolment and
+            the promo code, as before.
+        -   Already active: the payment is a duplicate. It stays on record and is refunded in
+            full (`createRefund` with key `duplicate-refund:<session>`, recorded through
+            `TransactionsService.applyRefund`). The learner gets one email saying they paid twice
+            and were refunded; no `checkout_completed`, no enrolment email, no count. The audit
+            action is `payment.duplicate`, and `refund_issued` carries `duplicate: true`. The
+            outcome is `duplicate`, which the webhook answers as `applied`.
+        -   If that refund fails, the outcome is `duplicate_unrefunded`: the webhook stores it
+            as the event's error for Support, and the payment stays `succeeded`. The next
+            fulfilment of that session (the success page's poll) finds the payment, sees it is an
+            unrefunded duplicate (`succeeded`, enrolment active and pointing elsewhere) and tries
+            the refund again; Support can also refund it. When the webhook and a poll refund the
+            same duplicate at once, the refund key returns one refund, and only the call that
+            records it writes the audit, the event and the email; a call that fails after the
+            other has recorded a full refund counts as done.
+    -   **`syncSession` reads every session that is not the enrolment's.** It answers `paid`
+        straight away only for the session the enrolment points at. For another one it retrieves
+        the session and, when that session is paid, runs fulfilment, which records and refunds a
+        duplicate even when no webhook arrives. It answers `paid` whenever the enrolment is
+        active.
+    -   **Only the paying session's refund removes access.** `TransactionsService.applyRefund`
+        sets the enrolment to `refunded` and lowers the count only when the refunded payment's
+        session is the one the enrolment points at. A refunded duplicate, whether by the step
+        above, by Support or in the Stripe dashboard, leaves the course in place, and the refund
+        notice says access was removed only when the enrolment is `refunded`. If Support refunds
+        the payment that gave access while another `succeeded` payment for the enrolment stands
+        (a duplicate not refunded yet), the enrolment is pointed at that payment instead and
+        stays active. `applyRefund` does all of this in one transaction that locks the
+        enrolment first, as fulfilment does, so refunds of two payments of one enrolment are
+        recorded one after the other. The "you paid twice" email reads the enrolment after its
+        refund: if Support refunded the other payment meanwhile, it says access was removed.
+    -   **Known limits.** A refund made from the Stripe dashboard is recorded by `charge.refunded`
+        under a made-up id when the charge carries no refund list, so it can be recorded twice if
+        it races the refund call above; this predates PR 1 and applies to Support refunds too. A
+        process that stops between writing a duplicate payment and refunding it leaves it for the
+        next poll or for Support, because the webhook ledger answers Stripe's retry as a
+        duplicate. Two restarts of one enrolment at the same moment (two tabs) can each open a
+        session; the one not pointed at stays open until it expires, and paying both falls back
+        to the refund. When the webhook's refund call gives up while a poll's call for the same
+        duplicate is still at Stripe, the webhook stores `duplicate_unrefunded` although the
+        poll then records the refund; the payment row is the record to trust.
     -   **Events:**
         -   `checkout_started` adds `locale ?? null`;
         -   `checkout_completed` on the webhook and `sync` paths, which share `fulfilCheckout`,
@@ -1083,6 +1167,29 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
         -   a paid course completed by `sync`, from the metadata.
 
         `checkout_started` records it too.
+    -   **Two sessions for one enrolment** (`apps/api/test/checkout.test.ts`):
+        -   restarting in another language expires the old session, and its success page
+            reports `expired`; switching back opens a third session, and a plain retry reuses
+            the open one;
+        -   a paid earlier session keeps its own promo code when the restart sends another,
+            including one paid after the restart, whose metadata has no `promoCodeId`;
+        -   a Support refund of the first payment while a duplicate is unrefunded moves access to
+            the duplicate;
+        -   the Stripe provider retries a refused key once with a fresh one
+            (`apps/api/test/stripe-provider.test.ts`), and no other error;
+        -   a payment that activates the enrolment while a restart runs is left alone;
+        -   a second payment found only by the success page's poll is refunded once;
+        -   a failed duplicate refund is retried by the next poll;
+        -   a session paid before the restart is fulfilled and the restart answers `enrolled`;
+        -   a session that could not be closed and is paid alone is fulfilled, and the enrolment
+            points at it;
+        -   both sessions paid: one enrolment, one count, one `checkout_completed`, and the
+            second payment refunded with one email; its `charge.refunded` keeps the course;
+        -   a failed refund is stored with the webhook event, and a Support refund of that
+            payment keeps the course;
+        -   a webhook and a `sync` for the same session at once both answer 200, with one
+            payment;
+        -   another learner's `sync` of an earlier session answers 404.
 
 ##### 20. Idempotency key test
 
@@ -1145,7 +1252,7 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
     -   **The inputs to `resolveLocale`:**
         -   `account` is held in state and set only through `setAccountLocale`.
         -   `param`, on web, is read once at first mount from `window.location`'s `lang` and
-            held in memory for the tab's life. Native has none.
+            held in memory until the app next loads. Native has none.
         -   `deviceLanguages` is `navigator.languages` on web and `[]` on native until PR 3.
     -   **Using the resolved value:** `t` and `<html lang>` use the resolved `locale`.
         `setPreference` is unchanged.

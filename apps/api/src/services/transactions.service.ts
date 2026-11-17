@@ -7,7 +7,7 @@ import {
   type TransactionSummary,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, EmptyFilter, eq, exists, ilike, or, sql } from 'drizzle-orm'
+import { and, EmptyFilter, eq, exists, ilike, ne, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { simpleEmail } from '../emails/templates'
 import { errors } from '../lib/errors'
@@ -203,7 +203,7 @@ export class TransactionsService {
     const { db, env, mailer } = this.deps
     const p = await db.query.payments.findFirst({
       where: { id: paymentId },
-      with: { user: true, course: true, profile: { with: { owner: true } } },
+      with: { user: true, course: true, enrollment: true, profile: { with: { owner: true } } },
     })
     if (!p) return
     const amount = `${(amountCents / 100).toFixed(2)} SGD`
@@ -214,7 +214,8 @@ export class TransactionsService {
         paragraphs: [
           `We have refunded ${amount} to your original payment method. It can take 5–10 working days to appear.`,
           `Reason: ${reason}`,
-          ...(p.status === 'refunded' ? ['Access to the course has been removed.'] : []),
+          // A refunded duplicate payment leaves the course in place (see applyRefund).
+          ...(p.enrollment.status === 'refunded' ? ['Access to the course has been removed.'] : []),
         ],
       }),
     )
@@ -244,34 +245,69 @@ export class TransactionsService {
     requestedBy: string | null
   }): Promise<boolean> {
     const { db } = this.deps
-    const inserted = await db
-      .insert(s.refunds)
-      .values({
-        paymentId: input.paymentId,
-        stripeRefundId: input.stripeRefundId,
-        amountCents: input.amountCents,
-        reason: input.reason,
-        requestedBy: input.requestedBy,
-      })
-      .onConflictDoNothing()
-      .returning()
-    if (inserted.length === 0) return false
-    const p = await db.query.payments.findFirst({ where: { id: input.paymentId } })
-    if (!p) return true
-    const refundedCents = Math.min(p.amountCents, p.refundedCents + input.amountCents)
-    const status = refundedCents >= p.amountCents ? 'refunded' : 'partially_refunded'
-    await db.update(s.payments).set({ refundedCents, status }).where(eq(s.payments.id, p.id))
-    if (status === 'refunded') {
-      await db
+    const payment = await db.query.payments.findFirst({ where: { id: input.paymentId } })
+    if (!payment) return false
+    // One transaction that locks the enrolment first, in the order fulfilment uses: refunds of
+    // two payments of one enrolment are then recorded one after the other.
+    return db.transaction(async (tx) => {
+      const [enrollment] = await tx
+        .select()
+        .from(s.enrollments)
+        .where(eq(s.enrollments.id, payment.enrollmentId))
+        .for('update')
+      const inserted = await tx
+        .insert(s.refunds)
+        .values({
+          paymentId: input.paymentId,
+          stripeRefundId: input.stripeRefundId,
+          amountCents: input.amountCents,
+          reason: input.reason,
+          requestedBy: input.requestedBy,
+        })
+        .onConflictDoNothing()
+        .returning()
+      if (inserted.length === 0) return false
+      const [p] = await tx.select().from(s.payments).where(eq(s.payments.id, input.paymentId))
+      if (!p) return true
+      const refundedCents = Math.min(p.amountCents, p.refundedCents + input.amountCents)
+      const status = refundedCents >= p.amountCents ? 'refunded' : 'partially_refunded'
+      await tx.update(s.payments).set({ refundedCents, status }).where(eq(s.payments.id, p.id))
+      // Only the payment that gave access takes it away: the enrolment points at that payment's
+      // session. Refunding a second, duplicate payment leaves the enrolment and the count alone.
+      if (
+        status !== 'refunded' ||
+        enrollment?.stripeCheckoutSessionId !== p.stripeCheckoutSessionId
+      )
+        return true
+      // Another payment for it still stands (a duplicate not refunded yet): access moves to it.
+      const [other] = await tx
+        .select({ sessionId: s.payments.stripeCheckoutSessionId })
+        .from(s.payments)
+        .where(
+          and(
+            eq(s.payments.enrollmentId, p.enrollmentId),
+            eq(s.payments.status, 'succeeded'),
+            ne(s.payments.id, p.id),
+          ),
+        )
+        .limit(1)
+      if (other) {
+        await tx
+          .update(s.enrollments)
+          .set({ stripeCheckoutSessionId: other.sessionId })
+          .where(eq(s.enrollments.id, p.enrollmentId))
+        return true
+      }
+      await tx
         .update(s.enrollments)
         .set({ status: 'refunded' })
         .where(eq(s.enrollments.id, p.enrollmentId))
-      await db
+      await tx
         .update(s.courses)
         .set({ enrolCount: sql`greatest(${s.courses.enrolCount} - 1, 0)` })
         .where(eq(s.courses.id, p.courseId))
-    }
-    return true
+      return true
+    })
   }
 
   /** Webhook: charge.refunded (covers refunds made from the Stripe dashboard). */
