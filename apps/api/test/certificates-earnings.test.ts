@@ -1,5 +1,6 @@
 import { schema as s } from '@elevate/db'
 import { seedDatabase } from '@elevate/db/seed'
+import { translate } from '@elevate/i18n'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -326,5 +327,69 @@ describe('earnings and transactions', () => {
     expect(manual.actorEmail).toBe('admin@test.local')
     expect(manual.metadata).toMatchObject({ reason: 'Duplicate purchase', amountCents: 8900 })
     expect((await t.api('GET', '/api/support/audit-log', { token: learner })).status).toBe(403)
+  })
+})
+
+describe('learner email language', () => {
+  const lastTo = (email: string) => t.mailer.sent.filter((m) => m.to === email).at(-1)
+
+  it("sends a Chinese account's certificate and refund emails in Chinese, the teacher's in English", async () => {
+    const zh = (
+      await t.signIn('zh-grad@example.com', 'learner', { locale: 'zh', localeChosen: true })
+    ).token as string
+    const enrollmentId = await buy(zh)
+    await completeCourse(zh, enrollmentId)
+    const certificate = lastTo('zh-grad@example.com')
+    expect(certificate?.html).toContain('<html lang="zh">')
+    expect(certificate?.subject).toBe(
+      translate('zh', 'email.certificate.title', { course: 'Sourdough from Scratch' }),
+    )
+
+    const payment = await t.db.query.payments.findFirst({ where: { enrollmentId } })
+    const refunded = await t.api('POST', `/api/support/transactions/${payment?.id}/refund`, {
+      token: admin,
+      body: { reason: 'Bought by mistake' },
+    })
+    expect(refunded.status).toBe(200)
+    const refund = lastTo('zh-grad@example.com')
+    expect(refund?.html).toContain('<html lang="zh">')
+    expect(refund?.subject).toBe(
+      translate('zh', 'email.refund.title', { course: 'Sourdough from Scratch' }),
+    )
+    expect(refund?.text).toContain(
+      translate('zh', 'email.refund.reason', { reason: 'Bought by mistake' }),
+    )
+    expect(refund?.text).toContain(translate('zh', 'email.refund.accessRemoved'))
+    const owner = lastTo('daniel@example.com')
+    expect(owner?.html).toContain('<html lang="en">')
+    expect(owner?.subject).toContain('was refunded')
+  })
+
+  it('translates the reason of a refund made in the Stripe dashboard', async () => {
+    const zh = (
+      await t.signIn('zh-dashboard@example.com', 'learner', { locale: 'zh', localeChosen: true })
+    ).token as string
+    const enrollmentId = await buy(zh)
+    const payment = await t.db.query.payments.findFirst({ where: { enrollmentId } })
+    await t.payments.createRefund({ paymentIntentId: payment?.stripePaymentIntentId as string })
+    await stripePost(t.payments.refundedEvent(payment?.stripePaymentIntentId as string))
+    const refund = lastTo('zh-dashboard@example.com')
+    expect(refund?.text).toContain(
+      translate('zh', 'email.refund.reason', {
+        reason: translate('zh', 'email.refund.reasonStripe'),
+      }),
+    )
+    // the stored reason stays the constant, whatever the learner's language
+    const row = await t.db.query.refunds.findFirst({ where: { paymentId: payment?.id as string } })
+    expect(row?.reason).toBe('Refunded in Stripe')
+  })
+
+  it('sends English to an account with no language', async () => {
+    const none = (await t.signIn('no-language@example.com')).token as string
+    const enrollmentId = await buy(none)
+    await completeCourse(none, enrollmentId)
+    const certificate = lastTo('no-language@example.com')
+    expect(certificate?.html).toContain('<html lang="en">')
+    expect(certificate?.subject).toBe('Your certificate: Sourdough from Scratch')
   })
 })
