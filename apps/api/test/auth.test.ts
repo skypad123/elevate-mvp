@@ -1,5 +1,6 @@
 import { ANALYTICS_EVENTS } from '@elevate/core'
 import { schema as s } from '@elevate/db'
+import { translate } from '@elevate/i18n'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
@@ -280,6 +281,26 @@ describe('the account language', () => {
     const teachLink = new URL(a.mailer.last()?.text.match(/https?:\/\/\S+/)?.[0] ?? '')
     expect(teachLink.origin).toBe('http://teach.test')
     expect(teachLink.searchParams.has('lang')).toBe(false)
+  })
+
+  it("sends the code email in the request's language, and English when none was sent", async () => {
+    await a.api('POST', '/api/auth/magic-link', {
+      body: { email: 'code-zh@example.com', audience: 'learner', locale: 'zh' },
+    })
+    const zh = a.mailer.last()
+    expect(zh?.html).toContain('<html lang="zh">')
+    expect(zh?.subject).toBe(
+      translate('zh', 'email.signIn.subject', {
+        portal: 'Elevate',
+        code: zh?.subject.match(/\d{3} \d{3}/)?.[0] ?? '',
+      }),
+    )
+    await a.api('POST', '/api/auth/magic-link', {
+      body: { email: 'code-none@example.com', audience: 'learner' },
+    })
+    const none = a.mailer.last()
+    expect(none?.html).toContain('<html lang="en">')
+    expect(none?.subject).toMatch(/^Your Elevate sign-in code: \d{3} \d{3}$/)
   })
 
   it('records a sign_in event with the language, and none for a refused Support sign-in', async () => {

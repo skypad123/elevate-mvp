@@ -70,7 +70,7 @@ cannot corrupt what users already have stored.
   Settings, and the review of a writer's held changes; in Support the profiles list, the profile
   page, the company card, the legal-name check and owner recovery; and the text inside the shared
   shell drawer, uploader, media preview, dialog and toast. Other pages stay English until they are translated whole, as do error messages from the
-  API and emails.
+  API and emails. Learner emails: amended by ADR 010. API error messages still stay English.
 - `test/catalog.test.ts` fails when a catalog has untranslated keys, unknown keys or mismatched
   placeholders, when two areas define the same key, or when an area is missing from a catalog.
 - Patterns, all without a new i18n API:
