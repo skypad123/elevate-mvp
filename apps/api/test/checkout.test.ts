@@ -1,6 +1,7 @@
 import { ANALYTICS_EVENTS, type AnalyticsEventName } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { seedDatabase } from '@elevate/db/seed'
+import { translate } from '@elevate/i18n'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
@@ -267,6 +268,54 @@ describe('checkout language', () => {
     expect(await eventProps(userId, ANALYTICS_EVENTS.checkoutCompleted)).toMatchObject({
       locale: 'zh',
     })
+  })
+
+  it("sends the receipt in the account's language", async () => {
+    const zh = await t.signIn('receipt-zh@example.com', 'learner', {
+      locale: 'zh',
+      localeChosen: true,
+    })
+    const { sessionId } = await start(zh.token as string, sourdoughId, { locale: 'zh' })
+    await stripePost(t.payments.completeCheckout(sessionId))
+    const receipt = t.mailer.sent.filter((m) => m.to === 'receipt-zh@example.com').at(-1)
+    expect(receipt?.html).toContain('<html lang="zh">')
+    expect(receipt?.subject).toBe(
+      translate('zh', 'email.receipt.title', { course: 'Sourdough from Scratch' }),
+    )
+    // an account with no language gets English
+    const { token } = await buyer('receipt-none@example.com')
+    const other = await start(token, sourdoughId, { locale: 'zh' })
+    await stripePost(t.payments.completeCheckout(other.sessionId))
+    const english = t.mailer.sent.filter((m) => m.to === 'receipt-none@example.com').at(-1)
+    expect(english?.html).toContain('<html lang="en">')
+    expect(english?.subject).toBe("You're enrolled: Sourdough from Scratch")
+  })
+
+  it("sends the email for a refunded second payment in the account's language", async () => {
+    const zh = await t.signIn('twice-zh@example.com', 'learner', {
+      locale: 'zh',
+      localeChosen: true,
+    })
+    const token = zh.token as string
+    const first = await start(token, sourdoughId, { locale: 'zh' })
+    // the second checkout runs in English; the email still follows the account
+    const expire = t.payments.expireCheckoutSession
+    t.payments.expireCheckoutSession = async () => {
+      throw new Error('Stripe is unreachable')
+    }
+    let second: { sessionId: string }
+    try {
+      second = await start(token, sourdoughId, { locale: 'en' })
+    } finally {
+      t.payments.expireCheckoutSession = expire
+    }
+    await stripePost(t.payments.completeCheckout(first.sessionId))
+    await stripePost(t.payments.completeCheckout(second.sessionId))
+    const mail = t.mailer.sent.filter((m) => m.to === 'twice-zh@example.com').at(-1)
+    expect(mail?.html).toContain('<html lang="zh">')
+    expect(mail?.subject).toBe(
+      translate('zh', 'email.duplicate.title', { course: 'Sourdough from Scratch' }),
+    )
   })
 
   it('adds no language when the request sends none', async () => {

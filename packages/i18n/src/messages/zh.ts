@@ -35,6 +35,7 @@ import { chromeZh } from './areas/chrome.zh'
 import { commonZh } from './areas/common.zh'
 import { companyApplyZh } from './areas/companyApply.zh'
 import { domainZh } from './areas/domain.zh'
+import { emailZh } from './areas/email.zh'
 import { invitationZh } from './areas/invitation.zh'
 import { learnerAuthZh } from './areas/learnerAuth.zh'
 import { learnerCertificateZh } from './areas/learnerCertificate.zh'
@@ -79,6 +80,7 @@ export const zhAreas: readonly Readonly<Record<string, string>>[] = [
   learnerCheckoutZh,
   learnerLearnZh,
   learnerCertificateZh,
+  emailZh,
 ]
 
 export const zh: Partial<Messages> = {
@@ -106,4 +108,5 @@ export const zh: Partial<Messages> = {
   ...learnerCheckoutZh,
   ...learnerLearnZh,
   ...learnerCertificateZh,
+  ...emailZh,
 }

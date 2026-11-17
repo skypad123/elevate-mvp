@@ -1,3 +1,4 @@
+import { type Locale, translate } from '@elevate/i18n'
 import type { MailMessage } from '../providers/mailer'
 
 const brand = {
@@ -23,16 +24,19 @@ export const escapeHtml = (value: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 
-/** `title` is text; `bodyHtml` is markup built from `para` and `button`. */
-function layout(title: string, bodyHtml: string): string {
-  return `<!doctype html><html><body style="margin:0;background:${brand.canvas};font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:${brand.ink}">
+/**
+ * `title` is text; `bodyHtml` is markup built from `para` and `button`. `locale` sets the page's
+ * language and the footer; a learner email passes the account's, every other email English.
+ */
+function layout(title: string, bodyHtml: string, locale: Locale = 'en'): string {
+  return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"></head><body style="margin:0;background:${brand.canvas};font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:${brand.ink}">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${brand.canvas};padding:32px 16px">
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:${brand.surface};border:1px solid ${brand.border};border-radius:16px;padding:32px">
 <tr><td style="font-family:Georgia,serif;font-size:22px;font-weight:600;color:${brand.moss};padding-bottom:16px">Elevate</td></tr>
 <tr><td style="font-family:Georgia,serif;font-size:26px;line-height:32px;font-weight:600;padding-bottom:12px">${escapeHtml(title)}</td></tr>
 ${bodyHtml}
-<tr><td style="font-size:12px;line-height:18px;color:${brand.inkSecondary};padding-top:24px;border-top:1px solid ${brand.border}">If you did not request this email you can ignore it.</td></tr>
+<tr><td style="font-size:12px;line-height:18px;color:${brand.inkSecondary};padding-top:24px;border-top:1px solid ${brand.border}">${escapeHtml(translate(locale, 'email.footer.ignore'))}</td></tr>
 </table></td></tr></table></body></html>`
 }
 
@@ -42,40 +46,58 @@ const button = (href: string, label: string, colour = brand.moss) =>
 const para = (text: string) =>
   `<tr><td style="font-size:16px;line-height:24px;color:${brand.inkSecondary};padding-bottom:16px">${escapeHtml(text)}</td></tr>`
 
+/** The sign-in code email, in the language of the page that asked for it. */
 export function magicLinkEmail(input: {
   to: string
   link: string
   code: string
   portalName: string
   expiresMinutes: number
+  locale: Locale
 }): MailMessage {
+  const { locale } = input
   const prettyCode = `${input.code.slice(0, 3)} ${input.code.slice(3)}`
+  const portal = input.portalName
+  const minutes = input.expiresMinutes
+  const title = translate(locale, 'email.signIn.title', { portal })
   const html = layout(
-    `Sign in to ${input.portalName}`,
-    `${para(`Use the button below to sign in. The link works once and expires in ${input.expiresMinutes} minutes.`)}
-<tr><td style="padding-bottom:24px">${button(input.link, 'Sign in')}</td></tr>
-${para('On your phone? Enter this code in the app instead:')}
+    title,
+    `${para(translate(locale, 'email.signIn.body', { minutes }))}
+<tr><td style="padding-bottom:24px">${button(input.link, translate(locale, 'email.signIn.button'))}</td></tr>
+${para(translate(locale, 'email.signIn.codeIntro'))}
 <tr><td style="font-family:ui-monospace,Menlo,monospace;font-size:28px;letter-spacing:6px;font-weight:600;color:${brand.ink};padding-bottom:8px">${prettyCode}</td></tr>`,
+    locale,
   )
-  const text = `Sign in to ${input.portalName}\n\nOpen this link (valid for ${input.expiresMinutes} minutes, single use):\n${input.link}\n\nOr enter this code in the app: ${input.code}\n\nIf you did not request this email you can ignore it.`
+  const text = [
+    title,
+    `${translate(locale, 'email.signIn.text.open', { minutes })}\n${input.link}`,
+    translate(locale, 'email.signIn.text.code', { code: input.code }),
+    translate(locale, 'email.footer.ignore'),
+  ].join('\n\n')
   return {
     to: input.to,
-    subject: `Your ${input.portalName} sign-in code: ${prettyCode}`,
+    subject: translate(locale, 'email.signIn.subject', { portal, code: prettyCode }),
     html,
     text,
   }
 }
 
+/** `locale` is the reader's language when the caller translated the text; English otherwise. */
 export function simpleEmail(input: {
   to: string
   title: string
   paragraphs: string[]
   cta?: { href: string; label: string; colour?: string }
+  locale?: Locale
 }): MailMessage {
   const html = layout(
     input.title,
     `${input.paragraphs.map(para).join('')}${input.cta ? `<tr><td style="padding-top:8px">${button(input.cta.href, input.cta.label, input.cta.colour)}</td></tr>` : ''}`,
+    input.locale,
   )
-  const text = `${input.title}\n\n${input.paragraphs.join('\n\n')}${input.cta ? `\n\n${input.cta.label}: ${input.cta.href}` : ''}`
+  const cta = input.cta
+    ? `\n\n${translate(input.locale ?? 'en', 'email.text.cta', { label: input.cta.label, url: input.cta.href })}`
+    : ''
+  const text = `${input.title}\n\n${input.paragraphs.join('\n\n')}${cta}`
   return { to: input.to, subject: input.title, html, text }
 }

@@ -7,12 +7,19 @@ import {
   type TransactionSummary,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
+import { translate } from '@elevate/i18n'
 import { and, EmptyFilter, eq, exists, ilike, ne, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { simpleEmail } from '../emails/templates'
 import { errors } from '../lib/errors'
 import type { SessionUser } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
+
+/**
+ * The reason recorded for a refund made in the Stripe dashboard. The learner's email shows its
+ * translation (`email.refund.reasonStripe`) instead of this text.
+ */
+export const STRIPE_REFUND_REASON = 'Refunded in Stripe'
 
 type PaymentWithRelations = typeof s.payments.$inferSelect & {
   user: { email: string }
@@ -207,15 +214,25 @@ export class TransactionsService {
     })
     if (!p) return
     const amount = `${(amountCents / 100).toFixed(2)} SGD`
+    // The learner's copy is in their account's language (ADR 010); the teacher's stays English.
+    const lang = p.user.locale ?? 'en'
     await mailer.send(
       simpleEmail({
         to: p.user.email,
-        title: `Refund issued for ${p.course.title}`,
+        locale: lang,
+        title: translate(lang, 'email.refund.title', { course: p.course.title }),
         paragraphs: [
-          `We have refunded ${amount} to your original payment method. It can take 5–10 working days to appear.`,
-          `Reason: ${reason}`,
+          translate(lang, 'email.refund.refunded', { amount }),
+          translate(lang, 'email.refund.reason', {
+            reason:
+              reason === STRIPE_REFUND_REASON
+                ? translate(lang, 'email.refund.reasonStripe')
+                : reason,
+          }),
           // A refunded duplicate payment leaves the course in place (see applyRefund).
-          ...(p.enrollment.status === 'refunded' ? ['Access to the course has been removed.'] : []),
+          ...(p.enrollment.status === 'refunded'
+            ? [translate(lang, 'email.refund.accessRemoved')]
+            : []),
         ],
       }),
     )
@@ -331,7 +348,7 @@ export class TransactionsService {
       | undefined
     const latest = refundsObj?.data?.[0]
     const amountCents = refundedTotal - p.refundedCents
-    const reason = 'Refunded in Stripe'
+    const reason = STRIPE_REFUND_REASON
     const recorded = await this.applyRefund({
       paymentId: p.id,
       stripeRefundId: latest?.id ?? `re_${chargeId ?? paymentIntentId}_${refundedTotal}`,

@@ -1,5 +1,6 @@
 import { ANALYTICS_EVENTS, type CertificateVerification, type CertificateView } from '@elevate/core'
 import { schema as s } from '@elevate/db'
+import { translate } from '@elevate/i18n'
 import { eq } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { simpleEmail } from '../emails/templates'
@@ -97,17 +98,25 @@ export class CertificatesService {
       entityId: certificate.id,
       metadata: { enrollmentId },
     })
+    // In the account's language, like every learner email (ADR 010).
+    const lang = enrollment.user.locale ?? 'en'
+    const course = enrollment.course.title
     await mailer.send(
       simpleEmail({
         to: enrollment.user.email,
-        title: `Your certificate: ${enrollment.course.title}`,
+        locale: lang,
+        title: translate(lang, 'email.certificate.title', { course }),
         paragraphs: [
-          `Congratulations, ${learnerName}. You completed "${enrollment.course.title}" by ${teacherName}.`,
-          `Anyone can verify it at ${this.verifyUrl(token)} — no sign-in needed.`,
+          translate(lang, 'email.certificate.congrats', {
+            name: learnerName,
+            course,
+            teacher: teacherName,
+          }),
+          translate(lang, 'email.certificate.verify', { url: this.verifyUrl(token) }),
         ],
         cta: {
           href: `${env.LEARNER_URL}/learn/${enrollmentId}/certificate`,
-          label: 'View certificate',
+          label: translate(lang, 'email.certificate.button'),
         },
       }),
     )

@@ -8,8 +8,9 @@
  *
  * Translated today: the whole learner app; navigation, the Settings/Preferences/Profile screens,
  * and the teaching-profile screens of Teach and Support (the Teach dashboard and start page,
- * members, invitations, held changes, company application and set-up, Support's profile pages).
- * Other pages are still English. The `apiError` area words the API's error codes (ADR 010).
+ * members, invitations, held changes, company application and set-up, Support's profile pages),
+ * and the learner emails. Other pages are still English. The `apiError` area words the API's
+ * error codes (ADR 010).
  *
  * To add an area: write the two files, then add it to `enAreas` and to `en` below, and to the
  * same two places in `zh.ts`. `test/catalog.test.ts` fails if the two lists disagree or if two
@@ -22,6 +23,7 @@ import { chromeEn } from './areas/chrome.en'
 import { commonEn } from './areas/common.en'
 import { companyApplyEn } from './areas/companyApply.en'
 import { domainEn } from './areas/domain.en'
+import { emailEn } from './areas/email.en'
 import { invitationEn } from './areas/invitation.en'
 import { learnerAuthEn } from './areas/learnerAuth.en'
 import { learnerCertificateEn } from './areas/learnerCertificate.en'
@@ -66,6 +68,7 @@ export const enAreas: readonly Readonly<Record<string, string>>[] = [
   learnerCheckoutEn,
   learnerLearnEn,
   learnerCertificateEn,
+  emailEn,
 ]
 
 export const en = {
@@ -93,4 +96,5 @@ export const en = {
   ...learnerCheckoutEn,
   ...learnerLearnEn,
   ...learnerCertificateEn,
+  ...emailEn,
 } as const
