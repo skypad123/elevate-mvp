@@ -52,8 +52,13 @@ be told apart from a default nobody chose.
   refund email and the email for an automatically refunded second payment use `users.locale`,
   else English. The teacher's copy of the refund email, and every
   Teach, Support and teacher email, stay English.
-- **API error messages stay English.** Clients show the API's message as it is, and word in the
-  language on screen only the sentences they write themselves (no connection, unknown failure).
+- **The learner app words API errors from their codes.** Every error a learner can see has a code
+  in `USER_ERROR_CODES` (`@elevate/core`) and a message `apiError.<code>`; the API sends variable
+  parts as `details`, never spliced into the sentence. The app never shows the API's English
+  sentence: an unlisted code or a proxy error gets a generic sentence in the language on screen.
+  The API's `message` stays English, for logs, Support and the web portals, which keep showing it
+  until their pages adopt the same rule. (Amended 2026-11-17; this first read "API error messages
+  stay English".)
 - **Certificate PDFs stay English,** as the document of record. The in-app certificate screen and
   the public certificate page are shown in the viewer's language.
 - **Teach and Support resolve `system` from the browser.** web-ui's `PreferencesProvider` passes

@@ -69,8 +69,10 @@ cannot corrupt what users already have stored.
   the invitation page, the company application and set-up, the Stripe card and return pages,
   Settings, and the review of a writer's held changes; in Support the profiles list, the profile
   page, the company card, the legal-name check and owner recovery; and the text inside the shared
-  shell drawer, uploader, media preview, dialog and toast. Other pages stay English until they are translated whole, as do error messages from the
-  API and emails. Learner emails: amended by ADR 010. API error messages still stay English.
+  shell drawer, uploader, media preview, dialog and toast. The whole learner app is translated
+  (Chinese design, PR 3), and so are the learner emails (ADR 010). Other pages stay English until
+  they are translated whole. Error messages from the API stay English; the learner app words
+  them from their codes instead (ADR 010).
 - `test/catalog.test.ts` fails when a catalog has untranslated keys, unknown keys or mismatched
   placeholders, when two areas define the same key, or when an area is missing from a catalog.
 - Patterns, all without a new i18n API:
@@ -82,10 +84,13 @@ cannot corrupt what users already have stored.
     sentence differently.
   - Plurals are two keys chosen in code: `t(n === 1 ? 'x.one' : 'x.other', { count: n })`.
   - A sentence with a link, a button or bold text in it stays one message with a `{slot}`, filled
-    with React nodes by `fillSlots` from `@elevate/web-ui/preferences`.
+    with React nodes by `fillSlots` from `@elevate/i18n/react` (re-exported by
+    `@elevate/web-ui/preferences`), which the learner app uses too.
   - Dates and lists go through `useFormatDate()` and `useFormatList()`, which follow the language.
   - A failed request is worded by `useErrorMessage()`: the server's message as it is (the API
     answers in English), and the two sentences the client words itself in the chosen language.
+    The learner app instead words every error from its code (`apiError.<code>`), as ADR 010 sets
+    out; the portals move to that when their pages adopt it.
 - Chosen over i18next: two locales, three runtimes (Vite ×2, React Native), zero runtime
   dependencies, and compile-time key checking. The catalog has grown from a few dozen strings to
   several hundred and the plural pairs above are still few; if ICU plurals or lazy namespaces

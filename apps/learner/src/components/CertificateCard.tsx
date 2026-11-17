@@ -1,9 +1,11 @@
 import type { CertificateView } from '@elevate/core'
+import { fillSlots } from '@elevate/i18n/react'
 import * as WebBrowser from 'expo-web-browser'
 import { Award, Check, Download, Share2 } from 'lucide-react-native'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Platform, Share, View } from 'react-native'
 import { formatDate } from '@/lib/format'
+import { usePreferences } from '@/lib/preferences'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Button, Logo, Text, toneColor } from '@/ui'
 
@@ -12,9 +14,26 @@ export type CertificateCardData = Pick<
   'learnerName' | 'courseTitle' | 'teacherName' | 'issuedAt' | 'token'
 >
 
+/** The name and the course in the statement, each laid out as its own large line. */
+const STATEMENT_LINE = /(\{name\}|\{course\})/
+
 /** The on-screen twin of the PDF: same wording, same Atelier framing. */
 export function CertificateCard({ certificate: c }: { certificate: CertificateCardData }) {
   const theme = useTheme()
+  const { t, locale } = usePreferences()
+  // One sentence, in the language's own order, split into the card's lines around the name and
+  // the course; the text between them is the small lines. A translation can repeat a small
+  // fragment, so each part's key counts the earlier parts with the same text.
+  const seen = new Map<string, number>()
+  const statement = t('learnerCertificate.card.statement')
+    .split(STATEMENT_LINE)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const n = seen.get(part) ?? 0
+      seen.set(part, n + 1)
+      return { part, key: `${part}#${n}` }
+    })
   return (
     <View
       style={{
@@ -40,26 +59,28 @@ export function CertificateCard({ certificate: c }: { certificate: CertificateCa
           <Logo size="sm" />
         </View>
         <Text variant="eyebrow" tone="brand" align="center" style={{ marginTop: theme.space[2] }}>
-          Certificate of completion
+          {t('learnerCertificate.card.eyebrow')}
         </Text>
-        <Text variant="small" tone="secondary" align="center">
-          This certifies that
-        </Text>
-        <Text variant="display" align="center">
-          {c.learnerName}
-        </Text>
-        <View style={{ width: 160, height: 1, backgroundColor: theme.colors.border }} />
-        <Text variant="small" tone="secondary" align="center">
-          has completed
-        </Text>
-        <Text variant="h2" align="center">
-          {c.courseTitle}
-        </Text>
-        <Text variant="small" tone="secondary" align="center">
-          taught by {c.teacherName} on Elevate
-        </Text>
+        {statement.map(({ part, key }) =>
+          part === '{name}' ? (
+            <Fragment key={key}>
+              <Text variant="display" align="center">
+                {c.learnerName}
+              </Text>
+              <View style={{ width: 160, height: 1, backgroundColor: theme.colors.border }} />
+            </Fragment>
+          ) : part === '{course}' ? (
+            <Text key={key} variant="h2" align="center">
+              {c.courseTitle}
+            </Text>
+          ) : (
+            <Text key={key} variant="small" tone="secondary" align="center">
+              {fillSlots(part, { teacher: c.teacherName })}
+            </Text>
+          ),
+        )}
         <Text variant="bodyStrong" align="center">
-          {formatDate(c.issuedAt)}
+          {formatDate(c.issuedAt, locale)}
         </Text>
         <View
           style={{
@@ -71,7 +92,7 @@ export function CertificateCard({ certificate: c }: { certificate: CertificateCa
         >
           <Award size={14} color={toneColor(theme, 'tertiary')} />
           <Text variant="caption" tone="tertiary">
-            Certificate ID {c.token}
+            {t('learnerCertificate.card.id', { token: c.token })}
           </Text>
         </View>
       </View>
@@ -87,6 +108,7 @@ export function CertificateActions({
   share?: boolean
 }) {
   const theme = useTheme()
+  const { t } = usePreferences()
   const [copied, setCopied] = useState(false)
 
   async function openPdf() {
@@ -98,7 +120,10 @@ export function CertificateActions({
   }
 
   async function shareLink() {
-    const message = `I completed “${c.courseTitle}” on Elevate. Verify it here: ${c.verifyUrl}`
+    const message = t('learnerCertificate.card.shareMessage', {
+      course: c.courseTitle,
+      url: c.verifyUrl,
+    })
     if (Platform.OS !== 'web') {
       await Share.share({ message, url: c.verifyUrl })
       return
@@ -106,7 +131,11 @@ export function CertificateActions({
     const nav = typeof navigator === 'undefined' ? null : navigator
     if (nav?.share) {
       try {
-        await nav.share({ title: 'Elevate certificate', text: message, url: c.verifyUrl })
+        await nav.share({
+          title: t('learnerCertificate.card.shareTitle'),
+          text: message,
+          url: c.verifyUrl,
+        })
         return
       } catch {
         // user dismissed the share sheet; fall through to copying
@@ -119,10 +148,15 @@ export function CertificateActions({
 
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[3] }}>
-      <Button label="Download PDF" variant="primary" icon={Download} onPress={openPdf} />
+      <Button
+        label={t('learnerCertificate.card.download')}
+        variant="primary"
+        icon={Download}
+        onPress={openPdf}
+      />
       {share ? (
         <Button
-          label={copied ? 'Link copied' : 'Share verify link'}
+          label={t(copied ? 'learnerCertificate.card.copied' : 'learnerCertificate.card.share')}
           variant="secondary"
           icon={copied ? Check : Share2}
           onPress={shareLink}

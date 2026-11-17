@@ -80,6 +80,8 @@ describe('lesson player', () => {
     expect(locked.status).toBe(403)
     expect(locked.body.error.code).toBe('lesson_locked')
     expect(locked.body.error.message).toContain('Building a starter')
+    // the titles travel as data, for the app to word the sentence in its language
+    expect(locked.body.error.details.blockedByTitles).toContain('Building a starter')
   })
 
   it('records monotonic progress and positions', async () => {
@@ -93,7 +95,10 @@ describe('lesson player', () => {
     const quizId = lessons[0]!.artefacts.find((a) => a.type === 'quiz')?.id as string
     expect((await progress(quizId, { status: 'completed' })).status).toBe(400)
     const lockedArtefact = lessons[1]!.artefacts[0]!.id
-    expect((await progress(lockedArtefact, { status: 'completed' })).status).toBe(403)
+    const lockedProgress = await progress(lockedArtefact, { status: 'completed' })
+    expect(lockedProgress.status).toBe(403)
+    // the same code as a locked lesson load, so the app words it the same way
+    expect(lockedProgress.body.error.code).toBe('lesson_locked')
     const e = await detail()
     expect(e.lessons[0].percent).toBe(50)
     expect(e.lessons[0].status).toBe('in_progress')

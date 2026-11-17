@@ -38,4 +38,15 @@ export const domainZh = {
   'stripe.account': 'Stripe 账户',
   'stripe.connect': '连接 Stripe',
   'stripe.openDashboard': '打开 Stripe 控制台',
+
+  'category.arts-culture': '艺术与文化',
+  'category.business': '商业',
+  'category.craft-making': '手工与制作',
+  'category.design': '设计',
+  'category.food-drink': '美食与饮品',
+  'category.language': '语言',
+  'category.music': '音乐',
+  'category.photography-film': '摄影与影视',
+  'category.technology': '科技',
+  'category.wellness': '身心健康',
 } satisfies Record<keyof typeof domainEn, string>

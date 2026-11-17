@@ -2,17 +2,20 @@
 # (DEV_ENDPOINTS_ENABLED=true in .env) so no email is involved.
 #
 # Env: EMAIL (default learner@example.com), API_URL (default http://localhost:4400).
+# Taps go by testID, so the flow works in either language; the text checks assume English.
 appId: ${APP_ID}
 env:
   EMAIL: ${EMAIL}
   API_URL: ${API_URL}
 ---
-- tapOn: "Sign in"
 - tapOn:
-    text: "you@example.com"
+    id: "nav-sign-in"
+- tapOn:
+    id: "sign-in-email"
 - inputText: ${EMAIL}
 - hideKeyboard
-- tapOn: "Email me a sign-in code"
+- tapOn:
+    id: "sign-in-request"
 - assertVisible: "Enter the 6-digit code"
 # Ask the API for a second code for the same address; any unconsumed code verifies.
 - runScript:
@@ -22,5 +25,6 @@ env:
       API_URL: ${API_URL}
 - inputText: ${output.code}
 - extendedWaitUntil:
-    visible: "Profile"
+    visible:
+      id: "nav-profile"
     timeout: 15000

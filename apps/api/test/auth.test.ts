@@ -42,6 +42,23 @@ describe('magic link auth', () => {
     expect(again.body.error.code).toBe('link_invalid')
   })
 
+  it('answers link_used to the loser when two requests verify one link at once', async () => {
+    await t.api('POST', '/api/auth/magic-link', {
+      body: { email: 'race@example.com', audience: 'learner' },
+    })
+    const token = new URL(
+      t.mailer.last()?.text.match(/https?:\/\/\S+/)?.[0] ?? '',
+    ).searchParams.get('token')
+    const [a, b] = await Promise.all([
+      t.api('POST', '/api/auth/verify', { body: { token } }),
+      t.api('POST', '/api/auth/verify', { body: { token } }),
+    ])
+    const statuses = [a.status, b.status].sort()
+    expect(statuses).toEqual([200, 400])
+    const loser = a.status === 400 ? a : b
+    expect(loser.body.error.code).toBe('link_used')
+  })
+
   it('signs in by code, rejects wrong codes, and locks after five attempts', async () => {
     const email = 'bob@example.com'
     const r = await t.api('POST', '/api/auth/magic-link', { body: { email, audience: 'learner' } })

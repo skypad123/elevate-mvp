@@ -1,9 +1,11 @@
 import type { ArtefactContentView, LearnerQuiz, QuizAnswers, QuizSubmitResult } from '@elevate/core'
+import type { Translator } from '@elevate/i18n'
 import { CheckCircle2, CircleAlert, Clock, HelpCircle, Trophy, XCircle } from 'lucide-react-native'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { errorMessage } from '@/lib/api-error'
+import { useErrorMessage } from '@/lib/api-error'
 import { startQuiz, submitQuiz } from '@/lib/learning'
+import { usePreferences } from '@/lib/preferences'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Badge, Button, Card, Text } from '@/ui'
 
@@ -29,6 +31,34 @@ function useCountdown(expiresAt: string | null): number | null {
   return left
 }
 
+/** The instructions before an attempt: one whole message for each case. */
+function introText(
+  t: Translator,
+  attempts: Pick<QuizArtefact['attempts'], 'max' | 'used' | 'bestScore'>,
+): string {
+  const best = attempts.bestScore
+  if (attempts.max === 1) {
+    return best !== null
+      ? t('learnerLearn.quiz.intro.single.best', { score: best })
+      : t('learnerLearn.quiz.intro.single')
+  }
+  const count = attempts.max - attempts.used
+  if (best !== null) {
+    return t(
+      count === 1
+        ? 'learnerLearn.quiz.intro.more.one.best'
+        : 'learnerLearn.quiz.intro.more.other.best',
+      { count, score: best },
+    )
+  }
+  return t(
+    count === 1 ? 'learnerLearn.quiz.intro.more.one' : 'learnerLearn.quiz.intro.more.other',
+    {
+      count,
+    },
+  )
+}
+
 export function QuizRunner({
   enrollmentId,
   artefact,
@@ -39,10 +69,13 @@ export function QuizRunner({
   onUpdated: (result: QuizSubmitResult) => void
 }) {
   const theme = useTheme()
+  const { t } = usePreferences()
+  const errorMessage = useErrorMessage()
   const [phase, setPhase] = useState<Phase>({ kind: 'intro' })
   const [answers, setAnswers] = useState<QuizAnswers>({})
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // The failed request itself, worded at render so a language switch rewords it.
+  const [error, setError] = useState<{ error: unknown } | null>(null)
   const secondsLeft = useCountdown(phase.kind === 'taking' ? phase.expiresAt : null)
   const { attempts } = artefact
   const quizId = artefact.quizId
@@ -61,7 +94,7 @@ export function QuizRunner({
         expiresAt: started.attempt.expiresAt,
       })
     } catch (e) {
-      setError(errorMessage(e))
+      setError({ error: e })
     } finally {
       setBusy(false)
     }
@@ -76,7 +109,7 @@ export function QuizRunner({
       setPhase({ kind: 'result', result })
       onUpdated(result)
     } catch (e) {
-      setError(errorMessage(e))
+      setError({ error: e })
     } finally {
       setBusy(false)
     }
@@ -98,7 +131,7 @@ export function QuizRunner({
   if (!artefact.quiz || !quizId) {
     return (
       <Card muted>
-        <Text tone="secondary">This quiz has no questions yet.</Text>
+        <Text tone="secondary">{t('learnerLearn.quiz.noQuestions')}</Text>
       </Card>
     )
   }
@@ -113,39 +146,54 @@ export function QuizRunner({
           ) : (
             <HelpCircle size={22} color={theme.colors.brand} />
           )}
-          <Text variant="h2">{attempts.passed ? 'Quiz passed' : artefact.title}</Text>
+          <Text variant="h2">
+            {attempts.passed ? t('learnerLearn.quiz.passed.title') : artefact.title}
+          </Text>
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] }}>
-          <Badge label={`${total} question${total === 1 ? '' : 's'}`} />
-          <Badge label={`Pass mark ${artefact.quiz.passMarkPercent}%`} tone="brand" />
           <Badge
-            label={`${attempts.used}/${attempts.max} attempt${attempts.max === 1 ? '' : 's'} used`}
+            label={t(
+              total === 1 ? 'learnerLearn.quiz.questions.one' : 'learnerLearn.quiz.questions.other',
+              { count: total },
+            )}
+          />
+          <Badge
+            label={t('learnerLearn.quiz.passMark', { percent: artefact.quiz.passMarkPercent })}
+            tone="brand"
+          />
+          <Badge
+            label={t(
+              attempts.max === 1
+                ? 'learnerLearn.quiz.attemptsUsed.one'
+                : 'learnerLearn.quiz.attemptsUsed.other',
+              { used: attempts.used, max: attempts.max },
+            )}
             tone={exhausted ? 'danger' : 'neutral'}
           />
           {artefact.quiz.timeLimitMinutes ? (
-            <Badge label={`${artefact.quiz.timeLimitMinutes} min limit`} tone="warning" />
+            <Badge
+              label={t('learnerLearn.quiz.timeLimit', {
+                minutes: artefact.quiz.timeLimitMinutes,
+              })}
+              tone="warning"
+            />
           ) : null}
         </View>
         {attempts.passed ? (
           <Text tone="secondary">
-            You scored {attempts.bestScore}%. This lesson's quiz is complete.
+            {t('learnerLearn.quiz.passedBody', { score: attempts.bestScore ?? 0 })}
           </Text>
         ) : exhausted ? (
           <Text tone="danger">
-            You have used all attempts. Best score: {attempts.bestScore ?? 0}%. Ask your teacher if
-            you need another go.
+            {t('learnerLearn.quiz.exhausted', { score: attempts.bestScore ?? 0 })}
           </Text>
         ) : (
           <>
-            <Text tone="secondary">
-              Answer every question, then submit.{' '}
-              {attempts.max === 1
-                ? 'You have a single attempt.'
-                : `You can try ${attempts.max - attempts.used} more time${attempts.max - attempts.used === 1 ? '' : 's'}.`}
-              {attempts.bestScore !== null ? ` Your best so far is ${attempts.bestScore}%.` : ''}
-            </Text>
+            <Text tone="secondary">{introText(t, attempts)}</Text>
             <Button
-              label={attempts.open ? 'Resume attempt' : 'Start quiz'}
+              label={
+                attempts.open ? t('learnerLearn.quiz.resumeAttempt') : t('learnerLearn.quiz.start')
+              }
               variant="accent"
               size="lg"
               loading={busy}
@@ -155,7 +203,7 @@ export function QuizRunner({
         )}
         {error ? (
           <Text variant="small" tone="danger">
-            {error}
+            {errorMessage(error.error)}
           </Text>
         ) : null}
       </Card>
@@ -169,7 +217,7 @@ export function QuizRunner({
           style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
         >
           <Text variant="eyebrow" tone="tertiary">
-            {answered} of {phase.quiz.questions.length} answered
+            {t('learnerLearn.quiz.answered', { answered, total: phase.quiz.questions.length })}
           </Text>
           {secondsLeft !== null ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -186,7 +234,7 @@ export function QuizRunner({
         {phase.quiz.questions.map((q, i) => (
           <Card key={q.id} style={{ gap: theme.space[3] }}>
             <Text variant="h3">
-              {i + 1}. {q.prompt}
+              {t('learnerLearn.numbered', { number: i + 1, title: q.prompt })}
             </Text>
             <View style={{ gap: theme.space[2] }}>
               {q.options.map((o) => {
@@ -240,11 +288,11 @@ export function QuizRunner({
         ))}
         {error ? (
           <Text variant="small" tone="danger">
-            {error}
+            {errorMessage(error.error)}
           </Text>
         ) : null}
         <Button
-          label="Submit answers"
+          label={t('learnerLearn.quiz.submit')}
           variant="accent"
           size="lg"
           loading={busy}
@@ -265,25 +313,30 @@ export function QuizRunner({
           <CircleAlert size={40} color={theme.colors.warning} />
         )}
         <Text variant="eyebrow" tone={result.passed ? 'success' : 'warning'}>
-          {result.passed ? 'Passed' : 'Not yet'}
+          {result.passed
+            ? t('learnerLearn.quiz.result.passed')
+            : t('learnerLearn.quiz.result.notYet')}
         </Text>
         <Text variant="display" style={{ fontSize: 48, lineHeight: 52 }}>
-          {result.grade.scorePercent}%
+          {t('learnerLearn.percent', { percent: result.grade.scorePercent })}
         </Text>
         <Text tone="secondary" align="center">
-          {result.grade.correctCount} of {result.grade.totalQuestions} correct · pass mark{' '}
-          {artefact.quiz.passMarkPercent}%
+          {t('learnerLearn.quiz.result.summary', {
+            correct: result.grade.correctCount,
+            total: result.grade.totalQuestions,
+            passMark: artefact.quiz.passMarkPercent,
+          })}
         </Text>
         {!result.passed && result.attemptsRemaining > 0 ? (
           <Button
-            label={`Try again (${result.attemptsRemaining} left)`}
+            label={t('learnerLearn.quiz.tryAgain', { count: result.attemptsRemaining })}
             variant="accent"
             onPress={begin}
             loading={busy}
           />
         ) : null}
         {!result.passed && result.attemptsRemaining === 0 ? (
-          <Text tone="danger">No attempts left for this quiz.</Text>
+          <Text tone="danger">{t('learnerLearn.quiz.noAttemptsLeft')}</Text>
         ) : null}
       </Card>
       <View style={{ gap: theme.space[3] }}>
@@ -306,15 +359,17 @@ export function QuizRunner({
                   <XCircle size={18} color={theme.colors.danger} />
                 )}
                 <Text variant="bodyStrong" style={{ flex: 1 }}>
-                  {i + 1}. {q?.prompt}
+                  {t('learnerLearn.numbered', { number: i + 1, title: q?.prompt ?? '' })}
                 </Text>
               </View>
               <Text variant="small" tone={p.correct ? 'success' : 'danger'}>
-                Your answer: {chosen ?? '—'}
+                {chosen === undefined
+                  ? t('learnerLearn.quiz.noAnswer')
+                  : t('learnerLearn.quiz.yourAnswer', { answer: chosen })}
               </Text>
               {!p.correct ? (
                 <Text variant="small" tone="secondary">
-                  Correct answer: {correct}
+                  {t('learnerLearn.quiz.correctAnswer', { answer: correct ?? '' })}
                 </Text>
               ) : null}
               {p.explanation ? (

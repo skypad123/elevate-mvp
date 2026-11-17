@@ -89,8 +89,9 @@ Send the language with the requests the app already makes (the sign-in request, 
 1.  **Every learner screen works in Chinese.** With the language set to Chinese, every route in
     `apps/learner/src/app` shows no English, with four exceptions:
     -   text that teachers typed;
-    -   API error messages;
     -   names: Elevate, Stripe, course and teacher names;
+    -   the browser's and the phone's own controls, such as the play and full-screen buttons of a
+        video, which follow the browser's or the phone's language;
     -   the certificate PDF, which stays an English document of record. The in-app certificate
         screen and the public `/c/[token]` page are translated, in the viewer's language.
 
@@ -128,8 +129,9 @@ Send the language with the requests the app already makes (the sign-in request, 
 -   **Translating text that teachers typed** (course titles, descriptions, lesson text, quiz
     questions). Multi-language course content is a later feature. No machine translation
     anywhere.
--   **Translating API error messages.** The API stays English. The app words only the error
-    sentences it already writes itself, as `useErrorMessage()` does in the web portals.
+-   **Translating API errors in Teach and Support.** The learner app words every API error it
+    can show from its code (see [The error rule](#the-error-rule)); the web portals keep showing
+    the server's English sentence until their pages adopt the same rule.
 -   **A course language field, or filtering by course language.** This is deferred, though see
     [Question 1](#open-questions).
 -   **Traditional Chinese, Malay or Tamil catalogs.** Only `en` and `zh` (Simplified, formatted
@@ -451,9 +453,9 @@ language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (me
     | Area                 | Screens and components                                                                                                                             |
     | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
     | `learnerCommon`      | the switcher, error sentences, durations, the "Free" price label, the list separator, `EmptyState`, `RootError`, `+not-found`                      |
-    | `learnerExplore`     | Explore (the home tab)                                                                                                                             |
+    | `learnerExplore`     | Explore (the home tab) and the course card                                                                                                         |
     | `learnerAuth`        | sign-in and verify                                                                                                                                 |
-    | `learnerCourse`      | course detail and the course card                                                                                                                  |
+    | `learnerCourse`      | course detail                                                                                                                                      |
     | `learnerCheckout`    | checkout and its success page                                                                                                                      |
     | `learnerLearn`       | the course overview (`learn/[enrollmentId]/index.tsx`), the lesson player and its `media/*` components, `QuizRunner`, `Trail` and the learning tab |
     | `learnerCertificate` | the in-app certificate screen, `CertificateCard` and the public `/c/[token]` page                                                                  |
@@ -472,13 +474,48 @@ language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (me
     -   money still goes through `formatSgd`, since `S$` is the same in both languages. Its
         English "Free" (`showFree`) is replaced at the learner call sites by
         `learnerCommon.price.free`.
--   **Errors.** A learner `useErrorMessage()` in `lib/api-error.ts` mirrors web-ui's.
-    -   It shows the API's message as it is, and the two sentences the client words itself (no
-        connection, unknown failure) from the catalog.
-    -   A response with no message no longer gets the English `'Something went wrong'` built in;
-        the translated generic sentence is used.
-    -   Screens store the error object and word it when they render, so a language switch
-        rewords a shown error.
+-   **Errors.** A learner `useErrorMessage()` in `lib/api-error.ts` words every failed request
+    in the language on screen, following [the error rule](#the-error-rule). Screens store the
+    error object and word it when they render, so a language switch rewords a shown error.
+
+### The error rule
+
+Amended 2026-11-17 (the Teach banner design's Question 3): every API error a learner can see has a
+code and a translated message, and only internal errors stay English. This reverses the brief's
+decision 8 and replaces [Alternative I](#alternative-i-translate-api-error-messages)'s rejection.
+
+-   **One code, one meaning.** Where the API used one code for several sentences, it gets distinct
+    codes:
+    -   `link_used` ("That sign-in link was already used.") is split from `link_invalid`;
+    -   `enrollment_inactive` is split from `forbidden`;
+    -   a locked lesson is always `lesson_locked`, also where `forbidden` said "This lesson is
+        locked";
+    -   `promo_wrong_course` ("That code does not apply to this course") and
+        `promo_not_started` ("That code is not active yet") are split from `promo_invalid`.
+-   **Variable parts travel as data.** A message never has text spliced into it on the server:
+    -   `lesson_locked` sends `details.blockedByTitles`, the titles of the lessons to finish
+        first;
+    -   `below_minimum` sends `details.minimumCents`.
+
+    The English `message` stays as it was, for logs, Support and the web portals.
+-   **The list of codes.** `USER_ERROR_CODES` in `@elevate/core` lists every code a learner can
+    see, and `@elevate/i18n` has an `apiError` area with `apiError.<code>` for each. The catalog
+    test fails when a listed code has no message. Codes the learner app can't reach (Teach,
+    Support, file paths) aren't listed; Teach and Support add theirs when their pages adopt the
+    rule.
+-   **Wording in the app.** `useErrorMessage()` turns:
+    -   an `ApiError` with a listed code into `t('apiError.<code>', …)`, with the details as
+        placeholder values (the lesson titles joined by `formatList`, the minimum by
+        `formatSgd`);
+    -   any other `ApiError` (an unlisted code, a non-JSON proxy error page, `internal`) into
+        `learnerCommon.error.generic`;
+    -   a request that never reached the server, on native (`Network request failed`) or on web
+        (a `TypeError` from `fetch`), into `learnerCommon.error.unreachable`.
+
+    The API's English sentence is never shown in the learner app.
+-   **Fewer errors to word.** The search field gets `maxLength={100}` and the Profile name field
+    `maxLength={120}`, the limits the API checks, so those `validation` errors can't happen from
+    the app; `apiError.validation` covers anything left.
 -   **The switcher.** A new `LanguageSwitch` shows `English` and `中文`, each from
     `localeNames` in its own script, as `role="radio"` chips in a labelled `radiogroup`. Its
     selected chip is the resolved language. It sits in two places:
@@ -543,7 +580,7 @@ language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (me
     -   the chosen-or-guessed rule at verify;
     -   the press-only writes and the single fill-in;
     -   the learner emails' languages;
-    -   API error messages staying English;
+    -   the learner app wording API errors from their codes (the error rule);
     -   certificate PDFs staying English;
     -   Teach and Support resolving `system` from the browser;
     -   the `?lang` hand-off, stored in Teach and Support only when nothing is stored.
@@ -708,6 +745,9 @@ language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (me
 -   **Reason for Rejection**: Rejected by author ([the brief's decision 8](learner-main-page-improvements.md#key-decisions--staging-for-next-steps)): the
     cost touches every handler and grows with each new error, while the screens that decide a
     sign-up show few API errors. The app translates only the two sentences it words itself.
+-   **Since adopted for the learner app** (2026-11-17): the client maps each code to a message,
+    as [the error rule](#the-error-rule) sets out. The cost is held down by a list of the codes a
+    learner can see and a test that each has a message.
 
 ### Alternative J: Translate only the purchase path first
 
@@ -1333,7 +1373,7 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
         -   the chosen-or-guessed rule at verify;
         -   the press-only writes and the single fill-in;
         -   the learner emails' languages;
-        -   API error messages staying English;
+        -   the learner app wording API errors from their codes (the error rule);
         -   certificate PDFs staying English;
         -   Teach and Support resolving `system` from the browser;
         -   the `?lang` hand-off, stored in Teach and Support only when nothing is stored.
@@ -1521,17 +1561,38 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
 
 ##### 47. Error wording
 
--   **Files**: `apps/learner/src/lib/api-error.ts` (Modify).
--   **Type / Scope**: error helper.
+-   **Files**: `apps/learner/src/lib/api-error.ts` (Modify); `packages/core/src/contracts/errors.ts`
+    (Create) and `packages/core/src/contracts/index.ts` (Modify);
+    `packages/i18n/src/messages/areas/apiError.en.ts` and `apiError.zh.ts` (Create);
+    `packages/i18n/test/catalog.test.ts` (Modify).
+-   **Type / Scope**: error contract, messages and helper ([the error rule](#the-error-rule)).
 -   **Proposed Changes**:
-    -   **`errorMessage`** gains a second fallback parameter, as web-ui's does. For an
-        `ApiError` it returns `error.message || fallback`, so an empty message never shows
-        blank.
-    -   **`ApiError.fromResponse`** keeps an empty message when the body has none. It no longer
-        uses the English `'Something went wrong'`.
-    -   **A new `useErrorMessage()`** returns `(error: unknown) => errorMessage(error,
-        t('learnerCommon.error.generic'), t('learnerCommon.error.unreachable'))`, memoised on
-        `t`.
+    -   **`USER_ERROR_CODES`** in `@elevate/core`, with its `UserErrorCode` type: every code a
+        learner can see. Each has a comment saying where it comes from.
+    -   **The `apiError` area** has `apiError.<code>` for each, `apiError.lesson_locked.after`
+        (`Finish {lessons} first.`) and `apiError.below_minimum` with `{amount}`.
+    -   **The catalog test** fails when a listed code has no `apiError.<code>` message.
+    -   **`ApiError.fromResponse`** keeps the code (`request_failed` for a body that isn't the
+        error envelope) and an empty message when the body has none; it no longer uses the
+        English `'Something went wrong'`.
+    -   **`errorMessage(error, t)`** words an error as the rule says; **`useErrorMessage()`**
+        returns it bound to the current `t`, memoised on `t`.
+
+##### 47a. Distinct error codes in the API
+
+-   **Files**: `apps/api/src/services/auth.service.ts`, `learning.service.ts` and
+    `payments.service.ts` (Modify); `apps/api/test/auth.test.ts`, `learning.test.ts` and
+    `checkout.test.ts` (Modify).
+-   **Type / Scope**: API services.
+-   **Proposed Changes**:
+    -   **`auth.service.ts`:** the "already used" branch of verify throws `link_used`.
+    -   **`learning.service.ts`:** an inactive enrolment throws `enrollment_inactive` (403); the
+        two "This lesson is locked" sites throw `lesson_locked` (403); the lesson-load
+        `lesson_locked` adds `details.blockedByTitles` beside `blockedBy`.
+    -   **`payments.service.ts`:** `resolvePromo` throws `promo_wrong_course` and
+        `promo_not_started` for those two cases; `below_minimum` adds
+        `details.minimumCents: 100`.
+    -   **English messages** are unchanged. Tests assert the new codes.
 
 ##### 48. `fillSlots`
 
@@ -1609,7 +1670,12 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
         </PreferencesProvider>
         ```
 
-        On native it renders with the defaults until the storage read finishes.
+        On native it renders with the defaults until the storage read finishes. It shows only
+        its translated sentence: the thrown error's own message is developer or API English,
+        which the error rule keeps off screen, so it is logged in development instead.
+    -   **Lists inside sentences** ("Finish {lessons} first.", the trail's "after {list}") join
+        with `learnerCommon.list.separator`, so two lesson titles read "A, B" in English where
+        the API's sentence said "A and B"; Chinese reads "A、B".
     -   **Navigation:** `TopNav.tsx` and `PillTabBar.tsx` already use `t()`. They gain only the
         `testID`s `nav-sign-in` and `nav-profile`.
 

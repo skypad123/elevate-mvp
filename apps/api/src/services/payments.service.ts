@@ -2,6 +2,7 @@ import {
   ANALYTICS_EVENTS,
   type CheckoutStartResponse,
   type CheckoutSyncResponse,
+  DEFAULT_MINIMUM_CHARGE_CENTS,
   formatSgd,
   type Locale,
   localeSchema,
@@ -92,9 +93,9 @@ export class PaymentsService {
     const now = this.deps.now()
     if (!promo?.active) throw errors.badRequest('promo_invalid', 'That promo code is not valid')
     if (promo.courseId && promo.courseId !== courseId)
-      throw errors.badRequest('promo_invalid', 'That code does not apply to this course')
+      throw errors.badRequest('promo_wrong_course', 'That code does not apply to this course')
     if (promo.startsAt && promo.startsAt > now)
-      throw errors.badRequest('promo_invalid', 'That code is not active yet')
+      throw errors.badRequest('promo_not_started', 'That code is not active yet')
     if (promo.expiresAt && promo.expiresAt < now)
       throw errors.badRequest('promo_expired', 'That promo code has expired')
     if (promo.maxRedemptions !== null && promo.redeemedCount >= promo.maxRedemptions)
@@ -214,7 +215,8 @@ export class PaymentsService {
     if (q.belowMinimum)
       throw errors.unprocessable(
         'below_minimum',
-        `The discounted price is below the minimum chargeable amount (${formatSgd(100)})`,
+        `The discounted price is below the minimum chargeable amount (${formatSgd(DEFAULT_MINIMUM_CHARGE_CENTS)})`,
+        { minimumCents: DEFAULT_MINIMUM_CHARGE_CENTS },
       )
     // The error code keeps its old name so clients do not change.
     const account = course.profile.payoutAccount

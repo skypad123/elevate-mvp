@@ -12,6 +12,7 @@ type Item = {
   label: string
   icon: LucideIcon
   match: (p: string) => boolean
+  testID?: string
 }
 
 export const TAB_BAR_HEIGHT = 64
@@ -41,6 +42,7 @@ export function PillTabBar() {
           href: '/profile',
           label: t('nav.profile'),
           icon: UserRound,
+          testID: 'nav-profile',
           match: (p) => p.startsWith('/profile'),
         },
       ]
@@ -55,6 +57,7 @@ export function PillTabBar() {
           href: '/sign-in',
           label: t('nav.signIn'),
           icon: LogIn,
+          testID: 'nav-sign-in',
           match: (p) => p.startsWith('/sign-in'),
         },
       ]
@@ -91,6 +94,7 @@ export function PillTabBar() {
           return (
             <Link key={item.href} href={item.href} asChild>
               <Pressable
+                testID={item.testID}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
                 style={{

@@ -3,8 +3,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { CheckCircle2, Clock, ShieldAlert } from 'lucide-react-native'
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, View } from 'react-native'
-import { errorMessage } from '@/lib/api-error'
+import { useErrorMessage } from '@/lib/api-error'
 import { catalogKeys, syncCheckout } from '@/lib/catalog'
+import { usePreferences } from '@/lib/preferences'
 import { useSession } from '@/lib/session'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Button, Card, EmptyState, Screen, Text } from '@/ui'
@@ -13,7 +14,10 @@ type State =
   | { kind: 'checking' }
   | { kind: 'paid'; enrollmentId: string; courseSlug: string }
   | { kind: 'expired' }
-  | { kind: 'error'; message: string }
+  // Why it failed, worded at render so a language switch rewords it
+  | { kind: 'noSession' }
+  | { kind: 'slow' }
+  | { kind: 'error'; error: unknown }
 
 /** Stripe redirects here with ?session_id=; we confirm fulfilment with the API (webhook or sync). */
 export default function CheckoutSuccess() {
@@ -22,6 +26,8 @@ export default function CheckoutSuccess() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { isLoading, isSignedIn } = useSession()
+  const { t } = usePreferences()
+  const wordError = useErrorMessage()
   const [state, setState] = useState<State>({ kind: 'checking' })
   const attempts = useRef(0)
 
@@ -35,7 +41,7 @@ export default function CheckoutSuccess() {
       return
     }
     if (!sessionId) {
-      setState({ kind: 'error', message: 'This page needs a checkout session.' })
+      setState({ kind: 'noSession' })
       return
     }
     let cancelled = false
@@ -59,14 +65,9 @@ export default function CheckoutSuccess() {
         }
         attempts.current += 1
         if (attempts.current < 15) setTimeout(tick, 2000)
-        else
-          setState({
-            kind: 'error',
-            message:
-              'Payment confirmation is taking longer than usual. Your enrolment will appear in My Learning once Stripe confirms it.',
-          })
+        else setState({ kind: 'slow' })
       } catch (e) {
-        if (!cancelled) setState({ kind: 'error', message: errorMessage(e) })
+        if (!cancelled) setState({ kind: 'error', error: e })
       }
     }
     void tick()
@@ -80,29 +81,29 @@ export default function CheckoutSuccess() {
       {state.kind === 'checking' ? (
         <View style={{ alignItems: 'center', gap: theme.space[4] }}>
           <ActivityIndicator color={theme.colors.brand} />
-          <Text tone="secondary">Confirming your payment…</Text>
+          <Text tone="secondary">{t('learnerCheckout.success.checking')}</Text>
         </View>
       ) : state.kind === 'paid' ? (
         <Card style={{ gap: theme.space[4], alignItems: 'center' }} elevated>
           <CheckCircle2 size={40} color={theme.colors.success} />
           <Text variant="eyebrow" tone="brand">
-            Enrolled
+            {t('learnerCheckout.success.eyebrow')}
           </Text>
           <Text variant="h1" align="center">
-            You're in.
+            {t('learnerCheckout.success.title')}
           </Text>
           <Text tone="secondary" align="center">
-            A confirmation email is on its way. Your progress is saved as you go, on any device.
+            {t('learnerCheckout.success.body')}
           </Text>
           <Button
-            label="Start learning"
+            label={t('learnerCheckout.success.start')}
             variant="accent"
             size="lg"
             fullWidth
             onPress={() => router.replace(`/learn/${state.enrollmentId}`)}
           />
           <Button
-            label="Back to course page"
+            label={t('learnerCheckout.success.backToCourse')}
             variant="ghost"
             onPress={() => router.replace(`/course/${state.courseSlug}`)}
           />
@@ -110,17 +111,29 @@ export default function CheckoutSuccess() {
       ) : state.kind === 'expired' ? (
         <EmptyState
           icon={Clock}
-          title="That checkout expired"
-          body="No payment was taken. Start again from the course page."
-          action={{ label: 'Explore courses', onPress: () => router.replace('/') }}
+          title={t('learnerCheckout.expired.title')}
+          body={t('learnerCheckout.expired.body')}
+          action={{
+            label: t('learnerCheckout.expired.explore'),
+            onPress: () => router.replace('/'),
+          }}
         />
       ) : (
         <EmptyState
           icon={ShieldAlert}
           tone="danger"
-          title="We could not confirm the payment"
-          body={state.message}
-          action={{ label: 'Go to My Learning', onPress: () => router.replace('/learning') }}
+          title={t('learnerCheckout.failed.title')}
+          body={
+            state.kind === 'noSession'
+              ? t('learnerCheckout.failed.noSession')
+              : state.kind === 'slow'
+                ? t('learnerCheckout.failed.slow')
+                : wordError(state.error)
+          }
+          action={{
+            label: t('learnerCheckout.failed.myLearning'),
+            onPress: () => router.replace('/learning'),
+          }}
         />
       )}
     </Screen>
