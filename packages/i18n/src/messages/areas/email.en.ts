@@ -10,6 +10,8 @@
 export const emailEn = {
   // The last line of every email
   'email.footer.ignore': 'If you did not request this email you can ignore it.',
+  // The button's line in the plain-text part: {label} is the button text, {url} its link
+  'email.text.cta': '{label}: {url}',
 
   // The sign-in code email. {portal} is "Elevate", "Elevate Teach" or "Elevate Support";
   // {code} is the six-digit code shown as "123 456"; {minutes} is how long the link works.

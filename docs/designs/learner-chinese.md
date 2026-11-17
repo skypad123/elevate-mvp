@@ -152,10 +152,11 @@ Send the language with the requests the app already makes (the sign-in request, 
     "later".
 -   **Question 2 (success target):** is there a target for the share of Chinese sign-ins and
     purchases? Or is the first release only meant to establish the baseline?
--   **Question 3 (the Chinese text), answered 2026-11-17:** the author writes the Chinese text
-    and checks it. Each PR is built with the English and the code, and leaves its Chinese area
-    as a list of the keys still to write; `test/catalog.test.ts` fails on "are fully
-    translated" until the author fills it in, and the PR doesn't merge before.
+-   **Question 3 (the Chinese text), answered 2026-11-17:** Claude drafts the Chinese text in the
+    house style of `packages/i18n/src/messages/zh.ts`, independent reviewers check it for
+    accuracy, consistency and mechanics, and the author reads it and signs it off. A PR with
+    Chinese text doesn't merge before that sign-off. (The author first chose to write it, then
+    asked Claude to draft it the same day.)
 
 This design answers the brief's Questions 1 (variants), 2 (existing installs), 3 and 10 (which
 language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (measurement) and
@@ -558,7 +559,7 @@ language wins), 4 (the certificate), 8 (`?lang` against Teach's setting), 14 (me
 
 | Risk                                                           | What goes wrong                                                                                                                                              | Mitigation or accepted cost                                                                                                                                                                                                                                                             |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **The Chinese text is wrong or unreviewed**                    | Payment, refund and sign-in wording that misleads, or reads as machine-made, on the screens and emails where learners decide to pay.                         | The text is written by a person (item 50). Who writes it and who checks it is [Question 3](#open-questions). PR 2 and PR 3 don't merge without that reviewer's sign-off.                                                                                                                |
+| **The Chinese text is wrong or unreviewed**                    | Payment, refund and sign-in wording that misleads, or reads as machine-made, on the screens and emails where learners decide to pay.                         | The text is drafted in the house style, reviewed independently and signed off by the author (item 50, [Question 3](#open-questions)). PR 2 and PR 3 don't merge without that sign-off.                                                                                                  |
 | **English literals are left in the app**                       | A screen shows English in a Chinese app. The catalog parity test can't find a literal that never became a key.                                               | The manual Goal 1 audit before PR 3 merges, recorded in the PR. The AGENTS.md "Translated pages" rule covers new strings. After launch, nothing automatic catches a new literal; a lint rule is a [future improvement](#future-improvements).                                           |
 | **The pre-paint scripts drift from `resolveLocale`**           | There are three hand-copied scripts (learner, Teach, Support), because a classic script can't import. A changed device rule in core would leave them behind. | They copy only the one-line device rule. Each names `resolveLocale` in a comment, and the Teach and Support copies stay identical, as today. A drifted script only sets `<html lang>` wrongly until the provider mounts and corrects it.                                                |
 | **A sign-in email in a language the owner didn't pick**        | Anyone can ask for a sign-in email for any address with `locale: 'zh'`. The owner may take it for phishing.                                                  | The sign-in request's rate limit (30 per 15 minutes) bounds it, as for English requests today. The request can't mark the language as chosen: only the verifying device can, so using the link at most fills an empty or guessed account.                                               |
@@ -1346,7 +1347,8 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
 -   **Files**: `packages/i18n/src/messages/areas/email.en.ts` and `email.zh.ts` (Create).
 -   **Type / Scope**: message catalog.
 -   **Proposed Changes**: these keys, as whole sentences with `{placeholders}`:
-    -   `email.footer.ignore`;
+    -   `email.footer.ignore`, and `email.text.cta` for the button's line in the plain-text part
+        (`{label}: {url}`, so Chinese gets a full-width colon);
     -   `email.signIn.subject`, `.title`, `.body`, `.button`, `.codeIntro`, `.text.open`,
         `.text.code`;
     -   `email.receipt.title`, `.paid`, `.stripeReceipt`, `.noReceipt`, `.start`, `.button`;
@@ -1620,7 +1622,9 @@ All learner paths below are relative to `apps/learner/src/` unless they start wi
         `learnerCheckout`, `learnerLearn` and `learnerCertificate`.
     -   **`learnerCommon`** holds the switcher label, errors, durations, `price.free`,
         `list.separator`, and the text of `EmptyState`, `RootError` and `+not-found`.
-    -   **Chinese text** is written by a person, not machine-translated.
+    -   **Chinese text** is drafted by Claude in the house style of `zh.ts`, reviewed
+        independently, and signed off by the author before merge (Question 3). Nothing is
+        translated at runtime.
 
 ##### 51. Category and preference messages
 

@@ -131,9 +131,9 @@ the `?lang` hand-off to Teach.
 
 ## Open Questions
 
--   **Question 1 (the Chinese text), answered 2026-11-17:** the author writes and checks it, as
-    for the Chinese design's Question 3. Neither pull request can pass its checks or merge until
-    the author has written it (see [Order of release](#order-of-release)).
+-   **Question 1 (the Chinese text), answered 2026-11-17:** as for the Chinese design's Question
+    3, Claude drafts it, independent reviewers check it, and the author signs it off. Neither pull
+    request merges before that sign-off (see [Order of release](#order-of-release)).
 -   **Question 2 (the decision rule):** when is the count of first applications read, and what
     result removes the banner? The count can't test the banner's place, so moving it is a
     judgement.
@@ -418,9 +418,8 @@ The brief's Questions 6 (who doesn't see the banner) and 7 (the introduction) ar
         configuration. It needs the Chinese design's PR 3 and the Teach PR.
 -   **The Chinese text gates both:** a Chinese area file can't be left empty. It is checked
     against its English file at compile time, and `packages/i18n/test/catalog.test.ts` fails on
-    a missing or empty message. The Chinese design forbids machine translation. So neither pull
-    request can pass its checks until [Question 1](#open-questions) is answered and the text is
-    written, and neither merges until the reviewer named there signs it off.
+    a missing or empty message. So neither pull request can pass its checks until its Chinese is
+    written, and neither merges until the author signs it off ([Question 1](#open-questions)).
 -   **Native:** the banner ships in the next store build after the learner PR. Web ships on
     deploy.
 

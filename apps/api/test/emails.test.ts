@@ -52,6 +52,22 @@ describe('learner email templates', () => {
     expect(en.html).toContain('If you did not request this email you can ignore it.')
   })
 
+  it.each(['en', 'zh'] as const)("writes the button's line of the text part in %s", (locale) => {
+    const mail = simpleEmail({
+      to: 'a@example.com',
+      locale,
+      title: 'T',
+      paragraphs: ['P'],
+      cta: { href: 'http://learner.test/learn/1', label: 'Go' },
+    })
+    expect(
+      mail.text.endsWith(
+        translate(locale, 'email.text.cta', { label: 'Go', url: 'http://learner.test/learn/1' }),
+      ),
+    ).toBe(true)
+    if (locale === 'en') expect(mail.text.endsWith('Go: http://learner.test/learn/1')).toBe(true)
+  })
+
   it.each(['en', 'zh'] as const)('escapes a course title typed by a teacher, in %s', (locale) => {
     const course = '<script>alert(1)</script>'
     const mail = simpleEmail({

@@ -95,6 +95,9 @@ export function simpleEmail(input: {
     `${input.paragraphs.map(para).join('')}${input.cta ? `<tr><td style="padding-top:8px">${button(input.cta.href, input.cta.label, input.cta.colour)}</td></tr>` : ''}`,
     input.locale,
   )
-  const text = `${input.title}\n\n${input.paragraphs.join('\n\n')}${input.cta ? `\n\n${input.cta.label}: ${input.cta.href}` : ''}`
+  const cta = input.cta
+    ? `\n\n${translate(input.locale ?? 'en', 'email.text.cta', { label: input.cta.label, url: input.cta.href })}`
+    : ''
+  const text = `${input.title}\n\n${input.paragraphs.join('\n\n')}${cta}`
   return { to: input.to, subject: input.title, html, text }
 }
