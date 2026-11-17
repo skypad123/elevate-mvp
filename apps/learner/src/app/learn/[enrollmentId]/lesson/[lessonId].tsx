@@ -300,6 +300,11 @@ export default function LessonPlayer() {
               queryKey: learningKeys.lesson(enrollmentId, lessonId),
             })
           }}
+          onAttemptEnded={() =>
+            void queryClient.invalidateQueries({
+              queryKey: learningKeys.lesson(enrollmentId, lessonId),
+            })
+          }
         />
       ) : null}
       {(active.type === 'video' || active.type === 'audio') &&
