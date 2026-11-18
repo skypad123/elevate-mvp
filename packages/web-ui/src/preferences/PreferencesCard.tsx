@@ -136,8 +136,8 @@ export function PreferencesDialog({
 
 /**
  * A header button that opens the preferences dialog. It is for pages shown before someone can
- * reach Settings (Teach's application and set-up pages, an invitation link), so they can still
- * pick a language and a theme. The icon is the usual sign for "language", for a reader who cannot
+ * reach Settings (the sign-in page, Teach's application and set-up pages, an invitation link), so
+ * they can still pick a language and a theme. The icon is the usual sign for "language", for a reader who cannot
  * read the label.
  */
 export function PreferencesButton({ className }: { className?: string }) {

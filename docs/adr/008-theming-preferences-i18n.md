@@ -43,8 +43,8 @@ cannot corrupt what users already have stored.
   portal applies the stored theme and language before first paint. It is a file loaded by a
   classic `<script src>` in `<head>`, not an inline script, because the deployed sites send
   `script-src 'self'` (ADR 005, `infra/terraform/modules/environment/sites.tf`).
-- Pages that come before Settings can be reached (Teach's application and set-up pages, an
-  invitation link) carry a `PreferencesButton` in their header. It opens the same rows
+- Pages that come before Settings can be reached (the sign-in page of Teach and Support, Teach's
+  application and set-up pages, an invitation link) carry a `PreferencesButton` in their header. It opens the same rows
   (`PreferenceRows`) in a dialog.
 - Learner: `src/lib/preferences.tsx` + platform `preferences-storage(.web).ts`; `ThemeProvider`
   resolves `system | light | dark`, and the splash screen stays up until preferences are loaded.
@@ -65,8 +65,9 @@ cannot corrupt what users already have stored.
   together by `messages/en.ts` and `messages/zh.ts`. A Chinese area is checked against its English
   file with `satisfies`, so a missing or unknown key is a compile error in that file.
 - Translated today: navigation, the Settings/Preferences/Profile screens, and the teaching-profile
-  screens: in Teach the profile switcher and staff banner, the start page, the dashboard, Members,
-  the invitation page, the company application and set-up, the Stripe card and return pages,
+  screens: the sign-in and verify pages of Teach and Support; in Teach the profile switcher and
+  staff banner, the start page, the dashboard, Members, the invitation page, the company
+  application and set-up, the personal application, the Stripe card and return pages,
   Settings, and the review of a writer's held changes; in Support the profiles list, the profile
   page, the company card, the legal-name check and owner recovery; and the text inside the shared
   shell drawer, uploader, media preview, dialog and toast. The whole learner app is translated
@@ -91,6 +92,10 @@ cannot corrupt what users already have stored.
     answers in English), and the two sentences the client words itself in the chosen language.
     The learner app instead words every error from its code (`apiError.<code>`), as ADR 010 sets
     out; the portals move to that when their pages adopt it.
+  - A page may map an `error.code` it knows to a catalog message. The server's sentence stays
+    English and is the fallback for every other code. First used for the sign-in codes
+    (`signInErrorKey` and `useSignInErrorMessage()` in `@elevate/web-ui/portal`), with the
+    `apiError` messages the learner app uses.
 - Chosen over i18next: two locales, three runtimes (Vite ×2, React Native), zero runtime
   dependencies, and compile-time key checking. The catalog has grown from a few dozen strings to
   several hundred and the plural pairs above are still few; if ICU plurals or lazy namespaces
@@ -115,7 +120,7 @@ cannot corrupt what users already have stored.
 - `text-brand` is no longer used for text anywhere; Biome does not enforce this, so review for it
   (`git grep -nP 'text-brand(?![-\w])' -- apps packages` should find only a comment in the tokens).
 - The shared components that carry text (`Dialog`, `Toast`, `MediaUploader`, `MediaPreview`,
-  `FullPageSpinner`) call `useT()`, so they must be rendered inside `PreferencesProvider`. Both
+  `FullPageSpinner`, `SignInPage`, `VerifyPage`) call `useT()`, so they must be rendered inside `PreferencesProvider`. Both
   portals put it outermost in `App.tsx`.
 - A portal's stored language is per origin: Teach and Support each remember their own.
 - Favicons: portals ship `public/favicon.svg` + PNG fallbacks in their brand colour; the learner's
