@@ -1,7 +1,7 @@
 # Teach banner on Explore
 
 -   **Author:** Sky Livingston
--   **Status:** The Teach PR is built (2026-11-18). The learner PR is not started.
+-   **Status:** The Teach PR is built (2026-11-18). The learner PR is built (2026-11-19).
 -   **Date:** 2026-11-17
 
 ---
@@ -1096,6 +1096,8 @@ sign-off is a merge condition.
         `apps/learner/src/app/course/[slug].tsx` has.
     -   **The back link:** a `Link href="/"` wrapping a `Pressable` with the `ArrowLeft` icon
         and the text `t('nav.explore')`, as that file lays it out, with `testID` `teach-back`.
+        It also takes `dismissTo`, so it returns to the Explore already in the stack instead of
+        pushing a second tab navigator (found in review; the course page's link pushes).
     -   **Content,** from the `learnerTeach.screen` keys in item 20: the title (variant `h1`)
         and intro (`bodyLg`, tone `secondary`), then the three titled sections, each with an
         `h3` heading and `body` text. The six steps are a numbered list. The closing note comes

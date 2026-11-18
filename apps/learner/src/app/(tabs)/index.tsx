@@ -6,11 +6,13 @@ import { CourseCard } from '@/components/CourseCard'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { HeroScene } from '@/components/mascot/HeroScene'
 import { TAB_BAR_HEIGHT } from '@/components/PillTabBar'
+import { TeachBanner } from '@/components/TeachBanner'
 import { useErrorMessage } from '@/lib/api-error'
 import { useCategories, useCourseList } from '@/lib/catalog'
 import { categoryName } from '@/lib/categories'
 import { usePreferences } from '@/lib/preferences'
 import { useBreakpoint } from '@/lib/responsive'
+import { useTeachBanner } from '@/lib/teach-banner'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Button, Card, Chip, EmptyState, Grid, Screen, Skeleton, Text } from '@/ui'
 
@@ -34,6 +36,12 @@ export default function Explore() {
   const items = courses.data?.pages.flatMap((p) => p.items) ?? []
   const columns = isLg ? 3 : isMd ? 2 : 1
   const searching = q.length > 0 || !!category
+  // The invitation to teach, after the list: only once the first page has loaded (an empty list
+  // included), and never while a search or category is active.
+  const teachBanner = useTeachBanner({
+    searching,
+    loaded: !courses.isPending && !courses.isError,
+  })
 
   return (
     <Screen bottomInset={isWideWeb ? 0 : TAB_BAR_HEIGHT}>
@@ -198,6 +206,10 @@ export default function Explore() {
             ) : null}
           </View>
         )}
+
+        {teachBanner.visible ? <TeachBanner onDismiss={teachBanner.dismiss} /> : null}
+        {/* The end of the page, for the device flow to scroll to when the banner is hidden. */}
+        <View testID="explore-end" style={{ height: 1 }} />
       </View>
     </Screen>
   )
