@@ -52,12 +52,18 @@ be told apart from a default nobody chose.
   refund email and the email for an automatically refunded second payment use `users.locale`,
   else English. The teacher's copy of the refund email, and every
   Teach, Support and teacher email, stay English.
+- **Teach and Support send the page's language on the sign-in request.** Their sign-in page sends
+  its resolved language as `locale`, so the code email and the emailed link follow the page. They
+  send no `locale` at verify, so signing in to a portal never writes `users.locale`. (Added
+  2026-11-18 with the Teach PR of the Teach banner design.)
 - **The learner app words API errors from their codes.** Every error a learner can see has a code
   in `USER_ERROR_CODES` (`@elevate/core`) and a message `apiError.<code>`; the API sends variable
   parts as `details`, never spliced into the sentence. The app never shows the API's English
   sentence: an unlisted code or a proxy error gets a generic sentence in the language on screen.
   The API's `message` stays English, for logs, Support and the web portals, which keep showing it
-  until their pages adopt the same rule. (Amended 2026-11-17; this first read "API error messages
+  until their pages adopt the same rule. The portals' sign-in and verify pages word the sign-in
+  codes and `rate_limited` from the same messages (`signInErrorKey` in `@elevate/web-ui/portal`),
+  and show the server's sentence for any other code. (Amended 2026-11-17; this first read "API error messages
   stay English".)
 - **Certificate PDFs stay English,** as the document of record. The in-app certificate screen and
   the public certificate page are shown in the viewer's language.
@@ -68,8 +74,9 @@ be told apart from a default nobody chose.
 - **The `?lang` hand-off is stored in Teach and Support only when nothing is stored.** Their
   pre-paint scripts read `?lang`; when it is a supported language and the stored `locale` is
   `system` or missing, they write it into `elevate.preferences` (keeping the theme), and either way
-  remove `lang` from the address bar, keeping the hash. The parameter arrives there once, on a site
-  that has no language of its own yet. The learner web app never stores `?lang`: it holds it in
+  remove `lang` from the address bar, keeping the hash. The parameter arrives from the learner
+  app's Teach banner, on a site that has no language of its own yet, and on the emailed sign-in
+  link, which carries the language of the page that asked for the code. The learner web app never stores `?lang`: it holds it in
   memory until the app next loads, because it arrives on every sign-in and checkout link and storing it would
   turn a guess into a lasting choice. In both, a language already stored is never overwritten.
 

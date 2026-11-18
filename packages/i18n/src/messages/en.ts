@@ -8,8 +8,9 @@
  *
  * Translated today: the whole learner app; navigation, the Settings/Preferences/Profile screens,
  * and the teaching-profile screens of Teach and Support (the Teach dashboard and start page,
- * members, invitations, held changes, company application and set-up, Support's profile pages),
- * and the learner emails. Other pages are still English. The `apiError` area words the API's
+ * members, invitations, held changes, the personal and company applications and set-up, Support's
+ * profile pages), the sign-in and verify pages of Teach and Support, and the learner emails. Other
+ * pages are still English. The `apiError` area words the API's
  * error codes (ADR 010).
  *
  * To add an area: write the two files, then add it to `enAreas` and to `en` below, and to the
@@ -34,6 +35,8 @@ import { learnerExploreEn } from './areas/learnerExplore.en'
 import { learnerLearnEn } from './areas/learnerLearn.en'
 import { membersEn } from './areas/members.en'
 import { paymentsEn } from './areas/payments.en'
+import { personalApplyEn } from './areas/personalApply.en'
+import { portalAuthEn } from './areas/portalAuth.en'
 import { supportCompanyEn } from './areas/supportCompany.en'
 import { supportProfileEn } from './areas/supportProfile.en'
 import { supportProfilesEn } from './areas/supportProfiles.en'
@@ -54,6 +57,8 @@ export const enAreas: readonly Readonly<Record<string, string>>[] = [
   membersEn,
   invitationEn,
   companyApplyEn,
+  personalApplyEn,
+  portalAuthEn,
   applicationEn,
   changesEn,
   supportProfilesEn,
@@ -82,6 +87,8 @@ export const en = {
   ...membersEn,
   ...invitationEn,
   ...companyApplyEn,
+  ...personalApplyEn,
+  ...portalAuthEn,
   ...applicationEn,
   ...changesEn,
   ...supportProfilesEn,

@@ -372,3 +372,99 @@ describe('the account language', () => {
     expect(await accountLocale(email)).toEqual({ locale: 'zh', localeChosen: false })
   })
 })
+
+/**
+ * What the sign-in pages of Teach and Support rely on: the code email follows the page's
+ * `locale`, verify sends none, and the error codes `signInErrorKey` (@elevate/web-ui) words.
+ */
+describe('the portal sign-in pages', () => {
+  // Its own app, so these sign-ins do not count against the other files' rate limits.
+  let p: TestApp
+  beforeAll(async () => {
+    p = await createTestApp()
+  })
+  afterAll(async () => {
+    await p.close()
+  })
+
+  const linkIn = (text: string | undefined) => new URL(text?.match(/https?:\/\/\S+/)?.[0] ?? '')
+
+  it("sends a Teach code email in the page's language, with the language on its link", async () => {
+    const r = await p.api('POST', '/api/auth/magic-link', {
+      body: { email: 'teach-zh@example.com', audience: 'teach', locale: 'zh' },
+    })
+    expect(r.status).toBe(200)
+    const mail = p.mailer.last()
+    expect(mail?.html).toContain('<html lang="zh">')
+    const link = linkIn(mail?.text)
+    expect(link.origin).toBe('http://teach.test')
+    expect(link.pathname).toBe('/verify')
+    expect(link.searchParams.get('lang')).toBe('zh')
+    expect(link.search.endsWith('&lang=zh')).toBe(true)
+  })
+
+  it("leaves the account's language alone when a portal verifies a link", async () => {
+    const chosen = 'teach-verify-chosen@example.com'
+    const user = await p.ensureUser(chosen)
+    await p.db
+      .update(s.users)
+      .set({ locale: 'en', localeChosen: true })
+      .where(eq(s.users.id, user.id))
+    const asked = await p.api('POST', '/api/auth/magic-link', {
+      body: { email: chosen, audience: 'teach', locale: 'zh' },
+    })
+    const token = linkIn(asked.body.dev.link).searchParams.get('token')
+    const v = await p.api('POST', '/api/auth/verify', { body: { token } })
+    expect(v.status).toBe(200)
+    const after = await p.db.query.users.findFirst({
+      where: { email: chosen },
+      columns: { locale: true, localeChosen: true },
+    })
+    expect(after).toEqual({ locale: 'en', localeChosen: true })
+
+    const empty = 'teach-verify-empty@example.com'
+    const askedEmpty = await p.api('POST', '/api/auth/magic-link', {
+      body: { email: empty, audience: 'teach', locale: 'zh' },
+    })
+    const emptyToken = linkIn(askedEmpty.body.dev.link).searchParams.get('token')
+    expect((await p.api('POST', '/api/auth/verify', { body: { token: emptyToken } })).status).toBe(
+      200,
+    )
+    const created = await p.db.query.users.findFirst({
+      where: { email: empty },
+      columns: { locale: true, localeChosen: true },
+    })
+    expect(created).toEqual({ locale: null, localeChosen: false })
+  })
+
+  it('answers link_invalid for an unknown token', async () => {
+    const v = await p.api('POST', '/api/auth/verify', { body: { token: 'x'.repeat(43) } })
+    expect(v.status).toBe(400)
+    expect(v.body.error.code).toBe('link_invalid')
+  })
+
+  it('answers link_invalid to the right code after five wrong ones use the link up', async () => {
+    const email = 'teach-locked@example.com'
+    const r = await p.api('POST', '/api/auth/magic-link', { body: { email, audience: 'teach' } })
+    const code: string = r.body.dev.code
+    const wrong = code === '000000' ? '111111' : '000000'
+    for (let i = 0; i < 5; i++) {
+      const bad = await p.api('POST', '/api/auth/verify', { body: { email, code: wrong } })
+      expect(bad.body.error.code).toBe('code_invalid')
+    }
+    const after = await p.api('POST', '/api/auth/verify', { body: { email, code } })
+    expect(after.status).toBe(400)
+    expect(after.body.error.code).toBe('link_invalid')
+  })
+
+  it('answers rate_limited to a sixth code request in the window', async () => {
+    const email = 'teach-spam@example.com'
+    for (let i = 0; i < 5; i++)
+      await p.api('POST', '/api/auth/magic-link', { body: { email, audience: 'teach' } })
+    const sixth = await p.api('POST', '/api/auth/magic-link', {
+      body: { email, audience: 'teach' },
+    })
+    expect(sixth.status).toBe(429)
+    expect(sixth.body.error.code).toBe('rate_limited')
+  })
+})
