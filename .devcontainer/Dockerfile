@@ -25,7 +25,14 @@ RUN printf '%s\n' \
   && git config --system --add safe.directory /workspaces/elevate-mvp
 
 COPY entrypoint.sh /usr/local/bin/dev-entrypoint
-RUN chmod 0755 /usr/local/bin/dev-entrypoint
+COPY check-node-modules.sh /usr/local/bin/dev-check-node-modules
+# npm refuses to run while node_modules is the host's directory: /usr/local/bin/npm is re-pointed
+# at the guard, after the global npm install above (`npm install -g npm` restores the plain link).
+# Not a COPY onto /usr/local/bin/npm: that would write through the link into npm-cli.js.
+COPY npm-guard.sh /usr/local/bin/dev-npm-guard
+RUN chmod 0755 /usr/local/bin/dev-entrypoint /usr/local/bin/dev-check-node-modules \
+    /usr/local/bin/dev-npm-guard \
+  && ln -sfn dev-npm-guard /usr/local/bin/npm
 
 WORKDIR /workspaces/elevate-mvp
 ENTRYPOINT ["/usr/local/bin/dev-entrypoint"]

@@ -26,6 +26,16 @@ when you sign in" for it to survive a reboot.
 - **Source** is bind-mounted at `/workspaces/elevate-mvp`. Every `node_modules` directory is a named
   volume, so Linux and host binaries (esbuild, Rollup, Tailwind, Biome) never mix. Run `npm ci`
   again inside the container after the lockfile changes.
+- **npm guard**: inside the container, `npm` refuses to run unless every workspace's
+  `node_modules` is its own mount (`.devcontainer/check-node-modules.sh`). A running container has
+  been seen without its `node_modules` volumes; its `npm ci` then wrote Linux binaries into the
+  host's `node_modules`, and `npm run dev` on the host failed with "Cannot find native binding".
+  If npm refuses, recreate the container from the host with `docker compose -f docker-compose.yml
+  -f .devcontainer/compose.yaml up -d --force-recreate dev` (or "Rebuild Container"); if the host's
+  `node_modules` already has Linux binaries, run `npm ci` on the host. A new workspace under
+  `apps/` or `packages/` needs a volume in `.devcontainer/compose.yaml`.
+  `ELEVATE_SKIP_NODE_MODULES_CHECK=1` bypasses the guard. The entrypoint logs the same check
+  (`docker logs elevate-dev`).
 - **Environment**: the repo-root `.env` is used as is. The Compose file overrides what differs in
   the container (`DATABASE_URL` → `db`, `SMTP_HOST` → `mail`, the `*_URL` values → `DEV_HOST`);
   real environment variables win over `node --env-file`. The same values reach SSH sessions through

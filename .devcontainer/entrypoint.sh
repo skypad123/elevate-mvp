@@ -10,6 +10,9 @@ for dir in "$WORKSPACE"/node_modules "$WORKSPACE"/apps/*/node_modules \
   if [ -d "$dir" ]; then chown node:node "$dir"; fi
 done
 
+# Shows up in `docker logs elevate-dev`. npm itself refuses to run until this passes.
+/usr/local/bin/dev-check-node-modules || true
+
 # Host identity lives in a volume, so it survives image rebuilds.
 if [ ! -f /etc/ssh/host_keys/ssh_host_ed25519_key ]; then
   ssh-keygen -q -t ed25519 -N '' -f /etc/ssh/host_keys/ssh_host_ed25519_key
