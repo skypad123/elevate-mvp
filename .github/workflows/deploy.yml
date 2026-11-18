@@ -146,7 +146,7 @@ jobs:
 
       - run: npm ci
 
-      # The API and learner URLs are compiled into the bundles.
+      # The API, learner and Teach URLs are compiled into the bundles.
       - name: Build Teach, Support and learner web
         env:
           VITE_API_URL: ${{ vars.API_URL }}
@@ -154,6 +154,7 @@ jobs:
           VITE_LEARNER_URL: ${{ vars.LEARNER_URL }}
           EXPO_PUBLIC_API_URL: ${{ vars.API_URL }}
           EXPO_PUBLIC_WEB_URL: ${{ vars.LEARNER_URL }}
+          EXPO_PUBLIC_TEACH_URL: ${{ vars.TEACH_URL }}
         run: |
           npx turbo run build --filter=@elevate/teach --filter=@elevate/support
           npx turbo run build:web --filter=@elevate/learner

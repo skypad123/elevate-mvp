@@ -44,6 +44,7 @@ import { learnerCommonZh } from './areas/learnerCommon.zh'
 import { learnerCourseZh } from './areas/learnerCourse.zh'
 import { learnerExploreZh } from './areas/learnerExplore.zh'
 import { learnerLearnZh } from './areas/learnerLearn.zh'
+import { learnerTeachZh } from './areas/learnerTeach.zh'
 import { membersZh } from './areas/members.zh'
 import { paymentsZh } from './areas/payments.zh'
 import { personalApplyZh } from './areas/personalApply.zh'
@@ -83,6 +84,7 @@ export const zhAreas: readonly Readonly<Record<string, string>>[] = [
   learnerCourseZh,
   learnerCheckoutZh,
   learnerLearnZh,
+  learnerTeachZh,
   learnerCertificateZh,
   emailZh,
 ]
@@ -113,6 +115,7 @@ export const zh: Partial<Messages> = {
   ...learnerCourseZh,
   ...learnerCheckoutZh,
   ...learnerLearnZh,
+  ...learnerTeachZh,
   ...learnerCertificateZh,
   ...emailZh,
 }
