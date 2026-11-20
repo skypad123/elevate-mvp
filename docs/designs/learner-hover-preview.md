@@ -23,7 +23,8 @@ It does four things:
     its address the same way it returns the cover image's. No token is signed per card.
 3.  **Gives every course with video a clip, and lets the teacher change it.** A course gets a
     clip from a default video and start time without the teacher doing anything. In Teach, the
-    teacher can pick a different video or start time, or turn the clip off. The agreement text
+    teacher can pick a different video or start time, or turn the clip off, and sees what the
+    clip will show before submitting the course. The agreement text
     on Teach's application pages gains a sentence saying that Elevate shows these previews. A
     course with no clip keeps its still cover image.
 4.  **Leaves phones and touch screens as they are.** They show the still cover image and never
@@ -99,7 +100,7 @@ It departs from the brief in five ways, each chosen by the author while drafting
     and then the cover image returns. Moving the mouse away brings the cover image back at
     once. Reaching a card with the keyboard does the same as hover.
 2.  **The application pages state the preview term before any teacher applies, and teachers
-    control their own preview.** Three parts:
+    control their own preview.** Four parts:
     -   **Teachers agree when they apply.** The agreement text on Teach's two application
         pages says that Elevate may show a short silent preview of a course's video to people
         who have not enrolled.
@@ -112,9 +113,13 @@ It departs from the brief in five ways, each chosen by the author while drafting
         clip off. Turning it off removes it from the catalog and deletes the stored file,
         also while Elevate has previews switched off. If the delete fails, the clip stays
         hidden and the delete is tried again at the next refresh of that course.
+    -   **The teacher sees what the clip will show before submitting.** Teach's "Review &
+        submit" panel names the video and the second the clip will start at, with a button
+        that opens the control.
 3.  **A course with no clip looks as it does today.** So does every card on a phone, a tablet
     or a touch-only laptop, and every card for a visitor who has asked their device to reduce
-    motion.
+    motion. The setting is read at each hover: a clip already playing when it is turned on
+    runs to its end.
 4.  **Phones and touch screens never download a clip.** The clip file is requested only when a
     card is hovered or reached with the keyboard. A visitor who never hovers downloads nothing
     for it. The catalog response does carry the clip's address, about 150 bytes per card.
@@ -181,17 +186,6 @@ later.
 
 ### Open
 
--   **Question 14 (whether the per-video count stays), open since 2026-11-20:** the second
-    review questioned the count of clips fetched for each video (Question 13). Five reviewers
-    pointed out that the 59 real calls never met the limit it guards, and that it locks a
-    video for good after ten fetches. The author chose to keep it until Mux answers the
-    question written for its support team on 2026-11-19.
-    -   If Mux says the limit is not enforced for animated images on signed playback, the
-        count goes: the `preview_fetches` column, the `limit` outcome and state, and the
-        changes-left line. The 10-second steps stay.
-    -   If Mux says it is enforced, the count stays and the reply settles its details.
-
-    Nothing else in the plan waits on this. The plan below is written with the count in.
 -   **Question 15 (the full teacher agreement), open since 2026-11-20:** the application
     pages gain a sentence about previews. `docs/spec.md` describes a fuller teacher agreement,
     drafted outside the code, that grants a hosting licence only. Someone has to check that it
@@ -295,12 +289,35 @@ later.
     of a video, 10 for a video under 100 seconds, for the video's lifetime, with every clip Mux
     returns counted, a repeat included. Two rules keep a teacher inside it, and the author chose
     both over either alone:
-    -   **The start moves in steps of 10 seconds,** and a video offers no more starts than
-        its allowance.
+    -   **The start moves in steps of 10 seconds.**
     -   **The clips fetched for each video are counted,** and the refresh stops asking Mux
-        when the count reaches the allowance.
+        when the count reaches the video's allowance.
 
-    Whether the count stays is open again: see Question 14.
+    As first answered, a video's allowance was Mux's documented number, and a video offered
+    no more starts than its allowance. Question 14 changed both on 2026-11-20.
+-   **Question 14 (whether the per-video count stays), answered 2026-11-20:** it stays, and a
+    video's allowance is 5 clips. The second review questioned the count: five reviewers
+    pointed out that the 59 real calls never met the limit it guards, and that it locks a
+    video for good once the allowance is used up. The author first chose to wait for Mux's
+    answer to the question written for its support team on 2026-11-19, and then chose not to
+    wait:
+    -   **The count stays.** Mux documents the limit, and nothing seen so far shows what
+        happens to a video that reaches it.
+    -   **The allowance is 5 for every video,** whatever its length. That is half of 10, the
+        least Mux documents for any video. The other half is room for clips Mux counts
+        beyond the 5. Some Elevate does not count: a request that timed out here after Mux
+        served it, a response the driver refused for its size or type, and calls made
+        outside this code. Some it counts but does not stop: two refreshes that both passed
+        the check before either counted, and `previews check`.
+    -   **The allowed starts are no longer cut to the allowance.** The cut kept the number
+        of different clips inside Mux's documented number. For clips made by a refresh the
+        count now does that with room to spare, and a cut to 5 would stop a clip starting
+        after second 40 of any video. `previews check` is not held to the allowance.
+
+    The cost is that a video gets at most a default clip and four changes, however long it
+    is, and fewer when it is on more than one course.
+    Nothing waits on Mux's reply. If the reply shows the limit is looser or not enforced,
+    the allowance is one constant.
 -   **Question 16 (a failed delete), answered 2026-11-19:** the clip's key stays on the course row
     until the delete of its file has succeeded. The clip is hidden first, then deleted, then
     forgotten, and a failed delete is tried again at the next refresh of that course. The old clip
@@ -324,6 +341,23 @@ later.
 -   **Question 20 (the Mux token type; the brief's Question 9, in part), answered
     2026-11-19:** Mux's "Secure video playback" guide lists a separate audience for animated
     images (`g`) and says image options must be claims inside the token.
+-   **Question 21 (the scope findings of the second review), answered 2026-11-21:** the
+    first stage of the second review questioned the design's size. The author went through
+    the findings that were still undecided:
+    -   **The video and start picker stays.** The reviewer called it the largest source of
+        work, and said the agreement sentence and the off switch already carry consent and
+        control. The author kept it (Alternative AT).
+    -   **Storing the clip once stays,** and Alternatives D and E keep their wording.
+    -   **All three commands stay:** `backfill`, `count` and `check`.
+    -   **Three smaller suggestions are taken up:**
+        -   Teach's "Review & submit" panel names the video and second the clip will show,
+            before the course is submitted;
+        -   the learner card reads its two media queries when the hover timer fires, and
+            no longer follows them live (Alternative AR);
+        -   Future Improvements says what a CDN needs before it can serve clips.
+    -   **One suggestion was taken up and then dropped.** The Teach card would have sent
+        "Make clip" once by itself on opening a clip that is not up to date. Four checkers
+        read it against the Teach code and it was taken out the same day (Alternative AS).
 
 ## Critical User Journeys (CUJs)
 
@@ -565,10 +599,11 @@ course view sends and do not work the rule out again, so they can't disagree.
         video goes with whichever video is the default at the time.
 -   **The allowed starts of a video** are 0, 10, 20 and so on, for as long as the 4-second
     clip ends at least 1 second before the video's stored length (the stored length is
-    rounded), and never more of them than the video's allowance. A 60-second video has six:
-    0 to 50. A 105-second video has ten, 0 to 90, although second 100 would fit.
--   **A video's allowance** is the larger of 10 and its length in seconds divided by 10,
-    rounded down. That is the limit in Mux's guide, taken as real (Question 13).
+    rounded). A 60-second video has six: 0 to 50. A 105-second video has eleven: 0 to 100.
+-   **A video's allowance** is 5 clips, whatever its length. That is half of 10, the least
+    Mux's guide gives any video (Questions 13 and 14). A video can have more allowed starts
+    than its allowance: the allowance limits how many clips are ever fetched, not which
+    starts can be chosen.
 -   The clip's end is always the start plus 4 seconds. A usable video is at least 5 seconds
     long, so the end is never past the video's end.
 -   A chosen video that has left the course is not an error. The rule falls back to the
@@ -674,7 +709,9 @@ The steps, numbered as in the diagram:
         new file and stop with `unchanged`.
     2.  **Delete.** `storage.delete(oldKey)`. If it fails, delete the new file, log it and
         stop with `failed`. The old key stays on the row with an empty source record, so the
-        next refresh retires it in step 4 and then makes the clip again.
+        next refresh retires it in step 4 and then makes the clip again, if the video has a
+        change left. If the discarded clip was the video's last, the course is left with no
+        clip from that video.
 9.  **Point the course at the new file.** One guarded `UPDATE` sets `preview_key` to the new
     key and writes the source record. If it returns no row, this run deletes the file it
     just wrote and stops with `unchanged`. If the update throws, its result is unknown, so
@@ -825,8 +862,10 @@ No new package and no new text.
     hover behaviour:
     -   **Who gets it.** The clip is shown only when
         `matchMedia('(hover: hover) and (pointer: fine)')` matches and
-        `matchMedia('(prefers-reduced-motion: reduce)')` does not. Both are followed live, so
-        plugging in a mouse or changing the setting takes effect without a reload.
+        `matchMedia('(prefers-reduced-motion: reduce)')` does not. Both are read when the
+        400 ms timer fires, so plugging in a mouse or changing the setting takes effect at
+        the next hover, without a reload. A change while a clip is playing does not stop
+        that clip.
     -   **The delay.** When the card becomes active, a 400 ms timer starts. Leaving clears it.
         `react-native-web`'s `Pressable` has no hover delay of its own.
     -   **The clip.** When the timer fires, a second `expo-image` is mounted over the cover,
@@ -854,7 +893,9 @@ A "Hover preview" card on the builder's Details tab, under "Cover image". It is 
 component with its own state, in English like the rest of the tab.
 
 -   **What it shows:**
-    -   a tick box, "Show a hover preview on the course card";
+    -   a tick box, "Show a hover preview on the course card", and under it one fixed line:
+        "Turning the preview off deletes the clip. Turning it on again makes a new clip,
+        which uses one of the video's clip changes.";
     -   a select of the course's usable videos by lesson and item title, with "Default: the
         course's first video" first. The list comes from the course view, not from the
         lessons on screen, which are draft rows for a writer. When the saved choice is not
@@ -872,7 +913,7 @@ component with its own state, in English like the rest of the tab.
     | ---------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
     | `off`      | The preview is turned off.                                                              | No preview is shown.                                                                                                      |
     | `no_video` | The course has no usable video.                                                         | Add a video to a lesson to get a preview.                                                                                 |
-    | `not_live` | The course is not live.                                                                 | The clip is made when the course goes live.                                                                               |
+    | `not_live` | The course is not live.                                                                 | The clip is made when the course goes live, if its video has a clip change left.                                          |
     | `paused`   | `COURSE_PREVIEWS` is off.                                                               | Elevate has previews switched off.                                                                                        |
     | `limit`    | The clip is not what the setting asks for, and the wanted video's allowance is used up. | This video has no clip changes left, so its clip can't be made or changed. Choose another video, or turn the preview off. |
     | `pending`  | A clip should exist and is missing or out of date.                                      | The clip is not up to date, with "Make clip".                                                                             |
@@ -880,9 +921,10 @@ component with its own state, in English like the rest of the tab.
 
 -   **Saving.** Both buttons use `PATCH /teach/profiles/:profileId/courses/:id`, the route the cover
     image uses. "Save preview" sends the three setting fields, or the switch alone when the preview
-    is being turned off. "Make clip" sends the chosen video and the start and leaves out the on or
-    off value, so a tab left open can't turn back on a preview that was turned off elsewhere. No new
-    route or capability is added, so the role table and its test need no new row.
+    is being turned off. "Make clip" sends the saved video and start as this page last loaded
+    them, and leaves out the on or off value, so a tab left open can't turn back on a preview
+    that was turned off elsewhere. No new route or capability is added, so the role table and
+    its test need no new row.
 -   **Who.** The existing details rule: draft and rejected courses, anyone with
     `course.editDraft`; live courses, `course.editLive`; courses under review, nobody. The
     builder already disables the Details tab for a writer on a live course, and its note there
@@ -912,12 +954,27 @@ component with its own state, in English like the rest of the tab.
     clip.
 -   **What the card's line follows.** The line naming the video and second shows what the
     last response resolved. It changes after a save, not while the teacher edits.
+-   **Before submitting.** Teach's "Review & submit" panel shows one line about the preview
+    while the course is a draft or was rejected, so the teacher sees what will be public
+    before asking for review:
+    -   when the preview is turned off: "Card preview: off.";
+    -   otherwise, when the rule resolves a video and that video has a clip change left:
+        "Card preview: 4 seconds of <lesson title>: <item title>, from <m:ss>. Anyone can
+        see it once the course is live.";
+    -   otherwise no line. The course has no usable video, or the video has no clip change
+        left, so no clip would be made.
+
+    Under the line is a "Change" button that opens the Details tab. It is shown only with
+    a line. The line does not depend on `COURSE_PREVIEWS`: a clip is made later if previews
+    are switched back on. A course under review is locked, so the clip made at approval is
+    the one the line named.
 -   **A known cost.** Any write to the course row remounts the Details form, which is keyed by
     the course's `updatedAt`, and drops unsaved title or description edits. Saving the cover
     image does this today, and "Save preview" does the same. "Make clip" changes no setting,
-    so it writes nothing to the course row and does not remount the form. The one exception
-    is after a stale choice: the card then sends the choice and the start as empty, and the
-    row is written once.
+    so it does not itself move `updatedAt`. It remounts the form only when something else
+    changed the course row since the page loaded it. The one exception is after a stale
+    choice: the button then sends the choice and the start as empty, and the row is written
+    once.
 
 `CourseView` (`packages/core/src/contracts/teach.ts`) gains one field:
 
@@ -974,9 +1031,10 @@ the seed is run: a person starts a one-off ECS task with a command override.
 -   **`previews count`** prints the number of live courses and how many have a clip (Goal 9).
 -   **`previews check`** asks Mux for one clip of a named video and prints whether it came
     back, its size and how long it took. It stores no file and changes no course. A clip that
-    comes back is a real fetch, so it adds one to the video's count. It is the repeatable
-    form of the first three checks, for when the Mux SDK is upgraded or the clip's shape
-    changes. It does not test the limit, which would use up the video's allowance.
+    comes back is a real fetch, so it adds one to the video's count and leaves that video
+    one change fewer. It is the repeatable form of the first three checks, for when the Mux
+    SDK is upgraded or the clip's shape changes. It does not test the limit, which would
+    use up the video's allowance.
 
 ### Configuration and turning it off
 
@@ -1055,8 +1113,9 @@ Two things follow:
     `previews check` is run on two filmed videos in staging, and the constants are revisited
     if either clip is over half the cap or took over half the timeout
     ([Verification Plan](#verification-plan)).
--   **The limit is assumed, not observed.** The design builds to Mux's documented limit
-    (Question 13). Whether the count that guards it stays is open (Question 14).
+-   **The limit is assumed, not observed.** The design takes Mux's documented limit as
+    real (Question 13). It counts the clips fetched for each video and stops at 5, half of
+    the least Mux documents (Question 14).
 
 ### Records and rules
 
@@ -1068,7 +1127,9 @@ Two things follow:
 -   **`docs/runbooks/mux.md`:** its statement that every thumbnail and HLS address carries a
     short-lived token gains the stored clip and the `gif` token used once to fetch it.
 -   **`infra/README.md` and `docs/runbooks/deploy.md`:** the three commands, when to run each,
-    and the new configuration value.
+    and the new configuration value. It says that each `previews check` uses one of the
+    video's 5 clips for good and is not stopped at 5, so it is run on a video Elevate
+    uploaded, not on a teacher's.
     -   `infra/README.md` also gets the query that lists clips that are hidden or switched
         off with a file still stored:
         `select id from courses where preview_key is not null and (preview_source_media_id is null or not preview_enabled)`.
@@ -1088,30 +1149,30 @@ Two things follow:
 
 ### Risks
 
-| Risk                                           | What goes wrong                                                                                                                                                                                                                                                                                           | Mitigation or accepted cost                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A teacher objects after the footage is out** | A teacher did not read the agreement sentence, or reads it differently. A public clip can't be recalled from browsers that fetched it.                                                                                                                                                                    | Accepted by the author with "on by default". The control in Teach and the approval email's sentence are the mitigations. Turning it off deletes the stored file.                                                                                                                                                                                                                                                                      |
-| **The default shows the wrong thing**          | Ten seconds into the first video is a title card, or content the teacher would not give away.                                                                                                                                                                                                             | Accepted. The teacher can pick another video or second. The approval email says a preview is showing.                                                                                                                                                                                                                                                                                                                                 |
-| **A course sits without a clip**               | An owner replaces the first video of a live course. Nothing remakes the clip until "Make clip", a change-set approval or the backfill.                                                                                                                                                                    | Accepted with Question 1's answer. The Details tab shows the state. Running the backfill repairs it. No cadence is set and nothing reminds anyone to.                                                                                                                                                                                                                                                                                 |
-| **Mux behaves differently on a signed asset**  | The string-valued options, the `.webp` extension with a `gif` token, or the sizes differ from what was read and measured.                                                                                                                                                                                 | Checked by real calls on one animated video on 2026-11-19 (Question 10): the token, the address and the clip's length are as designed. At 320 pixels clips were 66 KB to 241 KB; at 480 pixels, the design's width, one clip measured 0.24 MB. The size cap and content-type check stay as a guard.                                                                                                                                   |
-| **The per-asset limit is reached**             | A teacher changes a video's clip until its allowance is used up: 10 changes for a video under 100 seconds, counting the default clip, every time a preview is turned off and on again, a clip retired by an edit and made again when the video comes back, and a fetched clip that a later step discards. | By design (Question 13; whether the count stays is open, Question 14): the refresh stops asking Mux, a clip that is stored stays, and the card says the video has no changes left. A video can reach the limit with no clip stored, and then it never gets one. The teacher can pick another video or turn the preview off. The card shows the number left before that. If Mux's real limit is looser, the allowance is one function. |
-| **Requests get slower**                        | Support's approval, a change-set approval and "Save preview" wait for Mux. On a real signed video a first request took 2.0 to 4.1 seconds at 320 pixels and 4.4 seconds at 480, in one measurement; the timeout is 10.                                                                                    | Accepted. The timeout bounds the Mux fetch, and the buttons in Teach and Support already show a busy state.                                                                                                                                                                                                                                                                                                                           |
-| **Clips load the API**                         | Every first view of a clip streams it from storage through the one API task (256 CPU units and 512 MiB by default). There is no CDN. A 480-pixel clip of animated footage measured 0.24 MB; filmed footage is expected to be larger.                                                                      | The browser caches a clip for a year. The 400 ms delay keeps sweeps from downloading. If it shows in the API's load, `S3_PUBLIC_BASE_URL` and a CDN are the next step, outside this design.                                                                                                                                                                                                                                           |
-| **The clip looks soft or badly cropped**       | At 480 pixels the clip fills the card in the three-column grid at standard density. A high-density screen scales it up about 2 times, and a wide two-column card about 1.3 times. A 16:9 clip loses an eighth on each side. Portrait video is cropped top and bottom.                                     | Accepted with Question 12's answer. The width is one constant. Changing it later does not remake existing clips, because the source record holds only the video and the start.                                                                                                                                                                                                                                                        |
-| **The clip does not restart**                  | A browser may resume an animated image mid-loop on a second hover. Nothing in `expo-image` or the HTML standard promises a restart.                                                                                                                                                                       | To be checked by hand in Chrome, Safari and Firefox in the learner PR. If one resumes mid-loop, that is accepted.                                                                                                                                                                                                                                                                                                                     |
-| **The hover can't be tested automatically**    | Jest runs the iOS build of React Native. It proves the timer and the gates, not real pointer events, image loading or animation. The repo has no web end-to-end test.                                                                                                                                     | The learner PR lists hand checks in three browsers.                                                                                                                                                                                                                                                                                                                                                                                   |
-| **Nobody can see the feature locally**         | Local development has no Mux, and the seed has no video.                                                                                                                                                                                                                                                  | The API tests use the fake driver. Seeing a real clip needs Mux test credentials, whose assets are watermarked and at most 10 seconds long, so the default start there is 0.                                                                                                                                                                                                                                                          |
-| **Two refreshes at once**                      | Two requests make a clip for one course at the same moment.                                                                                                                                                                                                                                               | The guarded updates in steps 4, 8 and 9 cover the key and the setting: the loser deletes its own file.                                                                                                                                                                                                                                                                                                                                |
-| **A delete fails**                             | Storage refuses to delete a clip that was turned off, replaced, or retired after its video was removed.                                                                                                                                                                                                   | The clip is hidden at once and its key stays on the row, so the next refresh of that course tries again. Nothing retries on its own and the teacher is not told; only the log shows it. The backfill retries it. A query in `infra/README.md` lists such rows, and previews switched off with a file still stored.                                                                                                                    |
-| **A changed clip keeps showing**               | A teacher changes the video or the second and Mux fails. The old clip stays in the catalog, and the card says only that the clip is not up to date. After a change made while previews are paused, the old clip shows again when they are switched back on.                                               | Accepted by the author (2026-11-19), in preference to a course with no clip during every change. "Make clip" and the backfill replace it.                                                                                                                                                                                                                                                                                             |
-| **A stray public file**                        | A new file is written and the update that points at it fails or loses.                                                                                                                                                                                                                                    | Accepted. When the update returns no row, the run deletes the file it wrote. When the update throws, or that delete fails, the file stays at an address nobody was given. Nothing lists stray files.                                                                                                                                                                                                                                  |
-| **A teacher applied before the sentence**      | Production opens to teachers before the server PR is deployed, or a profile is made some other way. Its courses get clips although nobody on it saw the sentence.                                                                                                                                         | The release condition in Goal 2. Nothing in the code checks it. On staging, demo and test profiles are in this position; their footage is not real teachers'.                                                                                                                                                                                                                                                                         |
-| **Someone who never saw the sentence**         | Managers and writers who join a profile by invitation never see the application page. An owner installed by Support's recovery did not apply.                                                                                                                                                             | Not mitigated. The sentence is shown to the person who applies for the profile and to nobody else.                                                                                                                                                                                                                                                                                                                                    |
-| **Staff or a writer changes a teacher's clip** | Under the cover image's rule, staff can change a live course's preview, and a writer can set it on a draft.                                                                                                                                                                                               | Accepted by the author (Question 3). Staff requests are audit-logged by `requireProfile`, and every change writes `course.preview`, unless that write itself fails.                                                                                                                                                                                                                                                                   |
-| **A teacher who reads Chinese meets English**  | The agreement sentence is translated; the control in the builder is not.                                                                                                                                                                                                                                  | Accepted. The builder is English until it is translated whole (`AGENTS.md`).                                                                                                                                                                                                                                                                                                                                                          |
-| **A clip of a removed video stays up**         | The step that retires it after a direct edit fails before it hides the clip, a later edit path does not finish through `edited`, or a removal lands in the instant between a refresh's second look and its update.                                                                                        | Accepted by the author (2026-11-20). Nothing checks again when the catalog is read; that keeps the catalog query as it is today. The clip stays until the next refresh of that course, whose step 4 retires it. A test covers each way a video can be removed today, and the `AGENTS.md` rule names `edited`.                                                                                                                         |
-| **Switching off does not take clips down**     | `COURSE_PREVIEWS` off hides the addresses and stops new clips. Stored files are still served to anyone who has an address, and a revert of the server PR leaves them too.                                                                                                                                 | Accepted by the author (2026-11-20): the switch is a pause. Turning one course's preview off deletes its file. Nothing deletes every clip at once (Alternatives AN and AO, and Future Improvements).                                                                                                                                                                                                                                  |
-| **Success can't be measured**                  | Nothing counts hovers.                                                                                                                                                                                                                                                                                    | Accepted by the author (Question 4). The design claims only the count of courses with a clip.                                                                                                                                                                                                                                                                                                                                         |
+| Risk                                           | What goes wrong                                                                                                                                                                                                                                                                                                                                                                                                         | Mitigation or accepted cost                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A teacher objects after the footage is out** | A teacher did not read the agreement sentence, or reads it differently. A public clip can't be recalled from browsers that fetched it.                                                                                                                                                                                                                                                                                  | Accepted by the author with "on by default". Teach's "Review & submit" panel names the video and second before the course is submitted. The control in Teach and the approval email's sentence are the other mitigations. Turning it off deletes the stored file.                                                                                                                                                                                                                                                                                                                                            |
+| **The default shows the wrong thing**          | Ten seconds into the first video is a title card, or content the teacher would not give away.                                                                                                                                                                                                                                                                                                                           | Accepted. Teach's "Review & submit" panel names the video and second before the course is submitted, and the teacher can pick another video or second. The approval email says a preview is showing.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **A course sits without a clip**               | An owner replaces the first video of a live course. Nothing remakes the clip until "Make clip", a change-set approval or the backfill.                                                                                                                                                                                                                                                                                  | Accepted with Question 1's answer. The Details tab shows the state. Running the backfill repairs it. No cadence is set and nothing reminds anyone to.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Mux behaves differently on a signed asset**  | The string-valued options, the `.webp` extension with a `gif` token, or the sizes differ from what was read and measured.                                                                                                                                                                                                                                                                                               | Checked by real calls on one animated video on 2026-11-19 (Question 10): the token, the address and the clip's length are as designed. At 320 pixels clips were 66 KB to 241 KB; at 480 pixels, the design's width, one clip measured 0.24 MB. The size cap and content-type check stay as a guard.                                                                                                                                                                                                                                                                                                          |
+| **The per-asset limit is reached**             | A video's allowance of 5 clips is used up. Each of these uses one: the default clip, each change of start, each time the video is chosen again after another video, every time a preview is turned off and on again, a clip retired by an edit and made again when the video comes back, a fetched clip that a later step discards, each other course that uses the same video, and each `previews check` on the video. | By design (Questions 13 and 14): the refresh stops asking Mux, a clip that is stored stays, and the card says the video has no changes left. A video can reach the limit with no clip stored, and then it never gets one. The teacher can pick another video or turn the preview off. The card shows the number left before that, and says that turning the preview off and on again uses one. Five is low on purpose: it is half of the least Mux documents. If Mux's reply shows its limit is looser or not enforced, the allowance is one constant, and raising it gives every video the difference back. |
+| **Requests get slower**                        | Support's approval, a change-set approval and "Save preview" wait for Mux. On a real signed video a first request took 2.0 to 4.1 seconds at 320 pixels and 4.4 seconds at 480, in one measurement; the timeout is 10.                                                                                                                                                                                                  | Accepted. The timeout bounds the Mux fetch, and the buttons in Teach and Support already show a busy state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Clips load the API**                         | Every first view of a clip streams it from storage through the one API task (256 CPU units and 512 MiB by default). There is no CDN. A 480-pixel clip of animated footage measured 0.24 MB; filmed footage is expected to be larger.                                                                                                                                                                                    | The browser caches a clip for a year. The 400 ms delay keeps sweeps from downloading. If it shows in the API's load, `S3_PUBLIC_BASE_URL` and a CDN are the next step, outside this design, and a CDN needs the change named in Future Improvements first.                                                                                                                                                                                                                                                                                                                                                   |
+| **The clip looks soft or badly cropped**       | At 480 pixels the clip fills the card in the three-column grid at standard density. A high-density screen scales it up about 2 times, and a wide two-column card about 1.3 times. A 16:9 clip loses an eighth on each side. Portrait video is cropped top and bottom.                                                                                                                                                   | Accepted with Question 12's answer. The width is one constant. Changing it later does not remake existing clips, because the source record holds only the video and the start.                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **The clip does not restart**                  | A browser may resume an animated image mid-loop on a second hover. Nothing in `expo-image` or the HTML standard promises a restart.                                                                                                                                                                                                                                                                                     | To be checked by hand in Chrome, Safari and Firefox in the learner PR. If one resumes mid-loop, that is accepted.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **The hover can't be tested automatically**    | Jest runs the iOS build of React Native. It proves the timer and the gates, not real pointer events, image loading or animation. The repo has no web end-to-end test.                                                                                                                                                                                                                                                   | The learner PR lists hand checks in three browsers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Nobody can see the feature locally**         | Local development has no Mux, and the seed has no video.                                                                                                                                                                                                                                                                                                                                                                | The API tests use the fake driver. Seeing a real clip needs Mux test credentials, whose assets are watermarked and at most 10 seconds long, so the default start there is 0.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Two refreshes at once**                      | Two requests make a clip for one course at the same moment.                                                                                                                                                                                                                                                                                                                                                             | The guarded updates in steps 4, 8 and 9 cover the key and the setting: the loser deletes its own file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **A delete fails**                             | Storage refuses to delete a clip that was turned off, replaced, or retired after its video was removed.                                                                                                                                                                                                                                                                                                                 | The clip is hidden at once and its key stays on the row, so the next refresh of that course tries again. Nothing retries on its own and the teacher is not told; only the log shows it. The backfill retries it. A query in `infra/README.md` lists such rows, and previews switched off with a file still stored. When the delete fails while a clip is being replaced, the new clip is thrown away after it was counted; if it was the video's last, the course has no clip from that video.                                                                                                               |
+| **A changed clip keeps showing**               | A teacher changes the video or the second and Mux fails. The old clip stays in the catalog, and the card says only that the clip is not up to date. After a change made while previews are paused, the old clip shows again when they are switched back on.                                                                                                                                                             | Accepted by the author (2026-11-19), in preference to a course with no clip during every change. "Make clip" and the backfill replace it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **A stray public file**                        | A new file is written and the update that points at it fails or loses.                                                                                                                                                                                                                                                                                                                                                  | Accepted. When the update returns no row, the run deletes the file it wrote. When the update throws, or that delete fails, the file stays at an address nobody was given. Nothing lists stray files.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **A teacher applied before the sentence**      | Production opens to teachers before the server PR is deployed, or a profile is made some other way. Its courses get clips although nobody on it saw the sentence.                                                                                                                                                                                                                                                       | The release condition in Goal 2. Nothing in the code checks it. On staging, demo and test profiles are in this position; their footage is not real teachers'.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Someone who never saw the sentence**         | Managers and writers who join a profile by invitation never see the application page. An owner installed by Support's recovery did not apply.                                                                                                                                                                                                                                                                           | Not mitigated. The sentence is shown to the person who applies for the profile and to nobody else.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **Staff or a writer changes a teacher's clip** | Under the cover image's rule, staff can change a live course's preview, and a writer can set it on a draft.                                                                                                                                                                                                                                                                                                             | Accepted by the author (Question 3). Staff requests are audit-logged by `requireProfile`, and every change writes `course.preview`, unless that write itself fails.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **A teacher who reads Chinese meets English**  | The agreement sentence is translated; the control in the builder is not.                                                                                                                                                                                                                                                                                                                                                | Accepted. The builder is English until it is translated whole (`AGENTS.md`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **A clip of a removed video stays up**         | The step that retires it after a direct edit fails before it hides the clip, a later edit path does not finish through `edited`, or a removal lands in the instant between a refresh's second look and its update.                                                                                                                                                                                                      | Accepted by the author (2026-11-20). Nothing checks again when the catalog is read; that keeps the catalog query as it is today. The clip stays until the next refresh of that course, whose step 4 retires it. A test covers each way a video can be removed today, and the `AGENTS.md` rule names `edited`.                                                                                                                                                                                                                                                                                                |
+| **Switching off does not take clips down**     | `COURSE_PREVIEWS` off hides the addresses and stops new clips. Stored files are still served to anyone who has an address, and a revert of the server PR leaves them too.                                                                                                                                                                                                                                               | Accepted by the author (2026-11-20): the switch is a pause. Turning one course's preview off deletes its file. Nothing deletes every clip at once (Alternatives AN and AO, and Future Improvements).                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **Success can't be measured**                  | Nothing counts hovers.                                                                                                                                                                                                                                                                                                                                                                                                  | Accepted by the author (Question 4). The design claims only the count of courses with a clip.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ### Rollout and rollback
 
@@ -1564,17 +1625,20 @@ against the ways it could fail. The limit on animated images was decided the sam
 -   **Cons**:
     -   Steps alone do not hold if a repeat of the same clip counts against the limit:
         turning a preview off and on fetches the same clip again.
-    -   The count alone lets a teacher spend a short video's ten changes on starts a few
-        seconds apart.
+    -   The count alone lets a teacher spend a video's changes on starts a few seconds
+        apart.
 -   **Reason for Rejection**: Rejected by author on 2026-11-19, in favour of both rules together:
     steps alone do not hold if a repeat counts against the limit, and the count alone lets a teacher
-    spend ten changes on starts a few seconds apart. Whether the count stays is open (Question 14).
+    spend a video's changes on starts a few seconds apart. The count stays (Question 14).
 
 ### Weighed after the second review
 
 The second review ran on 2026-11-19 and 2026-11-20. Four of its reviewers found that a clip's
-file stays public after its video is removed and after previews are switched off. These are
-the changes weighed for that.
+file stays public after its video is removed and after previews are switched off. Alternatives
+AL to AO are the changes weighed for that. The review also questioned the count of clips for
+each video (Question 14), and Alternatives AP and AQ are the options weighed for that.
+Alternatives AR to AT are the options not taken when the author went through the review's
+scope findings (Question 21).
 
 #### Alternative AL: Hide a removed video's clip when the catalog is read
 
@@ -1624,12 +1688,97 @@ This was the design until 2026-11-20.
         command.
     -   The rule that the refresh retires before it checks the switch goes away.
 -   **Cons**:
-    -   Switching back on fetches every clip again. While the count stays (Question 14),
-        each fetch uses one of a video's changes for good.
+    -   Switching back on fetches every clip again. Each fetch uses one of a video's 5
+        clips for good (Question 14).
     -   A short switch-off during a Mux incident becomes a deletion that needs a full
         backfill afterwards.
 -   **Reason for Rejection**: Rejected by author on 2026-11-20: the refetch, and its cost
     against every video's allowance.
+
+#### Alternative AP: An allowance equal to Mux's documented limit
+
+The design until 2026-11-20. A video's allowance was the larger of 10 and its length in
+seconds divided by 10, rounded down, and its allowed starts were cut to that number.
+
+-   **Pros**:
+    -   A teacher gets every clip Mux documents: 10 for a video under 100 seconds, 120 for
+        one of 20 minutes.
+-   **Cons**:
+    -   It leaves no room for a clip Elevate does not count (a request that timed out here
+        after Mux served it, or a call made outside this code), or for a count that passes
+        the allowance (two refreshes that both passed the check, or `previews check`).
+    -   The allowance is a function of the video's length, and the allowed starts depend on
+        it.
+-   **Reason for Rejection**: Rejected by author on 2026-11-20, in favour of 5 for every
+    video, half of the least Mux documents (Question 14). The cost accepted is that a video
+    gets at most a default clip and four changes, however long it is.
+
+#### Alternative AQ: Wait for Mux's answer, and drop the count if the limit is not enforced
+
+Question 14 as it stood earlier on 2026-11-20.
+
+-   **Pros**:
+    -   Without the count there is one column, one outcome, one state and one line of the
+        card fewer to build, and no video is ever locked.
+    -   The 59 real calls suggest the limit is not enforced.
+-   **Cons**:
+    -   The question stays open for as long as a support reply takes.
+    -   Dropping the count would rest on one video on one day. Nothing seen shows what
+        happens to a video that does reach the limit.
+-   **Reason for Rejection**: Rejected by author on 2026-11-20, after first choosing it, in
+    favour of keeping the count with an allowance of 5 (Question 14).
+
+#### Alternative AR: Follow the two media queries live
+
+The design until 2026-11-21. A hook in the web file followed the mouse query and the
+reduced-motion query through their `change` events.
+
+-   **Pros**:
+    -   A visitor who turns on reduced motion while a clip plays sees it stop at once.
+-   **Cons**:
+    -   A hook, two listeners and the tests of their `change` events, for a change that
+        almost never happens during a 12-second clip.
+-   **Reason for Rejection**: Rejected by author on 2026-11-21, in favour of reading both
+    queries when the hover timer fires. The cost accepted is that a clip already playing
+    runs to its end.
+
+#### Alternative AS: The Teach card makes the clip by itself when it opens
+
+In the design for part of 2026-11-21. When the card opened on a clip that was not up to
+date, it sent the "Make clip" request once without a press.
+
+-   **Pros**:
+    -   A clip missing after a Mux failure or a removed video is made the next time someone
+        who can change the preview opens the Details tab, with no press and no backfill.
+-   **Cons**:
+    -   The card remounts after every save and on every visit to the tab, so the request
+        needs a guard against repeats and a record of requests in flight, kept outside the
+        component.
+    -   A page loaded before someone else's save writes its older video and start back,
+        without a press.
+    -   The answer remounts the Details form, and drops unsaved edits, when an enrolment or
+        a refund has changed the course row since the page loaded it.
+    -   A clip Mux serves but the driver refuses is not counted, so every page load that
+        opens the tab asks Mux for it again.
+    -   A clip is made, and one of the video's 5 clips is used, without anyone pressing a
+        button. Teach has no component tests, so all of this is checked by hand.
+-   **Reason for Rejection**: Rejected by author on 2026-11-21, after first choosing it, when
+    the checks against the Teach code showed these costs. "Make clip" stays a button.
+
+#### Alternative AT: An off switch only in the first release, and the picker later
+
+-   **Pros**:
+    -   Less to build: two setting columns, the three-step check and its error code, the
+        rules for a stale choice, the allowed starts, the list of videos in the course
+        view and the two selects all wait.
+    -   With 5 clips for each video, the picker gives a teacher four changes at most.
+    -   The picker could be added later without undoing anything.
+-   **Cons**:
+    -   A teacher whose default clip shows a title card, or something they would not give
+        away, could only turn the preview off.
+    -   The brief's decision 9 includes the picker.
+-   **Reason for Rejection**: Rejected by author on 2026-11-21, who kept the picker in the
+    first release (Question 21).
 
 ---
 
@@ -1651,13 +1800,18 @@ This was the design until 2026-11-20.
 ## Future Improvements
 
 -   **A CDN for public files,** if clips show in the API's load. The storage driver already
-    takes `S3_PUBLIC_BASE_URL`.
+    takes `S3_PUBLIC_BASE_URL`. Clips are served with a one-year cache lifetime, so a CDN
+    would keep serving a clip after its file was deleted. Before a CDN serves them, a delete
+    must also remove the clip from the CDN, or preview files must get a short lifetime in
+    shared caches (`s-maxage`).
 -   **A way to see the hover locally without Mux,** such as a seeded course with a short video
     and a stored clip.
 -   **Counting hovers,** through a client event endpoint, if the count of clips proves too
     coarse to decide anything.
 -   **A scheduled repair,** if courses often sit without a clip after live edits.
 -   **A sharper clip** once real sizes are known.
+-   **A higher allowance,** if Mux's reply shows its limit is looser or not enforced. It is
+    one constant, and raising it gives every video the difference back.
 -   **Have the file route refuse a clip the course no longer shows.** An old address would
     stop working the moment the course row changes, whether or not the delete has succeeded.
     It costs a database query on every clip request and stops working if a CDN is put in
@@ -1729,9 +1883,9 @@ then 17 to 22.
         under the 3 MB cap. A start past the video's end is refused with a JSON body.
     -   **What it did not show.** The size and the time for filmed footage at 480 pixels,
         which the 3 MB cap and the 10-second timeout depend on. And checks 4 to 6, because
-        the limit was never reached. The author chose to build to a conservative estimate of
-        the limit (Question 13), so no item waits on Mux. Filmed footage is measured in
-        staging ([Verification Plan](#verification-plan)).
+        the limit was never reached. The author chose to count the clips fetched for each
+        video and stop at 5 (Questions 13 and 14), so no item waits on Mux. Filmed footage
+        is measured in staging ([Verification Plan](#verification-plan)).
     -   The repeatable form of the first three checks is the `previews check` command of
         item 14.
 
@@ -1779,7 +1933,7 @@ then 17 to 22.
     -   Constants, exported as `COURSE_PREVIEW`: `width: 480`, `lengthSeconds: 4`, `fps: 10`,
         `defaultStartSeconds: 10`, `minDurationForDefaultStart: 15`, `minDurationSeconds: 5`,
         `endMarginSeconds: 1`, `maxStartSeconds: 86_400`, `startStepSeconds: 10`,
-        `minAllowance: 10`, `secondsPerAllowedClip: 10`, `maxBytes: 3_000_000`,
+        `maxClipsPerVideo: 5`, `maxBytes: 3_000_000`,
         `fetchTimeoutMs: 10_000`.
     -   Types:
         -   `PreviewSetting = { enabled: boolean; mediaId: string | null;
@@ -1795,16 +1949,16 @@ then 17 to 22.
         what the clip shows](#the-rule-for-what-the-clip-shows). A media ID that appears on two
         items counts once, at its first place. The start it returns is always one of the video's
         `allowedStarts`.
-    -   `previewAllowance(durationSeconds): number`: the larger of `minAllowance` and the
-        length divided by `secondsPerAllowedClip`, rounded down.
     -   `allowedStarts(durationSeconds): number[]`: the multiples of `startStepSeconds` from
-        0 for which start plus `lengthSeconds` is at most the length less `endMarginSeconds`,
-        cut to the first `previewAllowance(durationSeconds)` of them. `resolvePreview` lowers
-        a chosen start to the last of these that is not above it.
-    -   `previewChangesLeft(durationSeconds, previewFetches): number`: the allowance less
-        `previewFetches`, and never less than 0. It is the only place the subtraction is
-        done. The count can pass the allowance, because `check` (item 14) counts without
-        testing it and two refreshes started together can both fetch.
+        0 for which start plus `lengthSeconds` is at most the length less `endMarginSeconds`.
+        `resolvePreview` lowers a chosen start to the last of these that is not above it.
+    -   `previewChangesLeft(previewFetches): number`: `maxClipsPerVideo` less
+        `previewFetches`, and never less than 0. It is the only place the allowance is read
+        and the only place the subtraction is done. No other file writes the number 5, tests
+        and fixtures included; the unit test of this function is the one exception, because
+        it pins the decision. The count can pass the allowance, because
+        `check` (item 14) counts without testing it and two refreshes started together can
+        both fetch.
     -   **Which start applies.** A chosen start belongs to the chosen video. With a chosen
         video that is usable, the chosen start is used. With no chosen video, it is used on
         whichever video is the default at the time. When a chosen video is not usable and
@@ -1845,11 +1999,9 @@ then 17 to 22.
     -   a chosen video that is not usable, with a chosen start of 90, gives the default
         video and the default start, not 90;
     -   no chosen video, with a chosen start of 30, gives the default video from second 30;
-    -   `previewAllowance` gives 10 for 60 seconds, 10 for 105 and 120 for 1,200;
-    -   `previewChangesLeft` gives 10 for a 60-second video with no fetches, 0 at 10 fetches
-        and 0 at 12;
-    -   `allowedStarts` gives 0 to 50 for 60 seconds, 0 to 90 for 105 seconds (ten starts,
-        though second 100 would fit), and only 0 for 5 seconds;
+    -   `previewChangesLeft` gives 5 with no fetches, 0 at 5 fetches and 0 at 7;
+    -   `allowedStarts` gives 0 to 50 for 60 seconds, 0 to 100 for 105 seconds (eleven
+        starts), 0 to 1,190 for 1,200 seconds (120 starts), and only 0 for 5 seconds;
     -   `formatPreviewStart` gives `0:10`, `1:35` and `1:02:05`;
     -   `previewIsShown` is false when any one of its four conditions fails, including a
         key with no source, and true when all hold;
@@ -2043,10 +2195,12 @@ then 17 to 22.
             only when its value differs from the stored one. A request whose preview fields
             all equal the stored values, and that carries no other field, writes nothing to
             the row. So "Make clip" does not move `updated_at`: the Details form is not
-            remounted, unsaved title and description edits are kept, and the course lists
-            keep their order. The refresh still runs. After a stale choice the card sends
-            the choice and the start as empty, which are changed values, so that one "Make
-            clip" does write the row.
+            remounted by it, unsaved title and description edits are kept, and the course
+            lists keep their order. The form is still remounted when something else moved
+            `updated_at` since the page loaded the course, such as an enrolment. The
+            refresh still runs. After a stale choice the card sends the choice and the
+            start as empty, which are changed values, so that one "Make clip" does write
+            the row.
         -   The order is: the row update, if any value changed; then, when any of the three
             stored values changed, an audit row with action `course.preview`, entity
             `course` and metadata
@@ -2056,7 +2210,8 @@ then 17 to 22.
             `await this.previews.refresh(courseId)`. The audit row comes first, as in the two
             approvals, so that the record is made before the wait for Mux. The row update
             and the audit insert are separate statements, as in `setPrice`.
-        -   "Make clip" sends the chosen video and the start and no `previewEnabled`. The
+        -   "Make clip" sends the saved video and start as the page holds them, and no
+            `previewEnabled`. The
             request carries a preview field, so the refresh runs, which is how it asks for a
             new attempt. On a course whose preview is off, no clip is made: the refresh
             ends in `none`, or in `cleared` when a leftover file was waiting.
@@ -2167,8 +2322,10 @@ then 17 to 22.
             `wrong_kind` case and for `check` on an image;
         -   an `artefacts` row of type `video` with no `mediaAssetId`, for "A video item with
             no file";
-        -   for "The allowance", an update that sets the fixture video's `preview_fetches`
-            to 10 after its first clip is made.
+        -   for "The allowance", an update that sets the first fixture video's
+            `preview_fetches` to `COURSE_PREVIEW.maxClipsPerVideo` after its first clip is
+            made. The third set-up of "A writer's removal when the new clip can't be made"
+            uses the same update on the second video.
 
 ##### 16. API tests
 
@@ -2238,11 +2395,12 @@ then 17 to 22.
             no clip, and the view's state is `no_video`.
         -   **Starts are in steps.** A `PATCH` with start 35 answers 400. A start of 90 on
             a 60-second video is saved and the clip is cut from second 50.
-        -   **The allowance.** A course whose video already has `previewFetches` equal to
-            its allowance: a `PATCH` that changes the start answers 200, the fake driver is
-            not called, the old clip still shows, and the view's state is `limit` with
-            `changesLeft: 0`. Turning the preview off still clears the clip. Picking the
-            second video, which has changes left, makes a clip.
+        -   **The allowance.** A course with two videos, whose first video has
+            `previewFetches` set to its allowance: a `PATCH` that changes the start answers
+            200, the fake driver is not called, the old clip still shows, and the view's
+            state is `limit` with `changesLeft: 0` for the first video. Picking the second
+            video, which has changes left, makes a clip. On a second course set up the same
+            way, turning the preview off still clears the clip.
         -   **Only a returned clip is counted.** With `previewMode` set to `null`, a refresh
             leaves `previewFetches` as it was.
         -   **Short videos.** A course whose only video is 4 seconds long gets no clip, and
@@ -2323,8 +2481,10 @@ then 17 to 22.
         -   **Count.** With the four courses of the Backfill case, after its first run,
             `count` returns `{ live: 3, withClip: 3 }`.
         -   **Check** on a ready Mux video returns `ok: true`, the byte count and
-            `image/webp`, and leaves storage and the course untouched. On an image it
-            returns `ok: false`.
+            `image/webp`, and leaves storage and the course untouched. The video's
+            `previewFetches` is 1 afterwards. On a video already at its allowance, `check`
+            still calls the driver, the count is one more and `changesLeft` is 0. On an
+            image it returns `ok: false`.
     -   `checkout.test.ts`, in `describe('catalogue')`: every seeded course's card has
         `previewUrl: null`.
     -   `change-sets.test.ts`: a writer's change set replaces the first video's file; after
@@ -2338,6 +2498,7 @@ then 17 to 22.
 
 -   **Files**: `apps/teach/src/components/preview-card.tsx` (Create),
     `apps/teach/src/components/details-form.tsx` (Modify),
+    `apps/teach/src/components/review-panel.tsx` (Modify),
     `apps/teach/src/routes/courses/builder.tsx` (Modify).
 -   **Type / Scope**: Teach portal (React). English literals: the builder is not a translated
     page.
@@ -2350,7 +2511,9 @@ then 17 to 22.
             the mouse on it. Anyone can see it."
         -   **The tick box.** A plain `<input type="checkbox">` with a label, as
             `prerequisites-editor.tsx` uses; `@elevate/web-ui` has no checkbox component.
-            Label: "Show a hover preview on the course card". When it is unticked, the
+            Label: "Show a hover preview on the course card". Under it, one fixed line:
+            "Turning the preview off deletes the clip. Turning it on again makes a new clip,
+            which uses one of the video's clip changes." When it is unticked, the
             two selects are disabled. When `locked` is true the tick box, both selects and
             the button are disabled, as the other cards in `details-form.tsx` set
             `disabled={locked}` on each input.
@@ -2374,13 +2537,15 @@ then 17 to 22.
             order. When `videos` is empty, both selects hold only "Default" and the
             changes-left line is left out.
         -   **A saved start that is not an option.** A saved start can sit above the video's
-            last allowed start, because a hand-made request can store one. The select then
-            starts on the last option that is not above the saved start, which is the value
-            the rule lowers it to, and that does not count as a change.
+            last allowed start. A hand-made request can store one, and a start saved with
+            "Default" as the video outlasts a change of the default video to a shorter one.
+            The select then starts on the last option that is not above the saved start,
+            which is the value the rule lowers it to, and that does not count as a change.
         -   **Changes left.** Under the start, one line from that video's `changesLeft`:
-            "This video has 7 clip changes left." At 1 it reads "This video has 1 clip
-            change left." At 0 it reads "This video has no clip changes left.", and the
-            start select is disabled.
+            "This video has 3 clip changes left." At 1 it reads "This video has 1 clip
+            change left." At 0 it reads "This video has no clip changes left. If you turn
+            the preview off, this video can't be used for a clip again.", and the start
+            select is disabled.
         -   **The resolved line.** It names what the last response resolved, from
             `course.preview.resolved` and `videos`: "Shows 4 seconds of <lesson title>:
             <item title>, from <m:ss>.", with the time from `formatPreviewStart` (item 4).
@@ -2406,9 +2571,32 @@ then 17 to 22.
 
             It is also disabled while a request runs and when `locked` is true. "Save
             preview" sends the three fields, or `previewEnabled: false` alone when the box
-            is unticked. "Make clip" sends the choice and the start as the card holds them,
-            and no `previewEnabled`.
+            is unticked. "Make clip" sends `course.preview.mediaId` and
+            `course.preview.startSeconds` as they are, not the values of the two selects,
+            and no `previewEnabled`. The one exception is a stale choice, where it sends
+            both as empty.
+        -   **A request in flight is known only to the card that sent it.** A card that
+            remounts while its request runs, after a visit to another tab, shows its button
+            enabled again. A second press then starts a second refresh (risk row "Two
+            refreshes at once").
     -   `details-form.tsx` renders `PreviewCard` after the "Cover image" card.
+    -   `review-panel.tsx`: in the "Status" card, after the line that counts lessons and
+        items, one more block when `course.status` is `draft` or `rejected`, as under
+        [The control in Teach](#the-control-in-teach):
+        -   when `course.preview.enabled` is false: a
+            `<p className="text-small text-ink-secondary">` reading "Card preview: off.";
+        -   otherwise, when `course.preview.resolved` is set and the entry of
+            `course.preview.videos` whose `mediaId` equals `resolved.mediaId` has
+            `changesLeft` above 0: the same element reading "Card preview: 4 seconds of
+            <lesson title>: <item title>, from <m:ss>. Anyone can see it once the course
+            is live.", with the titles from that entry and the time from
+            `formatPreviewStart`;
+        -   otherwise nothing.
+
+        The block reads `enabled` and `resolved`, not `state`, so it is the same while
+        `COURSE_PREVIEWS` is off. Under the line, and only when a line is shown, a `Button`
+        with `variant="ghost"` and `size="sm"`, labelled "Change", calls
+        `onGoTo('details')`, as the checklist's "Fix" buttons do.
     -   `builder.tsx`: the note shown to a writer on a live course becomes "The title,
         description, cover image, hover preview and price of a live course are for the owner
         or a manager to change."
@@ -2507,6 +2695,8 @@ then 17 to 22.
     -   **`infra/README.md`:** a section beside "Seeding" with the three `run-task` commands,
         when to run the backfill (after a Mux outage, and after previews are switched back
         on), when to run the check (after a Mux SDK upgrade or a change to the clip's shape),
+        what the check costs (each run uses one of the video's 5 clips for good and is not
+        stopped at 5, so run it on a video Elevate uploaded, not on a teacher's),
         how to switch previews off, and the query that lists clips that are hidden or
         switched off with a file still stored:
         `select id from courses where preview_key is not null and (preview_source_media_id is null or not preview_enabled)`.
@@ -2527,11 +2717,15 @@ then 17 to 22.
     -   the card in each of its seven states. Two need a set-up step: for `paused`, restart
         the local API with `COURSE_PREVIEWS=false`; for `limit`, on a course with
         two test videos whose clip is from the first, set the second video's
-        `preview_fetches` to 10, its allowance, with one SQL update, then choose the second
+        `preview_fetches` to 5, its allowance, with one SQL update, then choose the second
         video;
     -   a writer on a draft can save it, and on a live course sees it disabled;
     -   "Save preview" with other unsaved details: the form resets, as it does for the cover
         image;
+    -   the "Review & submit" panel of a draft with a video shows the preview line with the
+        lesson, the item and "0:00", the default start of a 10-second test asset; "Change"
+        opens the Details tab; with the preview turned off it reads "Card preview: off.";
+        a draft with no video and a live course show no line and no button;
     -   both application pages show the second sentence in English and Chinese;
     -   Support's review page shows the line for a course under review and for a live one.
 
@@ -2555,16 +2749,17 @@ then 17 to 22.
     -   **Web file:** the same 4:3 `View` and cover `Image`, written out again, because the
         web file can't import the base component for the reason above; plus the behaviour
         under [The learner card](#the-learner-card):
-        -   a hook inside the file, `useMediaQuery(query)`, that reads
-            `window.matchMedia(query).matches`, follows its `change` event and removes the
-            listener on unmount. It returns `false` when `window.matchMedia` is not a
-            function, as the existing web files guard browser globals. The hero animation
-            reads reduced motion through reanimated's `useReducedMotion`, which reads the
-            setting once when the app starts. This hook is used instead, because it follows
-            a change while the page is open;
+        -   a function inside the file, `canShowClip(): boolean`, called when the hover
+            timer fires. It returns `false` when `window.matchMedia` is not a function, as
+            the existing web files guard browser globals. Otherwise it returns whether
+            `(hover: hover) and (pointer: fine)` matches and
+            `(prefers-reduced-motion: reduce)` does not. There is no hook and no listener.
+            The hero animation reads reduced motion through reanimated's
+            `useReducedMotion`, which reads the setting once when the app starts. The
+            media query is read here instead, because it is current at each hover;
         -   constants `HOVER_DELAY_MS = 400` and `MAX_PLAY_MS = 12_000`;
-        -   the clip is mounted when `previewUrl` is set, the mouse query matches, the
-            reduced-motion query does not, `active` has been true for `HOVER_DELAY_MS`, the
+        -   the clip is mounted when `previewUrl` is set, `active` has been true for
+            `HOVER_DELAY_MS`, `canShowClip()` returned `true` when that timer fired, the
             clip has not failed to load during this hover, and `MAX_PLAY_MS` has not passed
             since its `onLoad`. Both timers are cleared, and the failure is forgotten, when
             `active` turns false and on unmount;
@@ -2602,7 +2797,7 @@ then 17 to 22.
             'error')`.
         -   Time is moved with Jest's fake timers.
     -   `CourseCardCover-web.test.tsx` also installs a fake `window.matchMedia`, whose
-        answers and `change` events the test controls, and removes it afterwards, as
+        answers the test controls, and removes it afterwards, as
         `device-languages-web.test.tsx` does for window events. Cases:
         -   at rest, no clip is in the tree;
         -   `active` for 399 ms: no clip; at 400 ms: an image with the clip's address;
@@ -2612,9 +2807,11 @@ then 17 to 22.
             `onLoad` the 12 seconds do not run;
         -   it never mounts when the mouse query is false, when the reduced-motion query is
             true, or when `previewUrl` is null;
-        -   a `change` event on either query takes effect without a remount: the mouse
-            query turning true lets the clip mount, and the reduced-motion query turning
-            true removes it;
+        -   the queries are read when the timer fires: with the mouse query false at a
+            first hover and true at a second, only the second mounts the clip. After the
+            reduced-motion query turns true while a clip plays, and the component is
+            rendered again with the same props, the clip is still mounted; the next
+            hover mounts none;
         -   with no `window.matchMedia` at all, the clip never mounts;
         -   a load error removes it, and the next hover mounts it again;
         -   `isKeyboardFocus`, with a stand-in `Element` class installed on `globalThis` for
@@ -2663,8 +2860,8 @@ then 17 to 22.
 -   **Test Coverage Requirement**: every branch of `resolvePreview` and `previewState`
     (item 5), every outcome of `refresh`, every way a direct edit can remove a clip's video,
     and every `null` path of the Mux driver (items 8 and 16), and every condition that
-    mounts or removes the clip (item 25). Hand-checked
-    only: Teach's card and Support's line (item 22), and the real browser behaviour
+    mounts or removes the clip (item 25). Hand-checked only: Teach's card, the
+    "Review & submit" line and Support's line (item 22), and the real browser behaviour
     (item 26).
 -   **E2E/Integration**:
     -   the API integration tests of item 16;
@@ -2686,7 +2883,9 @@ then 17 to 22.
     -   after the server PR deploys to staging: `previews count`, then an approval of a
         course with video, and a check that Explore's response carries its `previewUrl`.
         This needs Mux on in staging. Then `previews check` on at least two filmed videos,
-        one of a person talking and one screen recording. Their sizes and times are written
+        one of a person talking and one screen recording. Neither has had a clip made from
+        it yet, because a repeat is served from Mux's cache and would not measure the time.
+        Each check uses one of that video's 5 clips. Their sizes and times are written
         under Question 10. If either clip is over half the 3 MB cap, or took over half the
         10-second timeout, the two constants are revisited before the learner PR deploys;
     -   after the learner PR deploys to staging: the browser checks of item 26.
