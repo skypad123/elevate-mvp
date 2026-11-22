@@ -1,4 +1,11 @@
-import { type ArtefactView, COURSE_CATEGORIES, type CourseView, formatSgd } from '@elevate/core'
+import {
+  type ArtefactView,
+  COURSE_CATEGORIES,
+  COURSE_PREVIEW,
+  type CourseView,
+  formatPreviewStart,
+  formatSgd,
+} from '@elevate/core'
 import {
   Badge,
   Button,
@@ -129,6 +136,14 @@ function ReviewCourseView({ course }: { course: CourseView }) {
             {course.thumbnail?.url ? (
               <img
                 src={course.thumbnail.url}
+                alt=""
+                className="mb-4 aspect-[4/3] w-full max-w-md rounded-card object-cover"
+              />
+            ) : null}
+            <p className="mb-2 text-body-lg text-ink-secondary">{hoverPreviewLine(course)}</p>
+            {course.preview.clipUrl ? (
+              <img
+                src={course.preview.clipUrl}
                 alt=""
                 className="mb-4 aspect-[4/3] w-full max-w-md rounded-card object-cover"
               />
@@ -347,4 +362,14 @@ function ArtefactPreview({ artefact }: { artefact: ArtefactView }) {
       ) : null}
     </li>
   )
+}
+
+/** Whether the course card's hover preview is on, and which video and second the rule picks. */
+function hoverPreviewLine(course: CourseView): string {
+  const { preview } = course
+  if (!preview.enabled) return 'Hover preview: off'
+  const resolved = preview.resolved
+  const video = resolved ? preview.videos.find((v) => v.mediaId === resolved.mediaId) : undefined
+  if (!resolved || !video) return 'Hover preview: none (no video)'
+  return `Hover preview: ${COURSE_PREVIEW.lengthSeconds} seconds of ${video.lessonTitle}: ${video.itemTitle}, from ${formatPreviewStart(resolved.startSeconds)}`
 }

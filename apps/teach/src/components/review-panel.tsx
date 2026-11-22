@@ -1,4 +1,9 @@
-import type { CourseView, SubmissionProblem } from '@elevate/core'
+import {
+  COURSE_PREVIEW,
+  type CourseView,
+  formatPreviewStart,
+  type SubmissionProblem,
+} from '@elevate/core'
 import { Badge, Button, Card, CardHeader, useToast } from '@elevate/web-ui'
 import { CheckCircle2, ExternalLink, Send, XCircle } from 'lucide-react'
 import { useState } from 'react'
@@ -41,6 +46,7 @@ export function ReviewPanel({
   const { checklist } = course
   const lessonTitle = new Map(course.lessons.map((l) => [l.id, l.title]))
   const totalItems = course.lessons.reduce((n, l) => n + l.artefacts.length, 0)
+  const previewLine = cardPreviewLine(course)
   const totalMinutes = Math.round(
     course.lessons.reduce(
       (n, l) => n + l.artefacts.reduce((m, a) => m + (a.durationSeconds ?? 0), 0),
@@ -133,6 +139,14 @@ export function ReviewPanel({
             item{totalItems === 1 ? '' : 's'}
             {totalMinutes ? ` · about ${totalMinutes} min` : ''}
           </p>
+          {previewLine ? (
+            <div className="space-y-2">
+              <p className="text-small text-ink-secondary">{previewLine}</p>
+              <Button variant="ghost" size="sm" onClick={() => onGoTo('details')}>
+                Change
+              </Button>
+            </div>
+          ) : null}
           {course.status === 'rejected' && course.rejectionReason ? (
             <blockquote className="rounded-card border-l-4 border-warning bg-warning-tint p-3 text-small text-ink">
               {course.rejectionReason}
@@ -172,4 +186,19 @@ export function ReviewPanel({
       </div>
     </div>
   )
+}
+
+/**
+ * What the course card's hover preview will show, before the course is submitted: a draft or a
+ * rejected course only. It reads `enabled` and `resolved`, not `state`, so it is the same while
+ * Elevate has previews switched off. No line when no clip would be made.
+ */
+function cardPreviewLine(course: CourseView): string | null {
+  if (course.status !== 'draft' && course.status !== 'rejected') return null
+  const { preview } = course
+  if (!preview.enabled) return 'Card preview: off.'
+  const resolved = preview.resolved
+  const video = resolved ? preview.videos.find((v) => v.mediaId === resolved.mediaId) : undefined
+  if (!resolved || !video || video.changesLeft <= 0) return null
+  return `Card preview: ${COURSE_PREVIEW.lengthSeconds} seconds of ${video.lessonTitle}: ${video.itemTitle}, from ${formatPreviewStart(resolved.startSeconds)}. Anyone can see it once the course is live.`
 }

@@ -10,6 +10,8 @@ import {
 export class FakeStorage implements StorageProvider {
   readonly driver = 'fake'
   readonly objects = new Map<string, { body: Uint8Array; mimeType: string }>()
+  /** A `delete` of a key in this set throws, so a test can make one delete fail. */
+  readonly failDeleteKeys = new Set<string>()
   constructor(private readonly apiUrl = 'http://api.test') {}
 
   async createUploadTarget(input: {
@@ -49,6 +51,7 @@ export class FakeStorage implements StorageProvider {
     return obj ? { size: obj.body.byteLength } : null
   }
   async delete(key: string): Promise<void> {
+    if (this.failDeleteKeys.has(key)) throw new Error(`fake delete failure: ${key}`)
     this.objects.delete(key)
   }
   async getUrl(key: string): Promise<string> {

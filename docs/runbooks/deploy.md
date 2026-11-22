@@ -21,16 +21,18 @@ Branches: `main` is development (local only); `staging` and `production` deploy 
 ## API
 
 1. Image: `docker build -f apps/api/Dockerfile -t elevate-api .` from the repo root. It contains
-   `dist/server.js` (the default command), `dist/migrate.js`, and two commands run by hand as
-   one-off tasks, `dist/seed.js` and `dist/reset-schema.js`, with the workspace packages bundled
-   in. Outside Docker: `npm run build -w @elevate/api`, then `npm run start:prod`.
+   `dist/server.js` (the default command), `dist/migrate.js`, and three commands run by hand as
+   one-off tasks, `dist/seed.js`, `dist/reset-schema.js` and `dist/previews.js` (hover-preview
+   clips: `backfill`, `count`, `check`; see `infra/README.md`, "Hover previews"), with the
+   workspace packages bundled in. Outside Docker: `npm run build -w @elevate/api`, then `npm run start:prod`.
 2. Required env: `DATABASE_URL`, `SESSION_SECRET` (32+ random chars), `API_URL`, `LEARNER_URL`,
    `TEACH_URL`, `SUPPORT_URL` (these three are also the CORS allow-list in production),
    `NODE_ENV=production`, and `STORAGE_DRIVER=s3` + `S3_BUCKET` + `S3_REGION`. On AWS leave the S3
    keys unset so the task role is used; for R2 or MinIO set `S3_ENDPOINT` and the two keys.
    Optional integrations: `MAIL_DRIVER=resend` + `RESEND_API_KEY` + `MAIL_FROM`,
    `VIDEO_DRIVER=mux` + `MUX_*`, `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` +
-   `STRIPE_CONNECT_WEBHOOK_SECRET`.
+   `STRIPE_CONNECT_WEBHOOK_SECRET`. `COURSE_PREVIEWS` (default `true`) pauses hover-preview clips
+   on course cards when `false`; they need `VIDEO_DRIVER=mux`.
 3. Migrations: `node dist/migrate.js` (in the image) against the target `DATABASE_URL` before the
    new API version takes traffic; the Deploy workflow does this. `MIGRATIONS_DIR` points the
    bundle at the migration folders. Migrations are additive, with one exception: the teacher
@@ -79,3 +81,6 @@ Branches: `main` is development (local only); `staging` and `production` deploy 
   grant via Support → People → Roles).
 - [ ] Run the manual money loop (`docs/runbooks/money-loop.md`) against the production build in
   Stripe test mode before switching to live keys.
+- [ ] The hover-preview server PR was deployed before any teacher applied:
+  `select count(*) from profiles where applied_at < '<time of that deploy>'` returns 0
+  (ADR 011).

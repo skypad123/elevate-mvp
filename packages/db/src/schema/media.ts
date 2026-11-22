@@ -35,6 +35,8 @@ export const mediaAssets = snakeCase.table(
     mimeType: text().notNull(),
     sizeBytes: bigint({ mode: 'number' }),
     durationSeconds: integer(),
+    /** How many hover-preview clips Mux has returned for this video, in total (ADR 011). */
+    previewFetches: integer().notNull().default(0),
     width: integer(),
     height: integer(),
     errorMessage: text(),

@@ -53,6 +53,8 @@ with a new address, then approve it and run the legal-name check in Support
 | Support            | http://localhost:5174            |
 | Mailpit            | http://localhost:8025            |
 
+Hover previews need Mux. With the default local video driver no clip is made.
+
 ## Mobile
 
 Open the learner app in Expo Go from the Metro QR code. The app targets the API on the same host as

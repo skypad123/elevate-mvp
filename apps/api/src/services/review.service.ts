@@ -6,14 +6,17 @@ import { simpleEmail } from '../emails/templates'
 import { errors } from '../lib/errors'
 import type { SessionUser } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
+import { CoursePreviewService } from './course-preview.service'
 import { CoursesService } from './courses.service'
 import { ownerAndManagerEmails } from './recipients'
 
 /** Support-side course review. Approval here is the only way a course becomes live. */
 export class ReviewService {
   private readonly courses: CoursesService
+  private readonly previews: CoursePreviewService
   constructor(private readonly deps: Deps) {
     this.courses = new CoursesService(deps)
+    this.previews = new CoursePreviewService(deps)
   }
 
   async queue(): Promise<CourseSummary[]> {
@@ -65,6 +68,9 @@ export class ReviewService {
       name: ANALYTICS_EVENTS.courseApproved,
       properties: { courseId, profileId: course.profileId },
     })
+    // After the audit row, so a crash while waiting on Mux can't leave an approval unrecorded;
+    // before the emails, which are awaited without a catch. `refresh` never throws.
+    const preview = await this.previews.refresh(courseId)
     for (const to of await this.reviewRecipients(course.profile)) {
       await mailer.send(
         simpleEmail({
@@ -73,6 +79,11 @@ export class ReviewService {
           paragraphs: [
             `Good news, ${course.profile.displayName}: your course passed review and is now listed for learners.`,
             'Share the course page to start enrolments. Earnings appear in Elevate Teach as learners pay.',
+            ...(preview === 'made'
+              ? [
+                  "Its course card shows a short silent preview of your course's video when a visitor rests the mouse on it. You can change the preview or turn it off in Elevate Teach, under the course's Details tab.",
+                ]
+              : []),
           ],
           cta: { href: `${env.LEARNER_URL}/course/${course.slug}`, label: 'View course page' },
         }),
