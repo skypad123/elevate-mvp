@@ -56,6 +56,9 @@ export const personalApplyEn = {
   // Agreement wording, beside the button. "It" in "while it is listed" is the content
   'personalApply.agreement':
     'By applying you agree to the teacher agreement: you own your content; Elevate holds a non-exclusive hosting licence while it is listed.',
+  // Agreement wording, under the first agreement sentence. "Its course card" is the card of the course on Explore
+  'personalApply.agreementPreviews':
+    'Elevate may show a few silent seconds of video from each of your courses on its course card, as a preview that anyone can see; you can change the preview or turn it off for each course.',
   // The button: for a first application, and for one that is sent again
   'personalApply.submit.apply': 'Submit application',
   'personalApply.submit.reapply': 'Resubmit',

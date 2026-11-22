@@ -39,6 +39,8 @@ export const companyApplyZh = {
 
   'companyApply.agreement':
     '提交申请即表示您确认自己有权代表该公司行事，并同意教师协议：内容归公司所有；内容上线期间，Elevate 享有非排他性的托管许可。',
+  'companyApply.agreementPreviews':
+    'Elevate 可能会在课程卡片上展示公司每门课程中几秒无声的视频片段，作为所有人都能看到的预览；您可以为每门课程更换预览或将其关闭。',
   'companyApply.submit.apply': '提交申请',
   'companyApply.submit.reapply': '重新提交',
   'companyApply.sent.title': '申请已提交',

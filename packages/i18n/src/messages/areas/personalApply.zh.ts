@@ -33,6 +33,8 @@ export const personalApplyZh = {
 
   'personalApply.agreement':
     '提交申请即表示您同意教师协议：内容归您所有；内容上线期间，Elevate 享有非排他性的托管许可。',
+  'personalApply.agreementPreviews':
+    'Elevate 可能会在课程卡片上展示每门课程中几秒无声的视频片段，作为所有人都能看到的预览；您可以为每门课程更换预览或将其关闭。',
   'personalApply.submit.apply': '提交申请',
   'personalApply.submit.reapply': '重新提交',
   'personalApply.sent.title': '申请已提交',

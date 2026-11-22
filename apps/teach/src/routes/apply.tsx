@@ -224,7 +224,10 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
         </Card>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-small text-ink-tertiary">{t('personalApply.agreement')}</p>
+          <div className="space-y-2">
+            <p className="text-small text-ink-tertiary">{t('personalApply.agreement')}</p>
+            <p className="text-small text-ink-tertiary">{t('personalApply.agreementPreviews')}</p>
+          </div>
           <Button
             type="submit"
             variant="accent"

@@ -22,6 +22,7 @@ import { api } from '../lib/api'
 import { uploadInlineImage, useCourseActions } from '../lib/courses'
 import { useCurrentProfile } from '../lib/profile'
 import { useSaveTracker } from '../lib/save-tracker'
+import { PreviewCard } from './preview-card'
 
 export function DetailsForm({ course, locked }: { course: CourseView; locked: boolean }) {
   const actions = useCourseActions(course.id)
@@ -149,6 +150,7 @@ export function DetailsForm({ course, locked }: { course: CourseView; locked: bo
             }
           />
         </Card>
+        <PreviewCard course={course} locked={locked} />
         <Card as="section" className="space-y-4">
           <CardHeader title="Price" description="In Singapore dollars. Free courses are allowed." />
           <Input
