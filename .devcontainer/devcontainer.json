@@ -5,6 +5,7 @@
   "runServices": ["db", "mail", "dev"],
   "workspaceFolder": "/workspaces/elevate-mvp",
   "remoteUser": "node",
+  "updateRemoteUserUID": false,
   "overrideCommand": false,
   "shutdownAction": "none",
   "postCreateCommand": "npm ci",
