@@ -150,3 +150,9 @@ variable "csp_report_only" {
   type        = bool
   default     = true
 }
+
+variable "course_previews" {
+  description = "Whether the API makes and returns hover-preview clips for course cards."
+  type        = bool
+  default     = true
+}

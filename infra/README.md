@@ -315,6 +315,39 @@ The API image has a seed command, run as a one-off task (the `run-task` call is 
 Both need `SEED_SUPER_ADMIN_EMAIL` in the task's environment and write course thumbnails through
 the API's own storage, so they land in the environment's S3 bucket. Running a seed twice is safe.
 
+## Hover previews
+
+A course card's hover preview is a 4-second clip of the course's video, fetched once from Mux and
+stored under `public/previews/` ([ADR 011](../docs/adr/011-course-preview-clips.md)). Clips are
+made when Support approves a course, when a change set is approved, and when someone saves the
+preview in Teach. They need `integrations.mux`; with the local video driver none is made. The API
+image has three commands for them, run as one-off tasks like the seed (the same `run-task` call,
+with a different command):
+
+- `["node", "dist/previews.js", "backfill"]` makes or repairs the clip of every live course and
+  prints a count of each outcome. Run it after a Mux outage, and after previews are switched back
+  on. A second run asks Mux only for courses whose clip is not what the rule wants.
+- `["node", "dist/previews.js", "count"]` prints the number of live courses and how many have a
+  clip.
+- `["node", "dist/previews.js", "check", "<mediaId>"]` (optionally `"--start", "<seconds>"`)
+  asks Mux for one clip of that video and prints whether it came back, its size and how long it
+  took. It stores nothing. Run it after a Mux SDK upgrade or a change to the clip's shape. Each
+  run uses one of the video's 5 clips for good and is not stopped at 5, so run it on a video
+  Elevate uploaded, not on a teacher's.
+
+**Switching previews off** everywhere: set `course_previews = false` in the environment's
+`terraform.tfvars`, `terraform apply`, and run Deploy again. That is a pause, not a takedown: the
+catalog stops returning clips and none is made, but stored files stay and are still served to
+anyone who has an address. A teacher deletes one course's clip by turning its preview off in
+Teach.
+
+Clips that are hidden or switched off with a file still stored (a delete that failed is retried
+at the next refresh of that course):
+
+```sql
+select id from courses where preview_key is not null and (preview_source_media_id is null or not preview_enabled)
+```
+
 ## Resetting an environment
 
 One time only, for the teacher profiles change. That change replaced the earlier migrations with

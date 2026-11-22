@@ -40,7 +40,7 @@ npm run dev
 | Mailpit inbox | http://localhost:8025            |
 
 Everything runs locally without third-party accounts (`VIDEO_DRIVER=local`, `STORAGE_DRIVER=local`,
-Mailpit for email). Stripe test keys are needed for the real money loop — see
+Mailpit for email), except hover previews on course cards, which need Mux. Stripe test keys are needed for the real money loop — see
 [`docs/runbooks/`](docs/runbooks/). To develop inside a container, or remotely against an always-on
 machine, see [`docs/runbooks/dev-container.md`](docs/runbooks/dev-container.md).
 

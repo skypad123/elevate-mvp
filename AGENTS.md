@@ -71,6 +71,11 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 - Learner emails: the receipt, certificate, refund and second-payment refund emails use
   `users.locale ?? 'en'`; the sign-in code email uses the request's `locale`. See ADR 010. A new
   string in a learner email is a key in the `email` area. Teacher and Support emails stay English.
+- A course's hover-preview clip is made, replaced or cleared only by `CoursePreviewService`. A clip
+  always gets a new `public/previews/` key, because public files are cached as immutable. A direct
+  edit to a live course's lessons or items finishes through `CoursesService.edited`, which deletes a
+  clip whose video has left the course; nothing checks that again when the catalog is read
+  (ADR 011).
 - Run `npm run lint` (Biome) and `npx turbo run typecheck test` before committing.
 
 ## Expo conventions (apps/learner)
