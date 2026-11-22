@@ -19,12 +19,12 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
   region     = data.aws_region.current.region
 
-  # production: api.example.com · staging: api.staging.example.com
+  # production: elevatelearn.app, api.elevatelearn.app · staging: staging.elevatelearn.app, api.staging.…
   base_domain = var.environment == "production" ? var.root_domain : "${var.environment}.${var.root_domain}"
 
   api_domain = "api.${local.base_domain}"
   site_domains = {
-    learner = "app.${local.base_domain}"
+    learner = local.base_domain
     teach   = "teach.${local.base_domain}"
     support = "support.${local.base_domain}"
   }

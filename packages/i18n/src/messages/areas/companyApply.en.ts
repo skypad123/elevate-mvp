@@ -68,6 +68,9 @@ export const companyApplyEn = {
   // Agreement wording, beside the button. "It" in "while it is listed" is the content
   'companyApply.agreement':
     'By applying you confirm that you may act for this company, and agree to the teacher agreement: the company owns its content; Elevate holds a non-exclusive hosting licence while it is listed.',
+  // Agreement wording, under the first agreement sentence. "Its course card" is the card of the course on Explore
+  'companyApply.agreementPreviews':
+    "Elevate may show a few silent seconds of video from each of the company's courses on its course card, as a preview that anyone can see; you can change the preview or turn it off for each course.",
   // The button: for a first application, and for one that is sent again
   'companyApply.submit.apply': 'Submit application',
   'companyApply.submit.reapply': 'Resubmit',

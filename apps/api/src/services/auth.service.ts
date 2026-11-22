@@ -1,18 +1,20 @@
-import type {
-  Audience,
-  AuthUser,
-  MagicLinkRequest,
-  ProfileSummary,
-  VerifyRequest,
-  VerifyResponse,
+import {
+  ANALYTICS_EVENTS,
+  type Audience,
+  type AuthUser,
+  type MagicLinkRequest,
+  type ProfileSummary,
+  type VerifyRequest,
+  type VerifyResponse,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { magicLinkEmail } from '../emails/templates'
 import { hmacHex, randomCode, randomToken } from '../lib/crypto'
 import { errors } from '../lib/errors'
 import type { ProfileActor, SessionUser } from '../middleware/auth'
+import { trackEvent } from './audit.service'
 
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000
 const MAGIC_LINK_MAX_PER_WINDOW = 5
@@ -67,6 +69,8 @@ export class AuthService {
     const url = new URL('/verify', this.portalUrl(input.audience))
     url.searchParams.set('token', token)
     if (input.redirectPath) url.searchParams.set('redirect', input.redirectPath)
+    // Opens /verify in the language of the page that asked; nothing is added when none was sent.
+    if (input.locale) url.searchParams.set('lang', input.locale)
     const link = url.toString()
 
     await mailer.send(
@@ -76,6 +80,8 @@ export class AuthService {
         code,
         portalName: PORTAL_NAMES[input.audience],
         expiresMinutes: MAGIC_LINK_TTL_MS / 60000,
+        // In the language of the page that asked, which has no account language to go by yet.
+        locale: input.locale ?? 'en',
       }),
     )
 
@@ -133,9 +139,28 @@ export class AuthService {
       .where(and(eq(s.magicLinks.id, link.id), isNull(s.magicLinks.consumedAt)))
       .returning()
     if (consumed.length === 0)
-      throw errors.badRequest('link_invalid', 'That sign-in link was already used.')
+      throw errors.badRequest('link_used', 'That sign-in link was already used.')
 
     const user = await this.findOrCreateUser(link.email)
+    // A chosen language overwrites the account's; a guess only fills one that is empty or guessed.
+    if (input.locale) {
+      if (input.localeChosen) {
+        await db
+          .update(s.users)
+          .set({ locale: input.locale, localeChosen: true })
+          .where(eq(s.users.id, user.id))
+      } else {
+        await db
+          .update(s.users)
+          .set({ locale: input.locale, localeChosen: false })
+          .where(
+            and(
+              eq(s.users.id, user.id),
+              or(isNull(s.users.locale), eq(s.users.localeChosen, false)),
+            ),
+          )
+      }
+    }
     const authUser = await this.buildAuthUser(user.id)
 
     if (
@@ -144,6 +169,11 @@ export class AuthService {
     ) {
       throw errors.forbidden('This account does not have access to Elevate Support.')
     }
+    await trackEvent(this.deps, {
+      userId: user.id,
+      name: ANALYTICS_EVENTS.signIn,
+      properties: { audience: link.audience, locale: input.locale ?? null },
+    })
 
     const session = await this.createSession(user.id, link.audience, userAgent)
     return { ...session, user: authUser, redirectPath: link.redirectPath }
@@ -240,6 +270,8 @@ export class AuthService {
         ...user.ownedProfiles.map((p) => profileSummary(p, 'owner')),
         ...user.memberships.map((m) => profileSummary(m.profile, m.role)),
       ],
+      locale: user.locale,
+      localeChosen: user.localeChosen,
       createdAt: user.createdAt.toISOString(),
     }
   }

@@ -68,13 +68,17 @@ export function TopNav() {
             : null}
           {isSignedIn ? (
             <Link href="/profile" asChild>
-              <Pressable style={{ marginLeft: 12 }} accessibilityLabel={t('nav.profile')}>
+              <Pressable
+                testID="nav-profile"
+                style={{ marginLeft: 12 }}
+                accessibilityLabel={t('nav.profile')}
+              >
                 <Avatar name={user?.name ?? user?.email} url={user?.avatarUrl} size={36} />
               </Pressable>
             </Link>
           ) : (
             <Link href="/sign-in" asChild>
-              <Button label={t('nav.signIn')} size="sm" variant="secondary" />
+              <Button testID="nav-sign-in" label={t('nav.signIn')} size="sm" variant="secondary" />
             </Link>
           )}
         </View>

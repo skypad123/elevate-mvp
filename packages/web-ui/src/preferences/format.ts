@@ -3,9 +3,9 @@ import { useCallback, useMemo } from 'react'
 import { formatDate } from '../components/StatCard'
 import { usePreferences } from './PreferencesProvider'
 
-/** The BCP 47 tag for `Intl` formatting in the chosen language. */
+/** The BCP 47 tag for `Intl` formatting in the language on screen. */
 export function useIntlLocale(): string {
-  return intlLocale(usePreferences().preferences.locale)
+  return intlLocale(usePreferences().locale)
 }
 
 /**

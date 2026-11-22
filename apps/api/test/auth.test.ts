@@ -1,3 +1,7 @@
+import { ANALYTICS_EVENTS } from '@elevate/core'
+import { schema as s } from '@elevate/db'
+import { translate } from '@elevate/i18n'
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -36,6 +40,23 @@ describe('magic link auth', () => {
     const again = await t.api('POST', '/api/auth/verify', { body: { token } })
     expect(again.status).toBe(400)
     expect(again.body.error.code).toBe('link_invalid')
+  })
+
+  it('answers link_used to the loser when two requests verify one link at once', async () => {
+    await t.api('POST', '/api/auth/magic-link', {
+      body: { email: 'race@example.com', audience: 'learner' },
+    })
+    const token = new URL(
+      t.mailer.last()?.text.match(/https?:\/\/\S+/)?.[0] ?? '',
+    ).searchParams.get('token')
+    const [a, b] = await Promise.all([
+      t.api('POST', '/api/auth/verify', { body: { token } }),
+      t.api('POST', '/api/auth/verify', { body: { token } }),
+    ])
+    const statuses = [a.status, b.status].sort()
+    expect(statuses).toEqual([200, 400])
+    const loser = a.status === 400 ? a : b
+    expect(loser.body.error.code).toBe('link_used')
   })
 
   it('signs in by code, rejects wrong codes, and locks after five attempts', async () => {
@@ -190,5 +211,260 @@ describe('sign-in with a stale session token', () => {
     expect(v.status).toBe(200)
     expect(v.body.user.email).toBe(email)
     expect(v.body.token).not.toBe(token)
+  })
+})
+
+describe('the account language', () => {
+  // Its own app, so these sign-ins do not count against the file's magic-link rate limit.
+  let a: TestApp
+  beforeAll(async () => {
+    a = await createTestApp()
+  })
+  afterAll(async () => {
+    await a.close()
+  })
+
+  async function accountLocale(email: string) {
+    const user = await a.db.query.users.findFirst({
+      where: { email },
+      columns: { locale: true, localeChosen: true },
+    })
+    return user
+  }
+
+  async function setAccountLocale(email: string, locale: 'en' | 'zh', localeChosen: boolean) {
+    const user = await a.ensureUser(email)
+    await a.db.update(s.users).set({ locale, localeChosen }).where(eq(s.users.id, user.id))
+    return user
+  }
+
+  it('lets a chosen language at verify overwrite the account', async () => {
+    const email = 'chosen-zh@example.com'
+    await setAccountLocale(email, 'en', true)
+    const r = await a.signIn(email, 'learner', { locale: 'zh', localeChosen: true })
+    expect(r.status).toBe(200)
+    expect(await accountLocale(email)).toEqual({ locale: 'zh', localeChosen: true })
+    expect(r.body.user).toMatchObject({ locale: 'zh', localeChosen: true })
+  })
+
+  it('does not let a guessed language replace a chosen one', async () => {
+    const email = 'keeps-zh@example.com'
+    await setAccountLocale(email, 'zh', true)
+    const r = await a.signIn(email, 'learner', { locale: 'en', localeChosen: false })
+    expect(r.status).toBe(200)
+    expect(await accountLocale(email)).toEqual({ locale: 'zh', localeChosen: true })
+    expect(r.body.user).toMatchObject({ locale: 'zh', localeChosen: true })
+  })
+
+  it('lets a guessed language replace a guessed one', async () => {
+    const email = 'guessed-twice@example.com'
+    await setAccountLocale(email, 'zh', false)
+    await a.signIn(email, 'learner', { locale: 'en' })
+    expect(await accountLocale(email)).toEqual({ locale: 'en', localeChosen: false })
+  })
+
+  it('fills an empty account with a guessed language', async () => {
+    const email = 'new-guess@example.com'
+    const r = await a.signIn(email, 'learner', { locale: 'zh' })
+    expect(await accountLocale(email)).toEqual({ locale: 'zh', localeChosen: false })
+    expect(r.body.user).toMatchObject({ locale: 'zh', localeChosen: false })
+  })
+
+  it('leaves the account alone when verify sends no language', async () => {
+    const chosen = 'no-locale-chosen@example.com'
+    await setAccountLocale(chosen, 'zh', true)
+    await a.signIn(chosen)
+    expect(await accountLocale(chosen)).toEqual({ locale: 'zh', localeChosen: true })
+
+    const empty = 'no-locale-empty@example.com'
+    const r = await a.signIn(empty)
+    expect(await accountLocale(empty)).toEqual({ locale: null, localeChosen: false })
+    expect(r.body.user).toMatchObject({ locale: null, localeChosen: false })
+    const me = await a.api('GET', '/api/auth/me', { token: r.token })
+    expect(me.body.user).toMatchObject({ locale: null, localeChosen: false })
+  })
+
+  it("adds the request's language to the emailed link, and nothing when none was sent", async () => {
+    await a.api('POST', '/api/auth/magic-link', {
+      body: { email: 'link-zh@example.com', audience: 'learner', locale: 'zh' },
+    })
+    const zhLink = new URL(a.mailer.last()?.text.match(/https?:\/\/\S+/)?.[0] ?? '')
+    expect(zhLink.searchParams.get('lang')).toBe('zh')
+    expect(zhLink.searchParams.get('token')).toBeTruthy()
+
+    await a.api('POST', '/api/auth/magic-link', {
+      body: { email: 'link-teach@example.com', audience: 'teach' },
+    })
+    const teachLink = new URL(a.mailer.last()?.text.match(/https?:\/\/\S+/)?.[0] ?? '')
+    expect(teachLink.origin).toBe('http://teach.test')
+    expect(teachLink.searchParams.has('lang')).toBe(false)
+  })
+
+  it("sends the code email in the request's language, and English when none was sent", async () => {
+    await a.api('POST', '/api/auth/magic-link', {
+      body: { email: 'code-zh@example.com', audience: 'learner', locale: 'zh' },
+    })
+    const zh = a.mailer.last()
+    expect(zh?.html).toContain('<html lang="zh">')
+    expect(zh?.subject).toBe(
+      translate('zh', 'email.signIn.subject', {
+        portal: 'Elevate',
+        code: zh?.subject.match(/\d{3} \d{3}/)?.[0] ?? '',
+      }),
+    )
+    await a.api('POST', '/api/auth/magic-link', {
+      body: { email: 'code-none@example.com', audience: 'learner' },
+    })
+    const none = a.mailer.last()
+    expect(none?.html).toContain('<html lang="en">')
+    expect(none?.subject).toMatch(/^Your Elevate sign-in code: \d{3} \d{3}$/)
+  })
+
+  it('records a sign_in event with the language, and none for a refused Support sign-in', async () => {
+    const email = 'event-zh@example.com'
+    const r = await a.signIn(email, 'learner', { locale: 'zh', localeChosen: true })
+    const userId = r.body.user.id as string
+    const events = await a.db.query.analyticsEvents.findMany({
+      where: { name: ANALYTICS_EVENTS.signIn, userId },
+    })
+    expect(events).toHaveLength(1)
+    expect(events[0]?.properties).toEqual({ audience: 'learner', locale: 'zh' })
+
+    const plain = await a.signIn('event-none@example.com')
+    const plainEvents = await a.db.query.analyticsEvents.findMany({
+      where: { name: ANALYTICS_EVENTS.signIn, userId: plain.body.user.id as string },
+    })
+    expect(plainEvents[0]?.properties).toEqual({ audience: 'learner', locale: null })
+
+    const refusedEmail = 'event-refused@example.com'
+    const refused = await a.signIn(refusedEmail, 'support', { locale: 'en' })
+    expect(refused.status).toBe(403)
+    const refusedUser = await a.db.query.users.findFirst({ where: { email: refusedEmail } })
+    expect(refusedUser).toBeTruthy()
+    expect(
+      await a.db.query.analyticsEvents.findMany({
+        where: { name: ANALYTICS_EVENTS.signIn, userId: refusedUser?.id as string },
+      }),
+    ).toHaveLength(0)
+  })
+
+  it('stores the language PATCH /me sends', async () => {
+    const email = 'patch-locale@example.com'
+    const { token } = await a.signIn(email)
+    const chosen = await a.api('PATCH', '/api/me', {
+      token,
+      body: { locale: 'zh', localeChosen: true },
+    })
+    expect(chosen.status).toBe(200)
+    expect(chosen.body.user).toMatchObject({ locale: 'zh', localeChosen: true })
+    expect(await accountLocale(email)).toEqual({ locale: 'zh', localeChosen: true })
+
+    const followDevice = await a.api('PATCH', '/api/me', { token, body: { localeChosen: false } })
+    expect(followDevice.status).toBe(200)
+    expect(followDevice.body.user).toMatchObject({ locale: 'zh', localeChosen: false })
+    expect(await accountLocale(email)).toEqual({ locale: 'zh', localeChosen: false })
+
+    for (const body of [{ locale: 'fr' }, { localeChosen: 'yes' }]) {
+      const invalid = await a.api('PATCH', '/api/me', { token, body })
+      expect(invalid.status, JSON.stringify(body)).toBe(400)
+      expect(invalid.body.error.code).toBe('validation')
+    }
+    expect(await accountLocale(email)).toEqual({ locale: 'zh', localeChosen: false })
+  })
+})
+
+/**
+ * What the sign-in pages of Teach and Support rely on: the code email follows the page's
+ * `locale`, verify sends none, and the error codes `signInErrorKey` (@elevate/web-ui) words.
+ */
+describe('the portal sign-in pages', () => {
+  // Its own app, so these sign-ins do not count against the other files' rate limits.
+  let p: TestApp
+  beforeAll(async () => {
+    p = await createTestApp()
+  })
+  afterAll(async () => {
+    await p.close()
+  })
+
+  const linkIn = (text: string | undefined) => new URL(text?.match(/https?:\/\/\S+/)?.[0] ?? '')
+
+  it("sends a Teach code email in the page's language, with the language on its link", async () => {
+    const r = await p.api('POST', '/api/auth/magic-link', {
+      body: { email: 'teach-zh@example.com', audience: 'teach', locale: 'zh' },
+    })
+    expect(r.status).toBe(200)
+    const mail = p.mailer.last()
+    expect(mail?.html).toContain('<html lang="zh">')
+    const link = linkIn(mail?.text)
+    expect(link.origin).toBe('http://teach.test')
+    expect(link.pathname).toBe('/verify')
+    expect(link.searchParams.get('lang')).toBe('zh')
+    expect(link.search.endsWith('&lang=zh')).toBe(true)
+  })
+
+  it("leaves the account's language alone when a portal verifies a link", async () => {
+    const chosen = 'teach-verify-chosen@example.com'
+    const user = await p.ensureUser(chosen)
+    await p.db
+      .update(s.users)
+      .set({ locale: 'en', localeChosen: true })
+      .where(eq(s.users.id, user.id))
+    const asked = await p.api('POST', '/api/auth/magic-link', {
+      body: { email: chosen, audience: 'teach', locale: 'zh' },
+    })
+    const token = linkIn(asked.body.dev.link).searchParams.get('token')
+    const v = await p.api('POST', '/api/auth/verify', { body: { token } })
+    expect(v.status).toBe(200)
+    const after = await p.db.query.users.findFirst({
+      where: { email: chosen },
+      columns: { locale: true, localeChosen: true },
+    })
+    expect(after).toEqual({ locale: 'en', localeChosen: true })
+
+    const empty = 'teach-verify-empty@example.com'
+    const askedEmpty = await p.api('POST', '/api/auth/magic-link', {
+      body: { email: empty, audience: 'teach', locale: 'zh' },
+    })
+    const emptyToken = linkIn(askedEmpty.body.dev.link).searchParams.get('token')
+    expect((await p.api('POST', '/api/auth/verify', { body: { token: emptyToken } })).status).toBe(
+      200,
+    )
+    const created = await p.db.query.users.findFirst({
+      where: { email: empty },
+      columns: { locale: true, localeChosen: true },
+    })
+    expect(created).toEqual({ locale: null, localeChosen: false })
+  })
+
+  it('answers link_invalid for an unknown token', async () => {
+    const v = await p.api('POST', '/api/auth/verify', { body: { token: 'x'.repeat(43) } })
+    expect(v.status).toBe(400)
+    expect(v.body.error.code).toBe('link_invalid')
+  })
+
+  it('answers link_invalid to the right code after five wrong ones use the link up', async () => {
+    const email = 'teach-locked@example.com'
+    const r = await p.api('POST', '/api/auth/magic-link', { body: { email, audience: 'teach' } })
+    const code: string = r.body.dev.code
+    const wrong = code === '000000' ? '111111' : '000000'
+    for (let i = 0; i < 5; i++) {
+      const bad = await p.api('POST', '/api/auth/verify', { body: { email, code: wrong } })
+      expect(bad.body.error.code).toBe('code_invalid')
+    }
+    const after = await p.api('POST', '/api/auth/verify', { body: { email, code } })
+    expect(after.status).toBe(400)
+    expect(after.body.error.code).toBe('link_invalid')
+  })
+
+  it('answers rate_limited to a sixth code request in the window', async () => {
+    const email = 'teach-spam@example.com'
+    for (let i = 0; i < 5; i++)
+      await p.api('POST', '/api/auth/magic-link', { body: { email, audience: 'teach' } })
+    const sixth = await p.api('POST', '/api/auth/magic-link', {
+      body: { email, audience: 'teach' },
+    })
+    expect(sixth.status).toBe(429)
+    expect(sixth.body.error.code).toBe('rate_limited')
   })
 })

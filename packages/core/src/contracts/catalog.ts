@@ -20,6 +20,11 @@ export type CourseCard = {
   category: string
   priceCents: number
   thumbnailUrl: string | null
+  /**
+   * The hover-preview clip: a plain, lasting address of a public animated WebP, or null when the
+   * course has no clip to show (ADR 011).
+   */
+  previewUrl: string | null
   teacherName: string
   enrolCount: number
   lessonCount: number

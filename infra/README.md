@@ -4,11 +4,11 @@ Terraform for the two AWS environments, plus the steps to stand them up from not
 
 | Environment | Branch       | Where it runs                                  | How it deploys                                                   |
 | ----------- | ------------ | ---------------------------------------------- | ---------------------------------------------------------------- |
-| dev         | `main`, `v0` | your machine (`docker compose`, `npm run dev`) | nothing is deployed; CI runs on every push and pull request      |
+| dev         | `main`       | your machine (`docker compose`, `npm run dev`) | nothing is deployed; CI runs on every push and pull request      |
 | staging     | `staging`    | AWS, `*.staging.<domain>`                      | automatically on every push to `staging`                         |
 | production  | `production` | AWS, `*.<domain>`                              | on every push to `production`, after a reviewer approves the run |
 
-Code moves forward by pull request: feature branch → `main` (or `v0`) → `staging` → `production`.
+Code moves forward by pull request: feature branch → `main` → `staging` → `production`.
 
 ## What gets created
 
@@ -19,17 +19,19 @@ Per environment, in one AWS account, region `ap-southeast-1`:
 | API             | ECS Fargate, one task, behind an HTTPS Application Load Balancer; logs in CloudWatch           | `api.`                                 |
 | Database        | RDS Postgres 17 in private subnets, reachable only from the API task                           | –                                      |
 | Uploads         | Private S3 bucket (presigned uploads and downloads), accessed through the task's IAM role      | –                                      |
-| Learner web     | S3 + CloudFront, single-page-app fallback                                                      | `app.`                                 |
+| Learner web     | S3 + CloudFront, single-page-app fallback                                                      | `<domain>`                             |
 | Teach, Support  | S3 + CloudFront, single-page-app fallback                                                      | `teach.`, `support.`                   |
 | DNS and TLS     | Route 53 records, ACM certificates (regional for the API, `us-east-1` for CloudFront)          | under `<domain>` or `staging.<domain>` |
 | Configuration   | SSM Parameter Store under `/elevate/<environment>/`                                            | –                                      |
 | Deploy identity | An IAM role that only GitHub Actions jobs in the matching GitHub Environment can assume (OIDC) | –                                      |
+| Private access  | Staging only: a Tailscale App Connector (EC2 `t4g.micro` + Elastic IP); see "Private staging"  | –                                      |
 
 Shared by both (the `bootstrap` stack): the Terraform state bucket, GitHub's OIDC provider, and
 the `elevate-api` image repository in ECR.
 
 Expect very roughly US$55–65 a month per environment at idle (load balancer, one small Fargate
-task, a `t4g` database, public IPv4 addresses). This is an estimate, not a quote.
+task, a `t4g` database, public IPv4 addresses), plus about US$11 for staging's Tailscale connector.
+This is an estimate, not a quote.
 
 ```
 infra/terraform/
@@ -159,13 +161,47 @@ gh workflow run deploy.yml --ref staging
 
 A deploy:
 
-1. builds the API image and pushes it to ECR, tagged with the commit SHA (a commit that already
+1. checks that the commit's Terraform has been applied to the environment, and stops before
+   changing anything if it has not (see "Terraform before deploy" below);
+2. builds the API image and pushes it to ECR, tagged with the commit SHA (a commit that already
    has an image, such as one promoted from staging, reuses it);
-2. runs the database migrations as a one-off task, and stops if they fail, leaving the running API
+3. runs the database migrations as a one-off task, and stops if they fail, leaving the running API
    untouched;
-3. starts the new API task, waits for it to pass health checks, then stops the old one;
-4. builds the three web apps with that environment's URLs, uploads them to S3 and invalidates
+4. starts the new API task, waits for it to pass health checks, then stops the old one;
+5. builds the three web apps with that environment's URLs, uploads them to S3 and invalidates
    CloudFront.
+
+#### Terraform before deploy
+
+Every `terraform apply` stores a hash of the Terraform it applied in the SSM parameter
+`/elevate/<environment>/deploy/terraform-fingerprint`. The hash covers `envs/<environment>/`
+(the `.tf` files and the provider lock file) and everything under `modules/`. The deploy hashes the
+same files at the commit it is deploying, using `infra/scripts/terraform-fingerprint.sh`. If the
+two hashes differ, that commit changed the environment's Terraform and nobody has applied it yet,
+so the deploy fails at its first step with a message saying which directory to apply. Then:
+
+```bash
+git switch staging && git pull           # the commit the failed run deployed
+cd infra/terraform/envs/staging
+terraform plan
+terraform apply
+gh run rerun <run-id> --failed           # or re-run the failed jobs from the run's page
+```
+
+Some things to know:
+
+- Apply from a clean checkout of a commit with the same Terraform as the one being deployed. That
+  can be the branch after the merge, or the pull request's head commit before it. Terraform hashes
+  the files on disk, so applying with uncommitted edits records a hash that no commit has, and the
+  next deploy stops again.
+- `terraform.tfvars` and the `bootstrap` stack are not covered. Changes to them still need their
+  own apply, as before.
+- To see whether an environment is up to date without deploying, compare
+  `infra/scripts/terraform-fingerprint.sh staging` with
+  `aws ssm get-parameter --name /elevate/staging/deploy/terraform-fingerprint --query Parameter.Value --output text`.
+- The check arrived in a commit that also adds the parameter and the deploy role's permission to
+  read it. Each environment therefore needs one apply from that commit, or a later one, before its
+  next deploy will pass.
 
 ### 7. Check it
 
@@ -173,8 +209,8 @@ A deploy:
 curl https://api.staging.<domain>/api/health
 ```
 
-Open `https://app.staging.<domain>`, `https://teach.staging.<domain>` and
-`https://support.staging.<domain>`. With Resend off, the sign-in link and code are in the API log:
+Open `https://staging.<domain>`, `https://teach.staging.<domain>` and
+`https://support.staging.<domain>` (on staging, with Tailscale on: see "Private staging"). With Resend off, the sign-in link and code are in the API log:
 
 ```bash
 aws logs tail "$(terraform output -raw api_log_group)" --follow
@@ -184,6 +220,103 @@ The sites send their Content-Security-Policy in report-only mode at first. Click
 site with the browser console open; when it reports no violations, set `csp_report_only = false`
 in `terraform.tfvars` and apply.
 
+## Private staging (Tailscale)
+
+Staging answers only to devices on the tailnet. Its module call sets `private_access = true`;
+production leaves it off.
+
+- A Tailscale **App Connector** (`t4g.micro`, Amazon Linux, Elastic IP) runs in staging's VPC.
+  Tailnet devices send traffic for `staging.<domain>` and `*.staging.<domain>` through it, so it
+  arrives at AWS from the connector's Elastic IP. Everything else on those devices is untouched.
+- The three CloudFront sites run a viewer-request function that answers 403 unless the viewer is
+  that IP (or one of `private_access_extra_cidrs`). IPv6 is off on them, because the connector only
+  carries IPv4.
+- The API load balancer answers 403 by default and forwards only the connector's IP, plus two
+  public paths: `/api/webhooks/*` (Stripe and Mux, signature-checked) and `/api/health` (the
+  Deploy workflow checks it from a GitHub runner).
+- Still public, as before: presigned S3 links and Mux playback. The DNS names stay public too;
+  outsiders just get 403.
+
+### Setting it up
+
+1. **Tailscale policy file** (admin console → Access controls). Add the connector's tag, the app,
+   and auto-approval of the routes it advertises. Use your domain; `terraform output
+   tailscale_connector` shows the exact tag and domains.
+
+   ```jsonc
+   "tagOwners": {
+     "tag:elevate-staging-connector": ["autogroup:admin"]
+   },
+   "nodeAttrs": [
+     {
+       "target": ["*"],
+       "app": {
+         "tailscale.com/app-connectors": [
+           {
+             "name": "elevate-staging",
+             "connectors": ["tag:elevate-staging-connector"],
+             "domains": ["staging.<domain>", "*.staging.<domain>"]
+           }
+         ]
+       }
+     }
+   ],
+   "autoApprovers": {
+     "routes": {
+       "0.0.0.0/0": ["tag:elevate-staging-connector"],
+       "::/0": ["tag:elevate-staging-connector"]
+     }
+   }
+   ```
+
+   Merge these into the keys you already have. With the default allow-all policy nothing else is
+   needed; with custom ACLs or grants, make sure your devices may reach the routed addresses.
+2. **Auth key** (admin console → Settings → Keys): one-off (not reusable), not ephemeral,
+   pre-approved, tagged `tag:elevate-staging-connector`. It is used once, to join; tagged nodes do
+   not expire afterwards.
+3. **Apply** in `envs/staging`. From this point outsiders get 403, and so does everyone until the
+   connector has joined.
+4. **Hand the key to the connector.** It checks every 30 seconds and joins within a minute:
+
+   ```bash
+   aws ssm put-parameter --overwrite --type SecureString \
+     --name /elevate/staging-connector/TAILSCALE_AUTH_KEY --value 'tskey-auth-…'
+   ```
+
+   The key lives outside `/elevate/staging/` so the API cannot read it.
+5. **Check it**, with Tailscale on and then off:
+
+   | Request                                            | Tailscale on | Tailscale off                                  |
+   | -------------------------------------------------- | ------------ | ---------------------------------------------- |
+   | `https://staging.<domain>` (and teach, support)    | the app      | `403` with the plain-text message, not the app |
+   | `curl -i https://api.staging.<domain>/api/auth/me` | `401`        | `403`                                          |
+   | `curl https://api.staging.<domain>/api/health`     | `200`        | `200`                                          |
+
+   Then send a test webhook (`stripe trigger …`, or a Mux test upload) and run
+   `gh workflow run deploy.yml --ref staging`; both should still succeed.
+
+Devices need Tailscale's DNS (the default "Use Tailscale DNS" setting), because the connector
+learns which addresses to route from the DNS lookups. Linux devices also need
+`tailscale set --accept-routes`. Phones running the EAS `preview` build just need Tailscale on.
+
+### Running it
+
+- **Connector down?** Open a shell without SSH and look at the join service:
+
+  ```bash
+  aws ssm start-session --target <instance_id from `terraform output tailscale_connector`>
+  sudo journalctl -u tailscale-join -u tailscaled --no-pager | tail -50
+  ```
+
+- **Fallback addresses**: list up to four IPv4 CIDRs in `private_access_extra_cidrs` in
+  `terraform.tfvars` and apply; they are let in alongside the connector.
+- **Replacing the connector** (a new AMI, or the instance is gone): put a new one-off auth key in
+  the parameter first, then
+  `terraform apply -replace='module.environment.aws_instance.connector[0]'`. The Elastic IP stays,
+  so nothing else changes. Remove the old machine from the Tailscale admin console.
+- **Opening staging to everyone again**: set `private_access = false` in `envs/staging/main.tf`
+  and apply.
+
 ## Day to day
 
 - **Ship to staging**: open a pull request into `staging` and merge it.
@@ -191,8 +324,9 @@ in `terraform.tfvars` and apply.
   the waiting Deploy run.
 - **Change infrastructure or configuration**: edit `infra/terraform`, open a pull request (the
   **Infra** workflow checks formatting and validity), then `terraform plan` and `apply` from
-  `envs/<environment>` yourself. Changes to the API's environment variables take effect on the
-  next deploy.
+  `envs/<environment>` yourself. Apply before you merge into the environment's branch: a deploy
+  whose Terraform has not been applied stops at its first step ("Terraform before deploy").
+  Changes to the API's environment variables take effect on the next deploy.
 - **Roll back**: `git revert` the commit on the environment's branch and push. The deploy builds
   and rolls out the reverted code like any other commit. Database migrations are not reversed, so
   keep them additive. The one-time reset below is the exception: it cannot be rolled back.
@@ -215,6 +349,39 @@ The API image has a seed command, run as a one-off task (the `run-task` call is 
 
 Both need `SEED_SUPER_ADMIN_EMAIL` in the task's environment and write course thumbnails through
 the API's own storage, so they land in the environment's S3 bucket. Running a seed twice is safe.
+
+## Hover previews
+
+A course card's hover preview is a 4-second clip of the course's video, fetched once from Mux and
+stored under `public/previews/` ([ADR 011](../docs/adr/011-course-preview-clips.md)). Clips are
+made when Support approves a course, when a change set is approved, and when someone saves the
+preview in Teach. They need `integrations.mux`; with the local video driver none is made. The API
+image has three commands for them, run as one-off tasks like the seed (the same `run-task` call,
+with a different command):
+
+- `["node", "dist/previews.js", "backfill"]` makes or repairs the clip of every live course and
+  prints a count of each outcome. Run it after a Mux outage, and after previews are switched back
+  on. A second run asks Mux only for courses whose clip is not what the rule wants.
+- `["node", "dist/previews.js", "count"]` prints the number of live courses and how many have a
+  clip.
+- `["node", "dist/previews.js", "check", "<mediaId>"]` (optionally `"--start", "<seconds>"`)
+  asks Mux for one clip of that video and prints whether it came back, its size and how long it
+  took. It stores nothing. Run it after a Mux SDK upgrade or a change to the clip's shape. Each
+  run uses one of the video's 5 clips for good and is not stopped at 5, so run it on a video
+  Elevate uploaded, not on a teacher's.
+
+**Switching previews off** everywhere: set `course_previews = false` in the environment's
+`terraform.tfvars`, `terraform apply`, and run Deploy again. That is a pause, not a takedown: the
+catalog stops returning clips and none is made, but stored files stay and are still served to
+anyone who has an address. A teacher deletes one course's clip by turning its preview off in
+Teach.
+
+Clips that are hidden or switched off with a file still stored (a delete that failed is retried
+at the next refresh of that course):
+
+```sql
+select id from courses where preview_key is not null and (preview_source_media_id is null or not preview_enabled)
+```
 
 ## Resetting an environment
 

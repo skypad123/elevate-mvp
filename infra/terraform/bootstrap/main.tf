@@ -11,7 +11,8 @@ terraform {
     }
   }
 
-  # State starts local. After the first apply, uncomment, then run
+  # State lives in the bucket this stack creates. A new account starts with this block commented
+  # out, applies once, then runs:
   #   terraform init -migrate-state -backend-config="bucket=$(terraform output -raw state_bucket)"
   backend "s3" {
     key          = "bootstrap/terraform.tfstate"

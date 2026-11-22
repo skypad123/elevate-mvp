@@ -5,8 +5,9 @@ import * as WebBrowser from 'expo-web-browser'
 import { ArrowLeft, Lock, Tag } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
 import { Platform, Pressable, View } from 'react-native'
-import { errorMessage } from '@/lib/api-error'
+import { useErrorMessage } from '@/lib/api-error'
 import { fetchQuote, startCheckout } from '@/lib/catalog'
+import { usePreferences } from '@/lib/preferences'
 import { useSession } from '@/lib/session'
 import { webBaseUrl } from '@/lib/web-url'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -17,13 +18,16 @@ export default function Checkout() {
   const theme = useTheme()
   const router = useRouter()
   const { isSignedIn, isLoading } = useSession()
+  const { locale, t } = usePreferences()
+  const wordError = useErrorMessage()
   const [quote, setQuote] = useState<QuoteResponse | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  // Errors are kept as the error objects and worded at render, so a language switch rewords them
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [promo, setPromo] = useState('')
-  const [promoError, setPromoError] = useState<string | null>(null)
+  const [promoError, setPromoError] = useState<unknown>(null)
   const [applying, setApplying] = useState(false)
   const [paying, setPaying] = useState(false)
-  const [payError, setPayError] = useState<string | null>(null)
+  const [payError, setPayError] = useState<unknown>(null)
 
   useEffect(() => {
     if (isLoading) return
@@ -33,7 +37,7 @@ export default function Checkout() {
     }
     fetchQuote(courseId)
       .then(setQuote)
-      .catch((e) => setLoadError(errorMessage(e)))
+      .catch((e: unknown) => setLoadError(e))
   }, [courseId, isSignedIn, isLoading, router])
 
   async function applyPromo() {
@@ -42,7 +46,7 @@ export default function Checkout() {
     try {
       setQuote(await fetchQuote(courseId, promo.trim() || undefined))
     } catch (e) {
-      setPromoError(errorMessage(e))
+      setPromoError(e)
     } finally {
       setApplying(false)
     }
@@ -53,7 +57,7 @@ export default function Checkout() {
     setPaying(true)
     setPayError(null)
     try {
-      const result = await startCheckout(courseId, quote.promo?.code)
+      const result = await startCheckout(courseId, { locale, promoCode: quote.promo?.code })
       if (result.kind === 'enrolled') {
         router.replace(`/learn/${result.enrollmentId}`)
         return
@@ -61,19 +65,19 @@ export default function Checkout() {
       if (Platform.OS === 'web' && typeof window !== 'undefined') window.location.assign(result.url)
       else await WebBrowser.openBrowserAsync(result.url)
     } catch (e) {
-      setPayError(errorMessage(e))
+      setPayError(e)
       setPaying(false)
     }
   }
 
-  if (loadError) {
+  if (loadError !== null) {
     return (
       <Screen maxWidth={640}>
         <EmptyState
           tone="danger"
-          title="Could not start checkout"
-          body={loadError}
-          action={{ label: 'Back', onPress: () => router.back() }}
+          title={t('learnerCheckout.loadError.title')}
+          body={wordError(loadError)}
+          action={{ label: t('learnerCheckout.back'), onPress: () => router.back() }}
         />
       </Screen>
     )
@@ -84,23 +88,22 @@ export default function Checkout() {
       <Screen maxWidth={640}>
         <Card style={{ gap: theme.space[4] }}>
           <Text variant="eyebrow" tone="tertiary">
-            Checkout
+            {t('learnerCheckout.title')}
           </Text>
-          <Text variant="h2">Payments happen on the web</Text>
-          <Text tone="secondary">
-            To keep prices low we take card payments on elevate.sg rather than through the app
-            store. Your enrolment appears here as soon as you have paid.
-          </Text>
+          <Text variant="h2">{t('learnerCheckout.web.title')}</Text>
+          <Text tone="secondary">{t('learnerCheckout.web.body')}</Text>
           <Button
-            label="Continue on the web"
+            label={t('learnerCheckout.web.continue')}
             variant="accent"
             size="lg"
             fullWidth
             onPress={() =>
-              WebBrowser.openBrowserAsync(`${webBaseUrl()}/course/${quote.course.slug}`)
+              WebBrowser.openBrowserAsync(
+                `${webBaseUrl()}/course/${quote.course.slug}?lang=${locale}`,
+              )
             }
           />
-          <Button label="Back" variant="ghost" onPress={() => router.back()} />
+          <Button label={t('learnerCheckout.back')} variant="ghost" onPress={() => router.back()} />
         </Card>
       </Screen>
     )
@@ -117,10 +120,10 @@ export default function Checkout() {
         >
           <ArrowLeft size={16} color={theme.colors.inkSecondary} />
           <Text variant="small" tone="secondary">
-            Back to course
+            {t('learnerCheckout.backToCourse')}
           </Text>
         </Pressable>
-        <Text variant="h1">Checkout</Text>
+        <Text variant="h1">{t('learnerCheckout.title')}</Text>
 
         {!quote || !q ? (
           <Skeleton height={220} radius={theme.radii.card} />
@@ -149,7 +152,7 @@ export default function Checkout() {
                   {quote.course.title}
                 </Text>
                 <Text variant="small" tone="secondary">
-                  by {quote.course.teacherName}
+                  {t('learnerCheckout.byTeacher', { teacher: quote.course.teacherName })}
                 </Text>
               </View>
             </Card>
@@ -159,7 +162,7 @@ export default function Checkout() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[2] }}>
                   <Tag size={16} color={theme.colors.inkTertiary} />
                   <Text variant="smallStrong" tone="secondary">
-                    Promo code
+                    {t('learnerCheckout.promo.label')}
                   </Text>
                 </View>
                 <View
@@ -169,15 +172,19 @@ export default function Checkout() {
                     <Input
                       value={promo}
                       onChangeText={setPromo}
-                      placeholder="e.g. WELCOME10"
+                      placeholder={t('learnerCheckout.promo.placeholder')}
                       autoCapitalize="characters"
                       autoCorrect={false}
-                      error={promoError}
+                      error={promoError !== null ? wordError(promoError) : null}
                       onSubmitEditing={applyPromo}
                     />
                   </View>
                   <Button
-                    label={quote.promo ? 'Update' : 'Apply'}
+                    label={
+                      quote.promo
+                        ? t('learnerCheckout.promo.update')
+                        : t('learnerCheckout.promo.apply')
+                    }
                     variant="secondary"
                     onPress={applyPromo}
                     loading={applying}
@@ -185,30 +192,45 @@ export default function Checkout() {
                 </View>
                 {quote.promo ? (
                   <Text variant="small" tone="success">
-                    {quote.promo.code} applied:{' '}
                     {quote.promo.type === 'percent'
-                      ? `${quote.promo.value}% off`
-                      : `${formatSgd(quote.promo.value)} off`}
+                      ? t('learnerCheckout.promo.appliedPercent', {
+                          code: quote.promo.code,
+                          percent: quote.promo.value,
+                        })
+                      : t('learnerCheckout.promo.appliedAmount', {
+                          code: quote.promo.code,
+                          amount: formatSgd(quote.promo.value),
+                        })}
                   </Text>
                 ) : null}
               </View>
               <View style={{ height: 1, backgroundColor: theme.colors.border }} />
               <View style={{ gap: theme.space[2] }}>
-                <Row label="Course price" value={formatSgd(q.listPriceCents)} />
+                <Row label={t('learnerCheckout.row.price')} value={formatSgd(q.listPriceCents)} />
                 {q.discountCents > 0 ? (
-                  <Row label="Discount" value={`−${formatSgd(q.discountCents)}`} tone="success" />
+                  <Row
+                    label={t('learnerCheckout.row.discount')}
+                    value={`−${formatSgd(q.discountCents)}`}
+                    tone="success"
+                  />
                 ) : null}
                 <Row
-                  label="Total today"
-                  value={formatSgd(q.amountCents, { showFree: true })}
+                  label={t('learnerCheckout.row.total')}
+                  value={
+                    q.amountCents === 0 ? t('learnerCommon.price.free') : formatSgd(q.amountCents)
+                  }
                   strong
                 />
                 <Text variant="caption" tone="tertiary">
-                  Includes all payment processing fees. No subscription.
+                  {t('learnerCheckout.fees')}
                 </Text>
               </View>
               <Button
-                label={q.isFree ? 'Enrol for free' : `Pay ${formatSgd(q.amountCents)} with Stripe`}
+                label={
+                  q.isFree
+                    ? t('learnerCheckout.pay.free')
+                    : t('learnerCheckout.pay.stripe', { price: formatSgd(q.amountCents) })
+                }
                 variant="accent"
                 size="lg"
                 fullWidth
@@ -219,17 +241,16 @@ export default function Checkout() {
               />
               {q.belowMinimum ? (
                 <Text variant="small" tone="danger">
-                  The discounted price is below the minimum card payment. Remove the code to
-                  continue.
+                  {t('learnerCheckout.belowMinimum')}
                 </Text>
               ) : null}
-              {payError ? (
+              {payError !== null ? (
                 <Text variant="small" tone="danger">
-                  {payError}
+                  {wordError(payError)}
                 </Text>
               ) : null}
               <Text variant="caption" tone="tertiary" align="center">
-                You will be taken to Stripe's secure checkout and back here when done.
+                {t('learnerCheckout.stripeNote')}
               </Text>
             </Card>
           </>

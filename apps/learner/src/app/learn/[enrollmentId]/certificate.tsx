@@ -2,8 +2,9 @@ import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { ArrowLeft, Award } from 'lucide-react-native'
 import { Pressable, View } from 'react-native'
 import { CertificateActions, CertificateCard } from '@/components/CertificateCard'
-import { ApiError, errorMessage } from '@/lib/api-error'
+import { ApiError, useErrorMessage } from '@/lib/api-error'
 import { useCertificate } from '@/lib/learning'
+import { usePreferences } from '@/lib/preferences'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Button, Card, EmptyState, Screen, Skeleton, Text } from '@/ui'
 
@@ -11,6 +12,8 @@ export default function OwnCertificate() {
   const { enrollmentId = '' } = useLocalSearchParams<{ enrollmentId: string }>()
   const theme = useTheme()
   const router = useRouter()
+  const { t } = usePreferences()
+  const errorMessage = useErrorMessage()
   const query = useCertificate(enrollmentId)
 
   let body: React.ReactNode
@@ -27,16 +30,14 @@ export default function OwnCertificate() {
       <EmptyState
         icon={Award}
         tone={notYet ? 'neutral' : 'danger'}
-        title={
-          notYet ? 'Finish the course to earn your certificate' : 'Could not load your certificate'
-        }
-        body={
+        title={t(
           notYet
-            ? 'Complete every lesson and pass every quiz. Your certificate is issued the moment you do.'
-            : errorMessage(query.error)
-        }
+            ? 'learnerCertificate.own.notYet.title'
+            : 'learnerCertificate.own.loadFailed.title',
+        )}
+        body={notYet ? t('learnerCertificate.own.notYet.body') : errorMessage(query.error)}
         action={{
-          label: notYet ? 'Back to the course' : 'Try again',
+          label: t(notYet ? 'learnerCertificate.own.notYet.action' : 'learnerCommon.error.retry'),
           onPress: () => (notYet ? router.replace(`/learn/${enrollmentId}`) : query.refetch()),
         }}
       />
@@ -47,24 +48,20 @@ export default function OwnCertificate() {
       <View style={{ gap: theme.space[5] }}>
         <View style={{ gap: theme.space[2] }}>
           <Text variant="eyebrow" tone="brand">
-            Your certificate
+            {t('learnerCertificate.own.eyebrow')}
           </Text>
-          <Text variant="h1">You did it.</Text>
-          <Text tone="secondary">
-            Download the PDF or share the verify link. Anyone can open the link to confirm your
-            certificate, no sign-in needed; it is also printed on the PDF with a QR code.
-          </Text>
+          <Text variant="h1">{t('learnerCertificate.own.title')}</Text>
+          <Text tone="secondary">{t('learnerCertificate.own.intro')}</Text>
         </View>
         <CertificateCard certificate={c} />
         {c.learnerName.includes('@') ? (
           <Card style={{ gap: theme.space[3], borderColor: theme.colors.warning }}>
-            <Text variant="bodyStrong">Put your name on it</Text>
+            <Text variant="bodyStrong">{t('learnerCertificate.own.noName.title')}</Text>
             <Text variant="small" tone="secondary">
-              Your profile has no name yet, so the certificate shows your email. Add your name under
-              Profile and it is reprinted here automatically, same verify link.
+              {t('learnerCertificate.own.noName.body')}
             </Text>
             <Button
-              label="Go to Profile"
+              label={t('learnerCertificate.own.noName.action')}
               variant="secondary"
               size="sm"
               onPress={() => router.push('/profile')}
@@ -74,7 +71,7 @@ export default function OwnCertificate() {
         <CertificateActions certificate={c} />
         <Card muted style={{ gap: 4 }}>
           <Text variant="caption" tone="tertiary">
-            Verify link
+            {t('learnerCertificate.own.verifyLink')}
           </Text>
           <Text variant="small" selectable>
             {c.verifyUrl}
@@ -93,7 +90,7 @@ export default function OwnCertificate() {
           >
             <ArrowLeft size={16} color={theme.colors.inkSecondary} />
             <Text variant="small" tone="secondary">
-              Back to course
+              {t('learnerCertificate.own.back')}
             </Text>
           </Pressable>
         </Link>

@@ -16,21 +16,23 @@ that hold on any host.
 | `apps/learner` (web)         | Static Expo export (`npm run build:web`, `web.output: single`)       | S3 + CloudFront           |
 | `apps/learner` (iOS/Android) | EAS Build (`eas build`), EAS Update for JS                           | Expo Application Services |
 
-Branches: `main` and `v0` are development (local only), `staging` and `production` deploy on push.
+Branches: `main` is development (local only); `staging` and `production` deploy on push.
 
 ## API
 
 1. Image: `docker build -f apps/api/Dockerfile -t elevate-api .` from the repo root. It contains
-   `dist/server.js` (the default command), `dist/migrate.js`, and two commands run by hand as
-   one-off tasks, `dist/seed.js` and `dist/reset-schema.js`, with the workspace packages bundled
-   in. Outside Docker: `npm run build -w @elevate/api`, then `npm run start:prod`.
+   `dist/server.js` (the default command), `dist/migrate.js`, and three commands run by hand as
+   one-off tasks, `dist/seed.js`, `dist/reset-schema.js` and `dist/previews.js` (hover-preview
+   clips: `backfill`, `count`, `check`; see `infra/README.md`, "Hover previews"), with the
+   workspace packages bundled in. Outside Docker: `npm run build -w @elevate/api`, then `npm run start:prod`.
 2. Required env: `DATABASE_URL`, `SESSION_SECRET` (32+ random chars), `API_URL`, `LEARNER_URL`,
    `TEACH_URL`, `SUPPORT_URL` (these three are also the CORS allow-list in production),
    `NODE_ENV=production`, and `STORAGE_DRIVER=s3` + `S3_BUCKET` + `S3_REGION`. On AWS leave the S3
    keys unset so the task role is used; for R2 or MinIO set `S3_ENDPOINT` and the two keys.
    Optional integrations: `MAIL_DRIVER=resend` + `RESEND_API_KEY` + `MAIL_FROM`,
    `VIDEO_DRIVER=mux` + `MUX_*`, `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` +
-   `STRIPE_CONNECT_WEBHOOK_SECRET`.
+   `STRIPE_CONNECT_WEBHOOK_SECRET`. `COURSE_PREVIEWS` (default `true`) pauses hover-preview clips
+   on course cards when `false`; they need `VIDEO_DRIVER=mux`.
 3. Migrations: `node dist/migrate.js` (in the image) against the target `DATABASE_URL` before the
    new API version takes traffic; the Deploy workflow does this. `MIGRATIONS_DIR` points the
    bundle at the migration folders. Migrations are additive, with one exception: the teacher
@@ -52,9 +54,9 @@ Branches: `main` and `v0` are development (local only), `staging` and `productio
 - Serve each `dist/` as a static site with a rewrite of every path to `index.html` (React Router
   and expo-router are client-side routers; the public certificate URL `/c/{token}` depends on it).
   CloudFront does this through its error responses.
-- `VITE_API_URL` and `VITE_LEARNER_URL` (portals) and `EXPO_PUBLIC_API_URL` and
-  `EXPO_PUBLIC_WEB_URL` (learner) are compiled in at build time; the Deploy workflow sets them from
-  the GitHub Environment.
+- `VITE_API_URL` and `VITE_LEARNER_URL` (portals) and `EXPO_PUBLIC_API_URL`,
+  `EXPO_PUBLIC_WEB_URL` and `EXPO_PUBLIC_TEACH_URL` (learner) are compiled in at build time; the
+  Deploy workflow sets them from the GitHub Environment.
 - Security headers (`X-Frame-Options: DENY`, `Referrer-Policy`, HSTS and a CSP allowing the API,
   the uploads bucket, Mux, Stripe and Google Fonts) are set by the CloudFront response headers
   policy in `infra/terraform/modules/static_site`.
@@ -79,3 +81,6 @@ Branches: `main` and `v0` are development (local only), `staging` and `productio
   grant via Support → People → Roles).
 - [ ] Run the manual money loop (`docs/runbooks/money-loop.md`) against the production build in
   Stripe test mode before switching to live keys.
+- [ ] The hover-preview server PR was deployed before any teacher applied:
+  `select count(*) from profiles where applied_at < '<time of that deploy>'` returns 0
+  (ADR 011).

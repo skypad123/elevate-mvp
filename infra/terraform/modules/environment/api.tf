@@ -14,18 +14,19 @@ locals {
 
   api_environment = merge(
     {
-      NODE_ENV       = "production"
-      API_PORT       = tostring(local.api_port)
-      API_URL        = local.api_url
-      LEARNER_URL    = local.learner_url
-      TEACH_URL      = local.teach_url
-      SUPPORT_URL    = local.support_url
-      STORAGE_DRIVER = "s3"
-      S3_BUCKET      = aws_s3_bucket.uploads.bucket
-      S3_REGION      = local.region
-      MAIL_DRIVER    = var.integrations.resend ? "resend" : "console"
-      MAIL_FROM      = local.mail_from
-      VIDEO_DRIVER   = var.integrations.mux ? "mux" : "local"
+      NODE_ENV        = "production"
+      API_PORT        = tostring(local.api_port)
+      API_URL         = local.api_url
+      LEARNER_URL     = local.learner_url
+      TEACH_URL       = local.teach_url
+      SUPPORT_URL     = local.support_url
+      STORAGE_DRIVER  = "s3"
+      S3_BUCKET       = aws_s3_bucket.uploads.bucket
+      S3_REGION       = local.region
+      MAIL_DRIVER     = var.integrations.resend ? "resend" : "console"
+      MAIL_FROM       = local.mail_from
+      VIDEO_DRIVER    = var.integrations.mux ? "mux" : "local"
+      COURSE_PREVIEWS = tostring(var.course_previews)
     },
     var.seed_super_admin_email == null ? {} : { SEED_SUPER_ADMIN_EMAIL = var.seed_super_admin_email },
   )
@@ -116,7 +117,8 @@ resource "aws_ecs_service" "api" {
     ignore_changes = [task_definition]
   }
 
-  depends_on = [aws_lb_listener.https]
+  # With private_access the target group is reached only through listener rules.
+  depends_on = [aws_lb_listener.https, aws_lb_listener_rule.public_paths, aws_lb_listener_rule.tailnet]
 }
 
 # ── Load balancer ───────────────────────────────────────────────────────────
@@ -156,9 +158,68 @@ resource "aws_lb_listener" "https" {
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
   certificate_arn   = aws_acm_certificate_validation.api.certificate_arn
 
-  default_action {
+  # With private_access, anything the rules below do not let through is refused. Each action type
+  # has its own block so a fixed response never carries a target group.
+  dynamic "default_action" {
+    for_each = var.private_access ? [] : [1]
+
+    content {
+      type             = "forward"
+      target_group_arn = aws_lb_target_group.api.arn
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = var.private_access ? [1] : []
+
+    content {
+      type = "fixed-response"
+
+      fixed_response {
+        content_type = "text/plain"
+        message_body = "This environment is only reachable over Tailscale."
+        status_code  = "403"
+      }
+    }
+  }
+}
+
+# Private access: what stays public. Stripe and Mux post webhooks (signature-checked by the API),
+# and the Deploy workflow checks /api/health from a GitHub runner.
+resource "aws_lb_listener_rule" "public_paths" {
+  count = var.private_access ? 1 : 0
+
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 10
+
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/webhooks/*", "/api/health"]
+    }
+  }
+}
+
+# Private access: everything else, from the Tailscale connector (see tailscale.tf).
+resource "aws_lb_listener_rule" "tailnet" {
+  count = var.private_access ? 1 : 0
+
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 20
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    source_ip {
+      values = local.private_access_cidrs
+    }
   }
 }
 

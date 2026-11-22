@@ -36,7 +36,10 @@ export function createStripeEventHandlers(deps: Deps): Record<string, StripeEven
     // enrolment until Support acts on it.
     if (outcome === 'unattributed')
       throw new Error(`unattributed_checkout: session ${input.sessionId} names no payout account`)
-    return outcome
+    // Also stored with the event: the learner paid twice and the second payment needs a refund.
+    if (outcome === 'duplicate_unrefunded')
+      throw new Error(`duplicate_unrefunded: session ${input.sessionId} paid an active enrolment`)
+    return outcome === 'duplicate' ? 'applied' : outcome
   }
   return {
     'account.updated': async (event) => connect.applyAccountUpdated(event.data.object),

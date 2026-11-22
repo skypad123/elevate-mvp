@@ -3,9 +3,10 @@ import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { ArrowLeft, ArrowRight, Award } from 'lucide-react-native'
 import { Pressable, View } from 'react-native'
 import { Trail } from '@/components/Trail'
-import { errorMessage } from '@/lib/api-error'
+import { useErrorMessage } from '@/lib/api-error'
 import { formatMinutes } from '@/lib/format'
 import { useEnrollment } from '@/lib/learning'
+import { usePreferences } from '@/lib/preferences'
 import { useBreakpoint } from '@/lib/responsive'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Button, Card, EmptyState, ProgressBar, Screen, Skeleton, Text } from '@/ui'
@@ -15,6 +16,8 @@ export default function EnrollmentTrail() {
   const theme = useTheme()
   const router = useRouter()
   const { isLg } = useBreakpoint()
+  const { t } = usePreferences()
+  const errorMessage = useErrorMessage()
   const enrollment = useEnrollment(enrollmentId)
 
   if (enrollment.isPending) {
@@ -34,9 +37,12 @@ export default function EnrollmentTrail() {
       <Screen maxWidth={880}>
         <EmptyState
           tone="danger"
-          title="Could not open this course"
+          title={t('learnerLearn.overview.loadError')}
           body={errorMessage(enrollment.error)}
-          action={{ label: 'My Learning', onPress: () => router.replace('/learning') }}
+          action={{
+            label: t('learnerLearn.overview.backToLearning'),
+            onPress: () => router.replace('/learning'),
+          }}
         />
       </Screen>
     )
@@ -58,7 +64,7 @@ export default function EnrollmentTrail() {
           >
             <ArrowLeft size={16} color={theme.colors.inkSecondary} />
             <Text variant="small" tone="secondary">
-              My Learning
+              {t('learnerLearn.overview.backToLearning')}
             </Text>
           </Pressable>
         </Link>
@@ -94,8 +100,16 @@ export default function EnrollmentTrail() {
             <Text variant="h1">{e.course.title}</Text>
             <ProgressBar percent={e.progress.percent} />
             <Text variant="small" tone="secondary">
-              {e.progress.percent}% · {e.progress.completedLessons} of {e.progress.totalLessons}{' '}
-              lessons complete
+              {t(
+                e.progress.totalLessons === 1
+                  ? 'learnerLearn.overview.progress.one'
+                  : 'learnerLearn.overview.progress.other',
+                {
+                  percent: e.progress.percent,
+                  completed: e.progress.completedLessons,
+                  total: e.progress.totalLessons,
+                },
+              )}
             </Text>
           </View>
         </View>
@@ -104,16 +118,16 @@ export default function EnrollmentTrail() {
           <Card style={{ gap: theme.space[3], borderColor: theme.colors.brand }} elevated>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[2] }}>
               <Award size={22} color={theme.colors.brand} />
-              <Text variant="h2">Course complete</Text>
+              <Text variant="h2">{t('learnerLearn.overview.complete.title')}</Text>
             </View>
             <Text tone="secondary">
               {e.certificateId
-                ? 'You finished every lesson and passed every quiz. Your certificate is ready to download and share.'
-                : 'You finished every lesson and passed every quiz. Your certificate is being prepared and will appear here.'}
+                ? t('learnerLearn.overview.complete.ready')
+                : t('learnerLearn.overview.complete.preparing')}
             </Text>
             {e.certificateId ? (
               <Button
-                label="View certificate"
+                label={t('learnerLearn.overview.viewCertificate')}
                 variant="primary"
                 onPress={() => router.push(`/learn/${enrollmentId}/certificate`)}
               />
@@ -130,7 +144,7 @@ export default function EnrollmentTrail() {
           >
             <View style={{ flex: 1, gap: 2 }}>
               <Text variant="eyebrow" tone="accent">
-                Up next
+                {t('learnerLearn.overview.upNext')}
               </Text>
               <Text variant="h3">{e.lessons.find((l) => l.id === resume.lessonId)?.title}</Text>
               <Text variant="small" tone="secondary" numberOfLines={1}>
@@ -142,7 +156,9 @@ export default function EnrollmentTrail() {
               </Text>
             </View>
             <Button
-              label={e.progress.percent > 0 ? 'Resume' : 'Start'}
+              label={
+                e.progress.percent > 0 ? t('learnerLearn.resume') : t('learnerLearn.overview.start')
+              }
               variant="accent"
               iconRight={ArrowRight}
               onPress={() => goTo(resume.lessonId, resume.artefactId)}
@@ -151,14 +167,28 @@ export default function EnrollmentTrail() {
         ) : null}
 
         <View style={{ gap: theme.space[4] }}>
-          <Text variant="h2">Lessons</Text>
+          <Text variant="h2">{t('learnerLearn.overview.lessons')}</Text>
           <Trail
             items={e.lessons.map((l) => ({
               id: l.id,
               title: l.title,
               summary: l.summary,
               status: l.status,
-              meta: `${l.artefacts.length} item${l.artefacts.length === 1 ? '' : 's'}${formatMinutes(l.artefacts.reduce((n, a) => n + (a.durationSeconds ?? 0), 0)) ? ` · ${formatMinutes(l.artefacts.reduce((n, a) => n + (a.durationSeconds ?? 0), 0))}` : ''}${l.status === 'in_progress' ? ` · ${l.percent}%` : ''}`,
+              meta: [
+                t(
+                  l.artefacts.length === 1
+                    ? 'learnerLearn.overview.items.one'
+                    : 'learnerLearn.overview.items.other',
+                  { count: l.artefacts.length },
+                ),
+                formatMinutes(
+                  l.artefacts.reduce((n, a) => n + (a.durationSeconds ?? 0), 0),
+                  t,
+                ),
+                l.status === 'in_progress' ? t('learnerLearn.percent', { percent: l.percent }) : '',
+              ]
+                .filter(Boolean)
+                .join(t('learnerLearn.meta.separator')),
               requires: l.status === 'locked' ? l.blockedBy : [],
             }))}
             onPress={(item) => goTo(item.id)}

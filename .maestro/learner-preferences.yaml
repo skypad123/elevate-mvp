@@ -20,14 +20,16 @@ env:
 - runFlow: sign-in.yaml
 
 # --- Appearance -------------------------------------------------------------------------
-- tapOn: "Profile"
+- tapOn:
+    id: "nav-profile"
 - scrollUntilVisible:
     element: "Appearance"
-- tapOn: "Dark"
+- tapOn:
+    id: "theme-dark"
 - assertVisible:
     id: "app-root-dark"
 - assertVisible:
-    text: "Dark"
+    id: "theme-dark"
     selected: true
 
 # Cold relaunch: the stored theme must be applied before anything is shown.
@@ -38,10 +40,12 @@ env:
 - takeScreenshot: learner-dark-after-relaunch
 
 # Forced light under the same OS setting.
-- tapOn: "Profile"
+- tapOn:
+    id: "nav-profile"
 - scrollUntilVisible:
     element: "Appearance"
-- tapOn: "Light"
+- tapOn:
+    id: "theme-light"
 - assertVisible:
     id: "app-root-light"
 - stopApp
@@ -50,10 +54,12 @@ env:
     id: "app-root-light"
 
 # --- Language ---------------------------------------------------------------------------
-- tapOn: "Profile"
+- tapOn:
+    id: "nav-profile"
 - scrollUntilVisible:
     element: "Language"
-- tapOn: "中文"
+- tapOn:
+    id: "profile-lang-zh"
 - assertVisible: "偏好设置"
 - assertVisible: "我的学习"
 - stopApp
@@ -62,11 +68,16 @@ env:
 - takeScreenshot: learner-zh-after-relaunch
 
 # Restore defaults so the next run starts clean even without clearState.
-- tapOn: "个人资料"
+- tapOn:
+    id: "nav-profile"
 - scrollUntilVisible:
     element: "语言"
-- tapOn: "English"
-- tapOn: "System"
+- tapOn:
+    id: "profile-lang-en"
+- tapOn:
+    id: "profile-lang-system"
 - assertVisible:
-    text: "System"
+    id: "profile-lang-system"
     selected: true
+- tapOn:
+    id: "theme-system"

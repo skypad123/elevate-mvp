@@ -63,6 +63,12 @@ variable "github_repo" {
   type        = string
 }
 
+variable "github_oidc_subject_prefix" {
+  description = "From `gh api repos/<owner>/<repo>/actions/oidc/customization/sub` (sub_claim_prefix)."
+  type        = string
+  default     = null
+}
+
 variable "integrations" {
   description = "Switch on Resend, Stripe and Mux once their SSM parameters hold real keys."
   type = object({
@@ -83,6 +89,17 @@ variable "csp_report_only" {
   default = true
 }
 
+variable "course_previews" {
+  type    = bool
+  default = true
+}
+
+variable "private_access_extra_cidrs" {
+  description = "IPv4 CIDRs let into staging besides the Tailscale connector (a fallback, e.g. an office IP)."
+  type        = list(string)
+  default     = []
+}
+
 module "environment" {
   source = "../../modules/environment"
 
@@ -91,14 +108,20 @@ module "environment" {
     aws.us_east_1 = aws.us_east_1
   }
 
-  environment = "staging"
-  root_domain = var.root_domain
-  github_repo = var.github_repo
-  vpc_cidr    = "10.20.0.0/16"
+  environment                = "staging"
+  root_domain                = var.root_domain
+  github_repo                = var.github_repo
+  github_oidc_subject_prefix = var.github_oidc_subject_prefix
+  vpc_cidr                   = "10.20.0.0/16"
 
   integrations           = var.integrations
   seed_super_admin_email = var.seed_super_admin_email
   csp_report_only        = var.csp_report_only
+  course_previews        = var.course_previews
+
+  # Only the tailnet can open staging (infra/README.md, "Private staging").
+  private_access             = true
+  private_access_extra_cidrs = var.private_access_extra_cidrs
 
   # Small and disposable: no deletion protection, one day of backups.
   db_instance_class        = "db.t4g.micro"
@@ -121,6 +144,10 @@ output "manual_parameters" {
 
 output "api_log_group" {
   value = module.environment.api_log_group
+}
+
+output "tailscale_connector" {
+  value = module.environment.tailscale_connector
 }
 
 output "github_environment_variables" {

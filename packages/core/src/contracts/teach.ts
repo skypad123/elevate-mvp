@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { courseCategorySchema } from '../domain/categories'
+import { COURSE_PREVIEW, type CoursePreviewState } from '../domain/course-preview'
 import { quizDefinitionSchema } from '../domain/quiz'
 import { richTextDocSchema } from '../domain/richtext'
 import { ENTITY_TYPES, type EntityType, isValidUen, normaliseUen, UEN_EXAMPLE } from '../domain/uen'
@@ -69,6 +70,17 @@ export const updateCourseSchema = z.object({
   descriptionJson: richTextDocSchema.nullable().optional(),
   category: courseCategorySchema.optional(),
   thumbnailMediaId: uuidSchema.nullable().optional(),
+  /** The hover preview's setting. An empty video or start means the default (ADR 011). */
+  previewEnabled: z.boolean().optional(),
+  previewMediaId: uuidSchema.nullable().optional(),
+  previewStartSeconds: z
+    .number()
+    .int()
+    .min(0)
+    .max(COURSE_PREVIEW.maxStartSeconds)
+    .multipleOf(COURSE_PREVIEW.startStepSeconds)
+    .nullable()
+    .optional(),
 })
 export type UpdateCourse = z.infer<typeof updateCourseSchema>
 
@@ -281,6 +293,34 @@ export type LessonView = {
   artefacts: ArtefactView[]
 }
 
+/**
+ * What Teach and Support are told about a course's hover preview. `resolved` and `state` are
+ * worked out by the API, so the portals do not apply the rule again.
+ */
+export type CoursePreviewView = {
+  enabled: boolean
+  /** The saved choice; null is the default. */
+  mediaId: string | null
+  /** The saved choice; null is the default. */
+  startSeconds: number | null
+  /** What the rule picks now. */
+  resolved: { mediaId: string; startSeconds: number } | null
+  /** The usable live videos, in the rule's order; the first is the default video. */
+  videos: Array<{
+    mediaId: string
+    lessonTitle: string
+    itemTitle: string
+    durationSeconds: number
+    /** The allowed starts, in seconds. */
+    starts: number[]
+    /** The allowance less the clips already fetched, never below 0. */
+    changesLeft: number
+  }>
+  /** The stored clip, only when a visitor can see it. */
+  clipUrl: string | null
+  state: CoursePreviewState
+}
+
 export type CourseView = {
   id: string
   slug: string
@@ -293,6 +333,7 @@ export type CourseView = {
   status: CourseStatus
   rejectionReason: string | null
   thumbnail: MediaAssetView | null
+  preview: CoursePreviewView
   /** `payable`: the profile has an active payout account that can take charges. */
   profile: { id: string; displayName: string; ownerEmail: string; payable: boolean }
   /**

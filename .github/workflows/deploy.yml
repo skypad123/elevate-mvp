@@ -45,6 +45,28 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      # `terraform apply` records a hash of the Terraform it applied (fingerprint.tf in
+      # infra/terraform/modules/environment). When this commit's Terraform hashes differently, it
+      # has not been applied yet, and the code may need what it adds, so nothing is deployed.
+      # This is a step rather than its own job so production still asks for one approval.
+      - name: Check that this commit's Terraform has been applied
+        env:
+          PARAMETER: /elevate/${{ github.ref_name }}/deploy/terraform-fingerprint
+        run: |
+          expected=$(infra/scripts/terraform-fingerprint.sh "$GITHUB_REF_NAME")
+          if ! applied=$(aws ssm get-parameter --name "$PARAMETER" --query Parameter.Value --output text 2>&1); then
+            echo "$applied"
+            echo "::error::No Terraform fingerprint in $PARAMETER. Run terraform apply in infra/terraform/envs/$GITHUB_REF_NAME from this commit, then re-run this workflow."
+            exit 1
+          fi
+          if [ "$applied" != "$expected" ]; then
+            echo "Applied: $applied"
+            echo "This commit: $expected"
+            echo "::error::infra/terraform changed since the last apply to $GITHUB_REF_NAME. Run terraform plan and apply in infra/terraform/envs/$GITHUB_REF_NAME from this commit ($GITHUB_SHA), then re-run this workflow."
+            exit 1
+          fi
+          echo "Terraform for $GITHUB_REF_NAME is applied ($applied)."
+
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
@@ -146,13 +168,15 @@ jobs:
 
       - run: npm ci
 
-      # The API and learner URLs are compiled into the bundles.
+      # The API, learner and Teach URLs are compiled into the bundles.
       - name: Build Teach, Support and learner web
         env:
           VITE_API_URL: ${{ vars.API_URL }}
+          VITE_TEACH_URL: ${{ vars.TEACH_URL }}
           VITE_LEARNER_URL: ${{ vars.LEARNER_URL }}
           EXPO_PUBLIC_API_URL: ${{ vars.API_URL }}
           EXPO_PUBLIC_WEB_URL: ${{ vars.LEARNER_URL }}
+          EXPO_PUBLIC_TEACH_URL: ${{ vars.TEACH_URL }}
         run: |
           npx turbo run build --filter=@elevate/teach --filter=@elevate/support
           npx turbo run build:web --filter=@elevate/learner

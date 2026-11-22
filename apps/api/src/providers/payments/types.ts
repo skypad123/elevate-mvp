@@ -1,3 +1,5 @@
+import type { Locale } from '@elevate/core'
+
 export type ConnectedAccountStatus = {
   accountId: string
   detailsSubmitted: boolean
@@ -34,21 +36,32 @@ export type CheckoutSessionInput = {
   customerEmail: string
   successUrl: string
   cancelUrl: string
+  /** The language on the learner's screen; Stripe Checkout shows it. Part of the idempotency key. */
+  locale?: Locale
+  /**
+   * The session this one replaces, if any. Part of the idempotency key, so a key is never sent
+   * again once its session has been replaced (Stripe would answer with the closed session, or
+   * refuse the request).
+   */
+  replacesSessionId?: string
   /** Written to the session and its payment intent as given; the caller builds it. */
   metadata: Record<string, string>
 }
 
 /**
- * A retried checkout for the same enrolment, amount and payee returns the same Stripe session. A
- * different payee is a different session, so a learner is never sent to pay an account that is no
- * longer the course's.
+ * Guards one start of checkout against a double submit. A later retry of the same attempt reuses
+ * the open session through the payments service, not through this key. A different payee is a
+ * different session, so a learner is never sent to pay an account that is no longer the course's;
+ * a different language is one too, so a retry after a switch opens a session in the new language.
  */
 export function checkoutIdempotencyKey(input: {
   enrollmentId: string
   amountCents: number
   payoutAccountId: string
+  locale?: Locale
+  replacesSessionId?: string
 }): string {
-  return `checkout:${input.enrollmentId}:${input.amountCents}:${input.payoutAccountId}`
+  return `checkout:${input.enrollmentId}:${input.amountCents}:${input.payoutAccountId}:${input.locale ?? 'none'}:${input.replacesSessionId ?? 'none'}`
 }
 
 export type CheckoutSessionResult = {
@@ -98,11 +111,18 @@ export interface PaymentsProvider {
   accountDashboardUrl(accountId: string): string
   createCheckoutSession(input: CheckoutSessionInput): Promise<{ id: string; url: string }>
   retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionResult>
+  /**
+   * Closes an open session so it can no longer be paid, and returns the session as it then is. A
+   * session that is not open (paid first, or already expired) is left as it is.
+   */
+  expireCheckoutSession(sessionId: string): Promise<CheckoutSessionResult>
   retrievePaymentDetails(paymentIntentId: string): Promise<PaymentDetails>
   createRefund(input: {
     paymentIntentId: string
     reason?: string
     metadata?: Record<string, string>
+    /** A retry with the same key returns the first refund instead of making another. */
+    idempotencyKey?: string
   }): Promise<RefundResult>
   listTransferAmountCents(destinationAccountId: string): Promise<number>
   /** Verifies the signature with one of the configured secrets and parses the event. */
@@ -141,6 +161,9 @@ export class UnconfiguredPaymentsProvider implements PaymentsProvider {
     return this.fail()
   }
   async retrieveCheckoutSession(): Promise<never> {
+    return this.fail()
+  }
+  async expireCheckoutSession(): Promise<never> {
     return this.fail()
   }
   async retrievePaymentDetails(): Promise<never> {

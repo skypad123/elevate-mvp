@@ -1,6 +1,7 @@
 import { schema as s } from '@elevate/db'
 import { eq, isNotNull } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { CoursePreviewService } from '../src/services/course-preview.service'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
 /**
@@ -1017,5 +1018,26 @@ describe('discarding', () => {
     })
     expect(again.status).toBe(200)
     expect((again.body.course as Course).changeSet?.id).not.toBe(stored?.id)
+  })
+})
+
+describe('the hover preview', () => {
+  it('makes a clip of the new file once a change set that swaps the first video is approved', async () => {
+    const c = await t.createCourse(profileId, { status: 'live', videos: 1 })
+    const firstVideo = c.videos[0] as { artefactId: string; mediaId: string }
+    // The fixture course is written live, so its first clip comes from a refresh.
+    expect(await new CoursePreviewService(t.deps).refresh(c.courseId)).toBe('made')
+
+    const replacement = await t.createVideoMedia(profileId)
+    const swapped = await t.api('PATCH', teach(`/artefacts/${firstVideo.artefactId}`), {
+      token: writer,
+      body: { mediaAssetId: replacement },
+    })
+    expect(swapped.status).toBe(200)
+    expect((await approve(c.courseId)).status).toBe(200)
+
+    expect(t.video.previewCalls.at(-1)?.assetId).toBe(replacement)
+    const course = await t.db.query.courses.findFirst({ where: { id: c.courseId } })
+    expect(course?.previewSourceMediaId).toBe(replacement)
   })
 })

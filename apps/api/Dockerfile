@@ -3,6 +3,8 @@
 #
 # The image runs the API (`node dist/server.js`, the default) and the one-off migration task
 # (`node dist/migrate.js`) that the deploy pipeline starts before rolling a new version.
+# It also carries three entry files a person runs as one-off tasks: `dist/seed.js`,
+# `dist/reset-schema.js` and `dist/previews.js`.
 
 FROM node:24-bookworm-slim AS base
 WORKDIR /app

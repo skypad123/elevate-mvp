@@ -28,6 +28,7 @@ import { RootError } from '@/components/RootError'
 import { PreferencesProvider, usePreferences } from '@/lib/preferences'
 import { queryClient } from '@/lib/query-client'
 import { SessionProvider, useSession } from '@/lib/session'
+import { useSignInForOpenedLink } from '@/lib/sign-in-redirect'
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider'
 
 SplashScreen.preventAutoHideAsync().catch(() => {})
@@ -78,6 +79,9 @@ function RootNavigator() {
     if (!booting) SplashScreen.hideAsync().catch(() => {})
   }, [booting])
 
+  // A signed-out visitor who opened a protected link goes to sign-in, then back to it.
+  useSignInForOpenedLink({ ready: !booting, isSignedIn })
+
   if (booting) return null
 
   const base = theme.scheme === 'dark' ? DarkTheme : DefaultTheme
@@ -108,9 +112,12 @@ function RootNavigator() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="course/[slug]" />
           <Stack.Screen name="c/[token]" />
+          {/* Open signed in or out: what teaching on Elevate involves, and the link to Teach. */}
+          <Stack.Screen name="teach" />
           <Stack.Protected guard={!isSignedIn}>
             <Stack.Screen name="(auth)" />
           </Stack.Protected>
+          {/* Keep lib/sign-in-redirect.ts's list of signed-in routes in step with this group. */}
           <Stack.Protected guard={isSignedIn}>
             <Stack.Screen name="checkout/[courseId]" />
             <Stack.Screen name="checkout/success" />

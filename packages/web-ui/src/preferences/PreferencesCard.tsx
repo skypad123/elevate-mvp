@@ -1,4 +1,9 @@
-import { supportedLocales, type ThemePreference, themePreferenceSchema } from '@elevate/core'
+import {
+  type LocalePreference,
+  supportedLocales,
+  type ThemePreference,
+  themePreferenceSchema,
+} from '@elevate/core'
 import { localeNames } from '@elevate/i18n'
 import type { LucideIcon } from 'lucide-react'
 import { Monitor, Moon, Settings2, Sun } from 'lucide-react'
@@ -80,10 +85,9 @@ export function PreferenceRows() {
             aria-labelledby={labelId}
             wrapperClassName="sm:w-48"
             value={preferences.locale}
-            onChange={(e) =>
-              setPreference('locale', e.target.value as (typeof supportedLocales)[number])
-            }
+            onChange={(e) => setPreference('locale', e.target.value as LocalePreference)}
           >
+            <option value="system">{t('prefs.language.system')}</option>
             {supportedLocales.map((locale) => (
               <option key={locale} value={locale} lang={locale}>
                 {localeNames[locale]}
@@ -132,8 +136,8 @@ export function PreferencesDialog({
 
 /**
  * A header button that opens the preferences dialog. It is for pages shown before someone can
- * reach Settings (Teach's application and set-up pages, an invitation link), so they can still
- * pick a language and a theme. The icon is the usual sign for "language", for a reader who cannot
+ * reach Settings (the sign-in page, Teach's application and set-up pages, an invitation link), so
+ * they can still pick a language and a theme. The icon is the usual sign for "language", for a reader who cannot
  * read the label.
  */
 export function PreferencesButton({ className }: { className?: string }) {

@@ -3,16 +3,23 @@ import { Search, SearchX } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
 import { ScrollView, TextInput, View } from 'react-native'
 import { CourseCard } from '@/components/CourseCard'
+import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { HeroScene } from '@/components/mascot/HeroScene'
 import { TAB_BAR_HEIGHT } from '@/components/PillTabBar'
-import { errorMessage } from '@/lib/api-error'
+import { TeachBanner } from '@/components/TeachBanner'
+import { useErrorMessage } from '@/lib/api-error'
 import { useCategories, useCourseList } from '@/lib/catalog'
+import { categoryName } from '@/lib/categories'
+import { usePreferences } from '@/lib/preferences'
 import { useBreakpoint } from '@/lib/responsive'
+import { useTeachBanner } from '@/lib/teach-banner'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Button, Card, Chip, EmptyState, Grid, Screen, Skeleton, Text } from '@/ui'
 
 export default function Explore() {
   const theme = useTheme()
+  const { t } = usePreferences()
+  const errorMessage = useErrorMessage()
   const { isWideWeb, isMd, isLg } = useBreakpoint()
   const [query, setQuery] = useState('')
   const [q, setQ] = useState('')
@@ -29,6 +36,12 @@ export default function Explore() {
   const items = courses.data?.pages.flatMap((p) => p.items) ?? []
   const columns = isLg ? 3 : isMd ? 2 : 1
   const searching = q.length > 0 || !!category
+  // The invitation to teach, after the list: only once the first page has loaded (an empty list
+  // included), and never while a search or category is active.
+  const teachBanner = useTeachBanner({
+    searching,
+    loaded: !courses.isPending && !courses.isError,
+  })
 
   return (
     <Screen bottomInset={isWideWeb ? 0 : TAB_BAR_HEIGHT}>
@@ -47,12 +60,9 @@ export default function Explore() {
               <Text variant="eyebrow" tone="brand">
                 Elevate
               </Text>
-              <Text variant={isMd ? 'display' : 'h1'}>
-                Learn a craft from people who practise it.
-              </Text>
+              <Text variant={isMd ? 'display' : 'h1'}>{t('learnerExplore.hero.title')}</Text>
               <Text variant="bodyLg" tone="secondary">
-                Short, serious courses by independent teachers in Singapore. Pay once, learn at your
-                pace, earn a certificate you can verify.
+                {t('learnerExplore.hero.body')}
               </Text>
             </View>
             <HeroScene style={isLg ? undefined : { alignSelf: 'center' }} />
@@ -60,6 +70,7 @@ export default function Explore() {
         ) : null}
 
         <View style={{ gap: theme.space[3] }}>
+          <LanguageSwitch />
           <View
             style={{
               flexDirection: 'row',
@@ -77,11 +88,12 @@ export default function Explore() {
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search courses or teachers"
+              placeholder={t('learnerExplore.search.placeholder')}
               placeholderTextColor={theme.colors.inkTertiary}
               style={[theme.text.body, { flex: 1, color: theme.colors.ink, paddingVertical: 0 }]}
               returnKeyType="search"
-              accessibilityLabel="Search courses"
+              maxLength={100}
+              accessibilityLabel={t('learnerExplore.search.label')}
             />
           </View>
           <ScrollView
@@ -89,11 +101,22 @@ export default function Explore() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: theme.space[2], paddingVertical: 2 }}
           >
-            <Chip label="All" selected={!category} onPress={() => setCategory(undefined)} />
+            <Chip
+              label={t('learnerExplore.category.all')}
+              selected={!category}
+              onPress={() => setCategory(undefined)}
+            />
             {(categories.data ?? []).map((c) => (
               <Chip
                 key={c.slug}
-                label={c.count ? `${c.label} · ${c.count}` : c.label}
+                label={
+                  c.count
+                    ? t('learnerExplore.category.withCount', {
+                        category: categoryName(c.slug, t),
+                        count: c.count,
+                      })
+                    : categoryName(c.slug, t)
+                }
                 selected={category === c.slug}
                 onPress={() => setCategory(category === c.slug ? undefined : c.slug)}
               />
@@ -104,13 +127,26 @@ export default function Explore() {
           >
             <Text variant="eyebrow" tone="tertiary">
               {courses.isPending
-                ? 'Loading'
-                : `${items.length}${courses.hasNextPage ? '+' : ''} course${items.length === 1 ? '' : 's'}`}
+                ? t('learnerExplore.count.loading')
+                : courses.hasNextPage
+                  ? t('learnerExplore.count.more', { count: items.length })
+                  : t(
+                      items.length === 1
+                        ? 'learnerExplore.count.one'
+                        : 'learnerExplore.count.other',
+                      {
+                        count: items.length,
+                      },
+                    )}
             </Text>
             <View style={{ flexDirection: 'row', gap: theme.space[2] }}>
-              <Chip label="Newest" selected={sort === 'newest'} onPress={() => setSort('newest')} />
               <Chip
-                label="Most enrolled"
+                label={t('learnerExplore.sort.newest')}
+                selected={sort === 'newest'}
+                onPress={() => setSort('newest')}
+              />
+              <Chip
+                label={t('learnerExplore.sort.popular')}
                 selected={sort === 'popular'}
                 onPress={() => setSort('popular')}
               />
@@ -134,17 +170,17 @@ export default function Explore() {
         ) : courses.isError ? (
           <EmptyState
             tone="danger"
-            title="Could not load courses"
+            title={t('learnerExplore.error.title')}
             body={errorMessage(courses.error)}
-            action={{ label: 'Try again', onPress: () => courses.refetch() }}
+            action={{ label: t('learnerCommon.error.retry'), onPress: () => courses.refetch() }}
           />
         ) : items.length === 0 ? (
           <EmptyState
             icon={SearchX}
-            title="No courses match"
-            body="Try another search or category."
+            title={t('learnerExplore.empty.title')}
+            body={t('learnerExplore.empty.body')}
             action={{
-              label: 'Clear filters',
+              label: t('learnerExplore.empty.clear'),
               onPress: () => {
                 setQuery('')
                 setCategory(undefined)
@@ -161,7 +197,7 @@ export default function Explore() {
             {courses.hasNextPage ? (
               <View style={{ alignItems: 'center' }}>
                 <Button
-                  label="Load more"
+                  label={t('learnerExplore.loadMore')}
                   variant="secondary"
                   loading={courses.isFetchingNextPage}
                   onPress={() => courses.fetchNextPage()}
@@ -170,6 +206,10 @@ export default function Explore() {
             ) : null}
           </View>
         )}
+
+        {teachBanner.visible ? <TeachBanner onDismiss={teachBanner.dismiss} /> : null}
+        {/* The end of the page, for the device flow to scroll to when the banner is hidden. */}
+        <View testID="explore-end" style={{ height: 1 }} />
       </View>
     </Screen>
   )

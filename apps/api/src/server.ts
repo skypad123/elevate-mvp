@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server'
 import { createApp } from './app'
 import { createDeps } from './deps'
 import { loadEnv } from './env'
+import { warnOnPendingMigrations } from './lib/migration-check'
 
 const env = loadEnv()
 const deps = await createDeps(env)
@@ -14,6 +15,7 @@ const server = serve({ fetch: app.fetch, port: env.API_PORT }, (info) => {
     storage: env.STORAGE_DRIVER,
     video: env.VIDEO_DRIVER,
   })
+  void warnOnPendingMigrations(deps.db, deps.log)
 })
 
 const shutdown = async () => {

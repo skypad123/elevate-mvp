@@ -43,17 +43,18 @@ cannot corrupt what users already have stored.
   portal applies the stored theme and language before first paint. It is a file loaded by a
   classic `<script src>` in `<head>`, not an inline script, because the deployed sites send
   `script-src 'self'` (ADR 005, `infra/terraform/modules/environment/sites.tf`).
-- Pages that come before Settings can be reached (Teach's application and set-up pages, an
-  invitation link) carry a `PreferencesButton` in their header. It opens the same rows
+- Pages that come before Settings can be reached (the sign-in page of Teach and Support, Teach's
+  application and set-up pages, an invitation link) carry a `PreferencesButton` in their header. It opens the same rows
   (`PreferenceRows`) in a dialog.
 - Learner: `src/lib/preferences.tsx` + platform `preferences-storage(.web).ts`; `ThemeProvider`
   resolves `system | light | dark`, and the splash screen stays up until preferences are loaded.
   The native read and the ready gate are unit-tested with jest-expo and the AsyncStorage mock
   (`apps/learner/src/lib/__tests__/preferences.test.tsx`); `.maestro/learner-preferences.yaml` checks a
   cold relaunch on a simulator via the `app-root-<scheme>` testID on the root view.
-- Not synced to the account for now. If that is wanted later: add `users.preferences jsonb`,
-  `updateMeSchema.preferences = preferencesSchema.partial()`, and merge server values through the
-  same `parseStoredPreferences` — the UI does not change.
+- Not synced to the account for now (amended by
+  [ADR 010](010-locale-resolution-and-email-language.md)). If that is wanted later: add
+  `users.preferences jsonb`, `updateMeSchema.preferences = preferencesSchema.partial()`, and merge
+  server values through the same `parseStoredPreferences` — the UI does not change.
 
 ### i18n is a small typed catalog package, `@elevate/i18n`
 
@@ -64,12 +65,15 @@ cannot corrupt what users already have stored.
   together by `messages/en.ts` and `messages/zh.ts`. A Chinese area is checked against its English
   file with `satisfies`, so a missing or unknown key is a compile error in that file.
 - Translated today: navigation, the Settings/Preferences/Profile screens, and the teaching-profile
-  screens: in Teach the profile switcher and staff banner, the start page, the dashboard, Members,
-  the invitation page, the company application and set-up, the Stripe card and return pages,
+  screens: the sign-in and verify pages of Teach and Support; in Teach the profile switcher and
+  staff banner, the start page, the dashboard, Members, the invitation page, the company
+  application and set-up, the personal application, the Stripe card and return pages,
   Settings, and the review of a writer's held changes; in Support the profiles list, the profile
   page, the company card, the legal-name check and owner recovery; and the text inside the shared
-  shell drawer, uploader, media preview, dialog and toast. Other pages stay English until they are translated whole, as do error messages from the
-  API and emails.
+  shell drawer, uploader, media preview, dialog and toast. The whole learner app is translated
+  (Chinese design, PR 3), and so are the learner emails (ADR 010). Other pages stay English until
+  they are translated whole. Error messages from the API stay English; the learner app words
+  them from their codes instead (ADR 010).
 - `test/catalog.test.ts` fails when a catalog has untranslated keys, unknown keys or mismatched
   placeholders, when two areas define the same key, or when an area is missing from a catalog.
 - Patterns, all without a new i18n API:
@@ -81,10 +85,17 @@ cannot corrupt what users already have stored.
     sentence differently.
   - Plurals are two keys chosen in code: `t(n === 1 ? 'x.one' : 'x.other', { count: n })`.
   - A sentence with a link, a button or bold text in it stays one message with a `{slot}`, filled
-    with React nodes by `fillSlots` from `@elevate/web-ui/preferences`.
+    with React nodes by `fillSlots` from `@elevate/i18n/react` (re-exported by
+    `@elevate/web-ui/preferences`), which the learner app uses too.
   - Dates and lists go through `useFormatDate()` and `useFormatList()`, which follow the language.
   - A failed request is worded by `useErrorMessage()`: the server's message as it is (the API
     answers in English), and the two sentences the client words itself in the chosen language.
+    The learner app instead words every error from its code (`apiError.<code>`), as ADR 010 sets
+    out; the portals move to that when their pages adopt it.
+  - A page may map an `error.code` it knows to a catalog message. The server's sentence stays
+    English and is the fallback for every other code. First used for the sign-in codes
+    (`signInErrorKey` and `useSignInErrorMessage()` in `@elevate/web-ui/portal`), with the
+    `apiError` messages the learner app uses.
 - Chosen over i18next: two locales, three runtimes (Vite ×2, React Native), zero runtime
   dependencies, and compile-time key checking. The catalog has grown from a few dozen strings to
   several hundred and the plural pairs above are still few; if ICU plurals or lazy namespaces
@@ -109,7 +120,7 @@ cannot corrupt what users already have stored.
 - `text-brand` is no longer used for text anywhere; Biome does not enforce this, so review for it
   (`git grep -nP 'text-brand(?![-\w])' -- apps packages` should find only a comment in the tokens).
 - The shared components that carry text (`Dialog`, `Toast`, `MediaUploader`, `MediaPreview`,
-  `FullPageSpinner`) call `useT()`, so they must be rendered inside `PreferencesProvider`. Both
+  `FullPageSpinner`, `SignInPage`, `VerifyPage`) call `useT()`, so they must be rendered inside `PreferencesProvider`. Both
   portals put it outermost in `App.tsx`.
 - A portal's stored language is per origin: Teach and Support each remember their own.
 - Favicons: portals ship `public/favicon.svg` + PNG fallbacks in their brand colour; the learner's

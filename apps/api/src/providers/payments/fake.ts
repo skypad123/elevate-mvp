@@ -22,6 +22,8 @@ type FakeSession = CheckoutSessionInput & {
   /** The key real Stripe would deduplicate on. */
   idempotencyKey: string
   paid: boolean
+  /** Closed by `expireCheckoutSession` before it was paid; it can no longer be paid. */
+  expired: boolean
   paymentIntentId: string
   refundedCents: number
   stripeFeeCents: number
@@ -36,6 +38,7 @@ export class FakePaymentsProvider implements PaymentsProvider {
   readonly accounts = new Map<string, FakeAccount>()
   readonly sessions = new Map<string, FakeSession>()
   readonly refunds: Array<{ refundId: string; paymentIntentId: string; amountCents: number }> = []
+  private readonly refundsByKey = new Map<string, RefundResult>()
   /** Actual Stripe fee the fake reports, in basis points + fixed, so tests can check estimate vs actual. */
   feeBps = 340
   feeFixedCents = 50
@@ -132,7 +135,7 @@ export class FakePaymentsProvider implements PaymentsProvider {
   async createCheckoutSession(input: CheckoutSessionInput): Promise<{ id: string; url: string }> {
     const idempotencyKey = checkoutIdempotencyKey(input)
     const existing = [...this.sessions.values()].find(
-      (s) => s.idempotencyKey === idempotencyKey && !s.paid,
+      (s) => s.idempotencyKey === idempotencyKey && !s.paid && !s.expired,
     )
     if (existing)
       return { id: existing.id, url: `https://checkout.fake-stripe.test/${existing.id}` }
@@ -141,9 +144,12 @@ export class FakePaymentsProvider implements PaymentsProvider {
       Math.round((input.amountCents * this.feeBps) / 10000) + this.feeFixedCents
     this.sessions.set(id, {
       ...input,
+      // Stripe does not store a metadata key whose value is empty.
+      metadata: Object.fromEntries(Object.entries(input.metadata).filter(([, v]) => v !== '')),
       id,
       idempotencyKey,
       paid: false,
+      expired: false,
       paymentIntentId: `pi_fake_${this.counter}`,
       refundedCents: 0,
       stripeFeeCents,
@@ -155,8 +161,8 @@ export class FakePaymentsProvider implements PaymentsProvider {
     if (!s) throw new Error(`no such session ${sessionId}`)
     return {
       id: s.id,
-      url: s.paid ? null : `https://checkout.fake-stripe.test/${s.id}`,
-      status: s.paid ? 'complete' : 'open',
+      url: s.paid || s.expired ? null : `https://checkout.fake-stripe.test/${s.id}`,
+      status: s.paid ? 'complete' : s.expired ? 'expired' : 'open',
       paymentStatus: s.paid ? 'paid' : 'unpaid',
       paymentIntentId: s.paid ? s.paymentIntentId : null,
       amountTotal: s.amountCents,
@@ -164,10 +170,17 @@ export class FakePaymentsProvider implements PaymentsProvider {
       metadata: s.metadata,
     }
   }
-  /** Simulates the learner paying. */
+  async expireCheckoutSession(sessionId: string): Promise<CheckoutSessionResult> {
+    const s = this.sessions.get(sessionId)
+    if (!s) throw new Error(`no such session ${sessionId}`)
+    if (!s.paid) s.expired = true
+    return this.retrieveCheckoutSession(sessionId)
+  }
+  /** Simulates the learner paying. Like Stripe, an expired session cannot be paid. */
   completeCheckout(sessionId: string): PaymentsWebhookEvent {
     const s = this.sessions.get(sessionId)
     if (!s) throw new Error(`no such session ${sessionId}`)
+    if (s.expired) throw new Error(`session ${sessionId} has expired`)
     s.paid = true
     return {
       id: `evt_cs_${sessionId}_${++this.counter}`,
@@ -200,14 +213,21 @@ export class FakePaymentsProvider implements PaymentsProvider {
       amountCents: s.amountCents,
     }
   }
-  async createRefund(input: { paymentIntentId: string }): Promise<RefundResult> {
+  async createRefund(input: {
+    paymentIntentId: string
+    idempotencyKey?: string
+  }): Promise<RefundResult> {
+    const earlier = input.idempotencyKey ? this.refundsByKey.get(input.idempotencyKey) : undefined
+    if (earlier) return earlier
     const s = [...this.sessions.values()].find((x) => x.paymentIntentId === input.paymentIntentId)
     if (!s) throw new Error(`no such payment intent ${input.paymentIntentId}`)
     const amountCents = s.amountCents - s.refundedCents
     s.refundedCents = s.amountCents
     const refundId = `re_fake_${++this.counter}`
     this.refunds.push({ refundId, paymentIntentId: input.paymentIntentId, amountCents })
-    return { refundId, amountCents, status: 'succeeded' }
+    const result = { refundId, amountCents, status: 'succeeded' }
+    if (input.idempotencyKey) this.refundsByKey.set(input.idempotencyKey, result)
+    return result
   }
   /** The charge.refunded event Stripe would send after createRefund. */
   refundedEvent(paymentIntentId: string): PaymentsWebhookEvent {

@@ -24,6 +24,12 @@ variable "github_repo" {
   type        = string
 }
 
+variable "github_oidc_subject_prefix" {
+  description = "Start of the sub claim in GitHub's OIDC token for this repository. With immutable subjects it is repo:<owner>@<owner_id>/<repo>@<repo_id> (see `gh api repos/<owner>/<repo>/actions/oidc/customization/sub`). Defaults to repo:<github_repo>."
+  type        = string
+  default     = null
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the environment's VPC."
   type        = string
@@ -114,10 +120,39 @@ variable "protect_data" {
   default     = false
 }
 
+# ── Private access (Tailscale) ──────────────────────────────────────────────
+
+variable "private_access" {
+  description = <<-EOT
+    Serve the three sites and the API only to the tailnet: a Tailscale App Connector instance in
+    this VPC gives the tailnet one fixed public IP, and CloudFront and the load balancer answer 403
+    to everyone else. Stripe and Mux webhooks and /api/health stay public. See infra/README.md.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "private_access_extra_cidrs" {
+  description = "IPv4 CIDRs let in besides the connector, e.g. an office IP as a fallback when the connector is down. At most 4: a load balancer rule holds 5 addresses, one of them the connector's."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = length(var.private_access_extra_cidrs) <= 4 && alltrue([for c in var.private_access_extra_cidrs : can(cidrnetmask(c))])
+    error_message = "private_access_extra_cidrs takes at most 4 IPv4 CIDRs, such as 203.0.113.7/32."
+  }
+}
+
 # ── Static sites ────────────────────────────────────────────────────────────
 
 variable "csp_report_only" {
   description = "Send the Content-Security-Policy as Report-Only. Start with true, check the browser console on each site, then switch to false."
+  type        = bool
+  default     = true
+}
+
+variable "course_previews" {
+  description = "Whether the API makes and returns hover-preview clips for course cards."
   type        = bool
   default     = true
 }

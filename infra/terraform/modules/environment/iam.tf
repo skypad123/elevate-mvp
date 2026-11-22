@@ -80,7 +80,7 @@ data "aws_iam_policy_document" "github_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:environment:${var.environment}"]
+      values   = ["${coalesce(var.github_oidc_subject_prefix, "repo:${var.github_repo}")}:environment:${var.environment}"]
     }
   }
 }
@@ -91,6 +91,12 @@ resource "aws_iam_role" "deploy" {
 }
 
 data "aws_iam_policy_document" "deploy" {
+  statement {
+    sid       = "ReadTerraformFingerprint"
+    actions   = ["ssm:GetParameter"]
+    resources = [aws_ssm_parameter.terraform_fingerprint.arn]
+  }
+
   statement {
     sid       = "EcrLogin"
     actions   = ["ecr:GetAuthorizationToken"]

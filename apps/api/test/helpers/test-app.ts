@@ -1,3 +1,4 @@
+import type { Locale } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { createPgliteDb } from '@elevate/db/pglite'
 import { eq } from 'drizzle-orm'
@@ -67,12 +68,21 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     return { status: res.status, body: body as T, res }
   }
 
-  async function signIn(email: string, audience: 'learner' | 'teach' | 'support' = 'learner') {
-    const requested = await api('POST', '/api/auth/magic-link', { body: { email, audience } })
+  /** Signs in by code. `opts` is the device's language, sent as the learner app sends it. */
+  async function signIn(
+    email: string,
+    audience: 'learner' | 'teach' | 'support' = 'learner',
+    opts: { locale?: Locale; localeChosen?: boolean } = {},
+  ) {
+    const requested = await api('POST', '/api/auth/magic-link', {
+      body: { email, audience, locale: opts.locale },
+    })
     if (requested.status !== 200)
       throw new Error(`magic link request failed: ${JSON.stringify(requested.body)}`)
     const code = requested.body.dev.code as string
-    const verified = await api('POST', '/api/auth/verify', { body: { email, code } })
+    const verified = await api('POST', '/api/auth/verify', {
+      body: { email, code, locale: opts.locale, localeChosen: opts.localeChosen },
+    })
     return {
       status: verified.status,
       body: verified.body,
@@ -209,10 +219,41 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
 
   let courseCounter = 0
   let companyCounter = 0
+  let videoCounter = 0
+
+  /**
+   * A ready Mux video of the profile, with no item, written straight to the database. Returns its
+   * media ID.
+   */
+  async function createVideoMedia(
+    profileId: string,
+    { seconds = 60, previewFetches = 0 }: { seconds?: number; previewFetches?: number } = {},
+  ) {
+    const n = ++videoCounter
+    const [media] = await db
+      .insert(s.mediaAssets)
+      .values({
+        profileId,
+        kind: 'video',
+        provider: 'mux',
+        status: 'ready',
+        playbackId: `pb_fixture_${n}`,
+        durationSeconds: seconds,
+        previewFetches,
+        filename: `fixture-video-${n}.mp4`,
+        mimeType: 'video/mp4',
+      })
+      .returning()
+    if (!media) throw new Error('failed to create video media')
+    return media.id
+  }
 
   /**
    * A course with two lessons, a text artefact in the first and a quiz in the second, written
    * straight to the database. Enough content for every builder route to have something to act on.
+   *
+   * `videos: 1` adds a video item to the first lesson, and `videos: 2` one to the second lesson
+   * too, each after the item already there, with its own ready Mux video of `videoSeconds`.
    */
   async function createCourse(
     profileId: string,
@@ -220,6 +261,8 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
       title?: string
       status?: 'draft' | 'pending_review' | 'live' | 'rejected'
       priceCents?: number
+      videos?: 0 | 1 | 2
+      videoSeconds?: number
     } = {},
   ) {
     const status = options.status ?? 'draft'
@@ -268,7 +311,27 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
       .values({ artefactId: quizArtefact.id, questionsJson: [] })
       .returning()
     if (!quiz) throw new Error('failed to create quiz')
+    const videos: Array<{ artefactId: string; mediaId: string }> = []
+    for (const [index, lessonId] of [lessonA.id, lessonB.id]
+      .slice(0, options.videos ?? 0)
+      .entries()) {
+      const mediaId = await createVideoMedia(profileId, { seconds: options.videoSeconds ?? 60 })
+      const [item] = await db
+        .insert(s.artefacts)
+        .values({
+          lessonId,
+          type: 'video',
+          title: `Fixture video ${index + 1}`,
+          position: 1,
+          mediaAssetId: mediaId,
+          durationSeconds: options.videoSeconds ?? 60,
+        })
+        .returning()
+      if (!item) throw new Error('failed to create video item')
+      videos.push({ artefactId: item.id, mediaId })
+    }
     return {
+      videos,
       courseId: course.id,
       slug: course.slug,
       lessonA: lessonA.id,
@@ -312,6 +375,7 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     grantRole,
     createProfile,
     createCourse,
+    createVideoMedia,
     addMember,
     enrol,
     makePayable,

@@ -1,26 +1,33 @@
-import { emailSchema } from '@elevate/core'
+import { emailSchema, isChosen } from '@elevate/core'
+import { fillSlots } from '@elevate/i18n/react'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { ArrowRight, MailCheck } from 'lucide-react-native'
 import { useState } from 'react'
 import { Platform, View } from 'react-native'
+import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { api } from '@/lib/api'
-import { errorMessage, unwrap } from '@/lib/api-error'
+import { unwrap, useErrorMessage } from '@/lib/api-error'
+import { usePreferences } from '@/lib/preferences'
 import { useSession } from '@/lib/session'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Button, Card, CodeInput, Input, Logo, Screen, Text } from '@/ui'
 
 type Step = { kind: 'email' } | { kind: 'code'; email: string }
+/** Kept as data and worded at render, so a language switch rewords a shown error. */
+type SignInError = { kind: 'invalidEmail' } | { kind: 'api'; error: unknown } | null
 
 export default function SignIn() {
   const theme = useTheme()
   const router = useRouter()
   const { signIn } = useSession()
+  const { locale, preferences, t } = usePreferences()
+  const errorMessage = useErrorMessage()
   const { redirect } = useLocalSearchParams<{ redirect?: string }>()
   const [step, setStep] = useState<Step>({ kind: 'email' })
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<SignInError>(null)
 
   const redirectPath =
     typeof redirect === 'string' && redirect.startsWith('/') ? redirect : undefined
@@ -28,7 +35,7 @@ export default function SignIn() {
   async function requestLink() {
     const parsed = emailSchema.safeParse(email)
     if (!parsed.success) {
-      setError('Enter a valid email address')
+      setError({ kind: 'invalidEmail' })
       return
     }
     setBusy(true)
@@ -36,13 +43,13 @@ export default function SignIn() {
     try {
       await unwrap(
         await api.auth['magic-link'].$post({
-          json: { email: parsed.data, audience: 'learner', redirectPath },
+          json: { email: parsed.data, audience: 'learner', redirectPath, locale },
         }),
       )
       setStep({ kind: 'code', email: parsed.data })
       setCode('')
     } catch (e) {
-      setError(errorMessage(e))
+      setError({ kind: 'api', error: e })
     } finally {
       setBusy(false)
     }
@@ -54,35 +61,49 @@ export default function SignIn() {
     setError(null)
     try {
       const result = await unwrap(
-        await api.auth.verify.$post({ json: { email: step.email, code: value } }),
+        await api.auth.verify.$post({
+          json: {
+            email: step.email,
+            code: value,
+            locale,
+            localeChosen: isChosen(preferences.locale),
+          },
+        }),
       )
       await signIn(result.token, result.user)
       router.replace((result.redirectPath ?? redirectPath ?? '/') as never)
     } catch (e) {
-      setError(errorMessage(e))
+      setError({ kind: 'api', error: e })
       setCode('')
     } finally {
       setBusy(false)
     }
   }
 
+  const errorText =
+    error === null
+      ? null
+      : error.kind === 'invalidEmail'
+        ? t('learnerAuth.email.invalid')
+        : errorMessage(error.error)
+
   return (
     <Screen maxWidth={520} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
       <View style={{ gap: theme.space[6] }}>
         <Logo size="lg" />
+        <LanguageSwitch />
         {step.kind === 'email' ? (
           <Card style={{ gap: theme.space[5] }}>
             <View style={{ gap: theme.space[2] }}>
               <Text variant="eyebrow" tone="tertiary">
-                Sign in or create an account
+                {t('learnerAuth.email.eyebrow')}
               </Text>
-              <Text variant="h1">Pick up where you left off.</Text>
-              <Text tone="secondary">
-                We will email you a one-time link and a 6-digit code. No passwords.
-              </Text>
+              <Text variant="h1">{t('learnerAuth.email.title')}</Text>
+              <Text tone="secondary">{t('learnerAuth.email.body')}</Text>
             </View>
             <Input
-              label="Email"
+              testID="sign-in-email"
+              label={t('learnerAuth.email.label')}
               value={email}
               onChangeText={setEmail}
               onSubmitEditing={requestLink}
@@ -92,12 +113,13 @@ export default function SignIn() {
               keyboardType="email-address"
               inputMode="email"
               textContentType="emailAddress"
-              placeholder="you@example.com"
-              error={error}
+              placeholder={t('learnerAuth.email.placeholder')}
+              error={errorText}
               returnKeyType="send"
             />
             <Button
-              label="Email me a sign-in code"
+              testID="sign-in-request"
+              label={t('learnerAuth.email.request')}
               variant="accent"
               size="lg"
               iconRight={ArrowRight}
@@ -106,7 +128,7 @@ export default function SignIn() {
               fullWidth
             />
             <Text variant="small" tone="tertiary">
-              By continuing you agree to the Elevate terms. Teachers sign in at Elevate Teach.
+              {t('learnerAuth.email.terms')}
             </Text>
           </Card>
         ) : (
@@ -115,18 +137,26 @@ export default function SignIn() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <MailCheck size={20} color={theme.colors.brand} />
                 <Text variant="eyebrow" tone="brand">
-                  Check your inbox
+                  {t('learnerAuth.code.eyebrow')}
                 </Text>
               </View>
-              <Text variant="h2">Enter the 6-digit code</Text>
+              <Text variant="h2" testID="sign-in-code-title">
+                {t('learnerAuth.code.title')}
+              </Text>
               <Text tone="secondary">
-                We sent it to <Text variant="bodyStrong">{step.email}</Text>.
-                {Platform.OS === 'web' ? ' You can also click the link in the email.' : ''}
+                {fillSlots(
+                  t(
+                    Platform.OS === 'web'
+                      ? 'learnerAuth.code.sentToWeb'
+                      : 'learnerAuth.code.sentTo',
+                  ),
+                  { email: <Text variant="bodyStrong">{step.email}</Text> },
+                )}
               </Text>
             </View>
-            <CodeInput value={code} onChange={setCode} onComplete={verifyCode} error={error} />
+            <CodeInput value={code} onChange={setCode} onComplete={verifyCode} error={errorText} />
             <Button
-              label="Verify"
+              label={t('learnerAuth.code.verify')}
               variant="primary"
               size="lg"
               loading={busy}
@@ -142,13 +172,13 @@ export default function SignIn() {
               }}
             >
               <Button
-                label="Use a different email"
+                label={t('learnerAuth.code.changeEmail')}
                 variant="ghost"
                 size="sm"
                 onPress={() => setStep({ kind: 'email' })}
               />
               <Button
-                label="Resend code"
+                label={t('learnerAuth.code.resend')}
                 variant="ghost"
                 size="sm"
                 onPress={requestLink}
@@ -158,7 +188,7 @@ export default function SignIn() {
           </Card>
         )}
         <Link href="/" asChild>
-          <Button label="Browse courses without signing in" variant="ghost" />
+          <Button label={t('learnerAuth.browse')} variant="ghost" />
         </Link>
       </View>
     </Screen>

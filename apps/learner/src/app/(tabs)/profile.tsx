@@ -4,8 +4,9 @@ import { LogOut } from 'lucide-react-native'
 import { useState } from 'react'
 import { View } from 'react-native'
 import { TAB_BAR_HEIGHT } from '@/components/PillTabBar'
+import { TeachProfileRow } from '@/components/TeachProfileRow'
 import { api } from '@/lib/api'
-import { errorMessage, unwrap } from '@/lib/api-error'
+import { unwrap, useErrorMessage } from '@/lib/api-error'
 import { usePreferences } from '@/lib/preferences'
 import { useBreakpoint } from '@/lib/responsive'
 import { useSession } from '@/lib/session'
@@ -15,21 +16,23 @@ import { Avatar, Badge, Button, Card, Chip, Input, Screen, Text } from '@/ui'
 export default function Profile() {
   const theme = useTheme()
   const { isWideWeb } = useBreakpoint()
-  const { user, signOut, refreshUser } = useSession()
+  const { user, signOut, refreshUser, chooseLocale } = useSession()
   const { preferences, setPreference, t } = usePreferences()
+  const errorMessage = useErrorMessage()
   const [name, setName] = useState(user?.name ?? '')
   const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null)
+  // The save's outcome; a failure keeps the error and is worded when shown
+  const [result, setResult] = useState<{ ok: true } | { ok: false; error: unknown } | null>(null)
 
   async function save() {
     setSaving(true)
-    setMessage(null)
+    setResult(null)
     try {
       await unwrap(await api.me.$patch({ json: { name: name.trim() } }))
       await refreshUser()
-      setMessage({ tone: 'success', text: t('profile.saved') })
+      setResult({ ok: true })
     } catch (e) {
-      setMessage({ tone: 'danger', text: errorMessage(e) })
+      setResult({ ok: false, error: e })
     } finally {
       setSaving(false)
     }
@@ -63,6 +66,8 @@ export default function Profile() {
             onChangeText={setName}
             placeholder={t('profile.name.placeholder')}
             autoCapitalize="words"
+            // The API's limit, so a long name can't fail validation
+            maxLength={120}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[3] }}>
             <Button
@@ -71,9 +76,9 @@ export default function Profile() {
               loading={saving}
               disabled={!name.trim() || name.trim() === (user?.name ?? '')}
             />
-            {message ? (
-              <Text variant="small" tone={message.tone}>
-                {message.text}
+            {result ? (
+              <Text variant="small" tone={result.ok ? 'success' : 'danger'}>
+                {result.ok ? t('profile.saved') : errorMessage(result.error)}
               </Text>
             ) : null}
           </View>
@@ -101,6 +106,7 @@ export default function Profile() {
                 <Chip
                   key={option}
                   role="radio"
+                  testID={`theme-${option}`}
                   label={t(`prefs.theme.${option}`)}
                   selected={preferences.theme === option}
                   onPress={() => setPreference('theme', option)}
@@ -118,18 +124,23 @@ export default function Profile() {
               accessibilityLabel={t('prefs.language')}
               style={{ flexDirection: 'row', gap: theme.space[2], flexWrap: 'wrap' }}
             >
-              {supportedLocales.map((locale) => (
+              {([...supportedLocales, 'system'] as const).map((option) => (
                 <Chip
-                  key={locale}
+                  key={option}
                   role="radio"
-                  label={localeNames[locale]}
-                  selected={preferences.locale === locale}
-                  onPress={() => setPreference('locale', locale)}
+                  testID={`profile-lang-${option}`}
+                  // A language's own name is in that language
+                  lang={option === 'system' ? undefined : option}
+                  label={option === 'system' ? t('prefs.language.system') : localeNames[option]}
+                  selected={preferences.locale === option}
+                  onPress={() => chooseLocale(option)}
                 />
               ))}
             </View>
           </View>
         </Card>
+
+        <TeachProfileRow />
 
         <Card style={{ gap: theme.space[3] }}>
           <Text variant="h3">{t('account.title')}</Text>

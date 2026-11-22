@@ -2,9 +2,10 @@ import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { ShieldCheck, ShieldX } from 'lucide-react-native'
 import { Pressable, View } from 'react-native'
 import { CertificateActions, CertificateCard } from '@/components/CertificateCard'
-import { errorMessage } from '@/lib/api-error'
+import { useErrorMessage } from '@/lib/api-error'
 import { formatDate } from '@/lib/format'
 import { useCertificateVerification } from '@/lib/learning'
+import { usePreferences } from '@/lib/preferences'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Button, EmptyState, Logo, Screen, Skeleton, Text } from '@/ui'
 
@@ -13,6 +14,8 @@ export default function VerifyCertificate() {
   const { token = '' } = useLocalSearchParams<{ token: string }>()
   const theme = useTheme()
   const router = useRouter()
+  const { t, locale } = usePreferences()
+  const errorMessage = useErrorMessage()
   const query = useCertificateVerification(token)
 
   let body: React.ReactNode
@@ -27,9 +30,9 @@ export default function VerifyCertificate() {
     body = (
       <EmptyState
         tone="danger"
-        title="Could not check this certificate"
+        title={t('learnerCertificate.verify.loadFailed.title')}
         body={errorMessage(query.error)}
-        action={{ label: 'Try again', onPress: () => query.refetch() }}
+        action={{ label: t('learnerCommon.error.retry'), onPress: () => query.refetch() }}
       />
     )
   } else if (!query.data.valid) {
@@ -38,13 +41,22 @@ export default function VerifyCertificate() {
       <EmptyState
         icon={ShieldX}
         tone="danger"
-        title={invalid.reason === 'revoked' ? 'Certificate revoked' : 'Certificate not found'}
+        title={t(
+          invalid.reason === 'revoked'
+            ? 'learnerCertificate.verify.revoked.title'
+            : 'learnerCertificate.verify.notFound.title',
+        )}
         body={
           invalid.reason === 'revoked'
-            ? `This certificate was withdrawn by Elevate on ${formatDate(invalid.revokedAt)} and is no longer valid.`
-            : 'No certificate matches this link. Check the address, or ask the holder for the link printed on their PDF.'
+            ? t('learnerCertificate.verify.revoked.body', {
+                date: formatDate(invalid.revokedAt, locale),
+              })
+            : t('learnerCertificate.verify.notFound.body')
         }
-        action={{ label: 'Explore courses', onPress: () => router.replace('/') }}
+        action={{
+          label: t('learnerCertificate.verify.notFound.action'),
+          onPress: () => router.replace('/'),
+        }}
       />
     )
   } else {
@@ -54,19 +66,17 @@ export default function VerifyCertificate() {
         <View style={{ gap: theme.space[2] }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[2] }}>
             <ShieldCheck size={24} color={theme.colors.success} />
-            <Text variant="h1">Verified certificate</Text>
+            <Text variant="h1">{t('learnerCertificate.verify.title')}</Text>
           </View>
           <Text tone="secondary">
-            Elevate confirms this certificate is genuine: it was issued when{' '}
-            {certificate.learnerName} completed every lesson and passed every quiz in this course.
-            Anyone with this link can check it, no account needed.
+            {t('learnerCertificate.verify.body', { name: certificate.learnerName })}
           </Text>
         </View>
         <CertificateCard certificate={certificate} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[3] }}>
           <CertificateActions certificate={certificate} share={false} />
           <Button
-            label="View the course"
+            label={t('learnerCertificate.verify.viewCourse')}
             variant="ghost"
             onPress={() => router.push(`/course/${courseSlug}`)}
           />

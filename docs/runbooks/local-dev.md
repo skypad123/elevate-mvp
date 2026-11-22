@@ -18,6 +18,9 @@ npm run db:seed
 npm run dev                     # api :4400 · learner web :8081 · teach :5173 · support :5174
 ```
 
+To run the toolchain in a Linux container instead, and to work on it from another machine, see
+[dev-container.md](dev-container.md).
+
 ## Signing in
 
 Magic links are delivered to Mailpit (http://localhost:8025). Each email carries a link (web) and a
@@ -50,10 +53,12 @@ with a new address, then approve it and run the legal-name check in Support
 | Support            | http://localhost:5174            |
 | Mailpit            | http://localhost:8025            |
 
+Hover previews need Mux. With the default local video driver no clip is made.
+
 ## Mobile
 
 Open the learner app in Expo Go from the Metro QR code. The app targets the API on the same host as
-Metro (port 4000) by default, so a phone on the same Wi-Fi works without configuration. To override,
+Metro (port 4400) by default, so a phone on the same Wi-Fi works without configuration. To override,
 create `apps/learner/.env` with `EXPO_PUBLIC_API_URL=http://<lan-ip>:4400`.
 
 ## Useful commands

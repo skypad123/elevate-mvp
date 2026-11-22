@@ -6,23 +6,38 @@
  * together here. Keys are flat, dot-separated and start with their area. `{name}` placeholders
  * are interpolated by `translate`.
  *
- * Translated today: navigation, the Settings/Preferences/Profile screens, and the teaching-profile
- * screens of Teach and Support (the Teach dashboard and start page, members, invitations, held
- * changes, company application and set-up, Support's profile pages). Other pages are still English.
+ * Translated today: the whole learner app; navigation, the Settings/Preferences/Profile screens,
+ * and the teaching-profile screens of Teach and Support (the Teach dashboard and start page,
+ * members, invitations, held changes, the personal and company applications and set-up, Support's
+ * profile pages), the sign-in and verify pages of Teach and Support, and the learner emails. Other
+ * pages are still English. The `apiError` area words the API's
+ * error codes (ADR 010).
  *
  * To add an area: write the two files, then add it to `enAreas` and to `en` below, and to the
  * same two places in `zh.ts`. `test/catalog.test.ts` fails if the two lists disagree or if two
  * areas define the same key.
  */
+import { apiErrorEn } from './areas/apiError.en'
 import { applicationEn } from './areas/application.en'
 import { changesEn } from './areas/changes.en'
 import { chromeEn } from './areas/chrome.en'
 import { commonEn } from './areas/common.en'
 import { companyApplyEn } from './areas/companyApply.en'
 import { domainEn } from './areas/domain.en'
+import { emailEn } from './areas/email.en'
 import { invitationEn } from './areas/invitation.en'
+import { learnerAuthEn } from './areas/learnerAuth.en'
+import { learnerCertificateEn } from './areas/learnerCertificate.en'
+import { learnerCheckoutEn } from './areas/learnerCheckout.en'
+import { learnerCommonEn } from './areas/learnerCommon.en'
+import { learnerCourseEn } from './areas/learnerCourse.en'
+import { learnerExploreEn } from './areas/learnerExplore.en'
+import { learnerLearnEn } from './areas/learnerLearn.en'
+import { learnerTeachEn } from './areas/learnerTeach.en'
 import { membersEn } from './areas/members.en'
 import { paymentsEn } from './areas/payments.en'
+import { personalApplyEn } from './areas/personalApply.en'
+import { portalAuthEn } from './areas/portalAuth.en'
 import { supportCompanyEn } from './areas/supportCompany.en'
 import { supportProfileEn } from './areas/supportProfile.en'
 import { supportProfilesEn } from './areas/supportProfiles.en'
@@ -43,12 +58,24 @@ export const enAreas: readonly Readonly<Record<string, string>>[] = [
   membersEn,
   invitationEn,
   companyApplyEn,
+  personalApplyEn,
+  portalAuthEn,
   applicationEn,
   changesEn,
   supportProfilesEn,
   supportProfileEn,
   supportCompanyEn,
   supportRecoveryEn,
+  apiErrorEn,
+  learnerCommonEn,
+  learnerExploreEn,
+  learnerAuthEn,
+  learnerCourseEn,
+  learnerCheckoutEn,
+  learnerLearnEn,
+  learnerTeachEn,
+  learnerCertificateEn,
+  emailEn,
 ]
 
 export const en = {
@@ -62,10 +89,22 @@ export const en = {
   ...membersEn,
   ...invitationEn,
   ...companyApplyEn,
+  ...personalApplyEn,
+  ...portalAuthEn,
   ...applicationEn,
   ...changesEn,
   ...supportProfilesEn,
   ...supportProfileEn,
   ...supportCompanyEn,
   ...supportRecoveryEn,
+  ...apiErrorEn,
+  ...learnerCommonEn,
+  ...learnerExploreEn,
+  ...learnerAuthEn,
+  ...learnerCourseEn,
+  ...learnerCheckoutEn,
+  ...learnerLearnEn,
+  ...learnerTeachEn,
+  ...learnerCertificateEn,
+  ...emailEn,
 } as const

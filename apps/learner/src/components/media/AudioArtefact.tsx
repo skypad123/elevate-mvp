@@ -2,6 +2,7 @@ import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-au
 import { Pause, Play, RotateCcw } from 'lucide-react-native'
 import { useEffect, useRef } from 'react'
 import { Pressable, View } from 'react-native'
+import { usePreferences } from '@/lib/preferences'
 import { useTheme } from '@/theme/ThemeProvider'
 import { ProgressBar } from '@/ui/ProgressBar'
 import { Text } from '@/ui/Text'
@@ -29,6 +30,7 @@ export function AudioArtefact({
   onEnded,
 }: AudioArtefactProps) {
   const theme = useTheme()
+  const { t } = usePreferences()
   const player = useAudioPlayer({ uri: url })
   const status = useAudioPlayerStatus(player)
   const lastSent = useRef(-1)
@@ -72,13 +74,15 @@ export function AudioArtefact({
       }}
     >
       <Text variant="eyebrow" tone="tertiary">
-        Audio lesson
+        {t('learnerLearn.audio.eyebrow')}
       </Text>
       <Text variant="h3">{title}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[3] }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={status.playing ? 'Pause' : 'Play'}
+          accessibilityLabel={
+            status.playing ? t('learnerLearn.audio.pause') : t('learnerLearn.audio.play')
+          }
           onPress={() => (status.playing ? player.pause() : player.play())}
           style={{
             width: 52,
@@ -108,7 +112,7 @@ export function AudioArtefact({
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Restart"
+          accessibilityLabel={t('learnerLearn.audio.restart')}
           onPress={() => player.seekTo(0).catch(() => {})}
           hitSlop={8}
         >

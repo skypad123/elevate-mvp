@@ -32,6 +32,16 @@ export const courses = snakeCase.table(
     descriptionJson: jsonb().$type<RichTextDoc>(),
     category: text().notNull(),
     thumbnailMediaId: uuid().references(() => mediaAssets.id, { onDelete: 'set null' }),
+    // The hover preview (docs/adr/011-course-preview-clips.md). The first three are the teacher's
+    // setting: an empty video or start means the default. The last three are kept by
+    // `CoursePreviewService` alone: the stored clip's key, and the video and start it was cut
+    // from. A key with an empty source record is a clip that is hidden, its file still to delete.
+    previewEnabled: boolean().notNull().default(true),
+    previewMediaId: uuid().references(() => mediaAssets.id, { onDelete: 'set null' }),
+    previewStartSeconds: integer(),
+    previewKey: text(),
+    previewSourceMediaId: uuid().references(() => mediaAssets.id, { onDelete: 'set null' }),
+    previewSourceStartSeconds: integer(),
     priceCents: integer().notNull().default(0),
     currency: text().notNull().default('sgd'),
     status: courseStatusEnum().notNull().default('draft'),
@@ -53,6 +63,10 @@ export const courses = snakeCase.table(
     index().on(t.status, t.publishedAt),
     index().on(t.status, t.enrolCount),
     check('courses_price_cents_non_negative', sql`${t.priceCents} >= 0`),
+    check(
+      'courses_preview_start_seconds_non_negative',
+      sql`${t.previewStartSeconds} is null or ${t.previewStartSeconds} >= 0`,
+    ),
   ],
 )
 

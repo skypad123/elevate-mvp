@@ -6,7 +6,7 @@ on:
   pull_request:
     paths: ["infra/**", ".github/workflows/infra.yml"]
   push:
-    branches: [main, v0, staging, production]
+    branches: [main, staging, production]
     paths: ["infra/**", ".github/workflows/infra.yml"]
 
 concurrency:

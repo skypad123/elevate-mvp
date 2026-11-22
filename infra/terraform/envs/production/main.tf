@@ -63,6 +63,12 @@ variable "github_repo" {
   type        = string
 }
 
+variable "github_oidc_subject_prefix" {
+  description = "From `gh api repos/<owner>/<repo>/actions/oidc/customization/sub` (sub_claim_prefix)."
+  type        = string
+  default     = null
+}
+
 variable "integrations" {
   description = "Switch on Resend, Stripe and Mux once their SSM parameters hold real keys."
   type = object({
@@ -83,6 +89,11 @@ variable "csp_report_only" {
   default = true
 }
 
+variable "course_previews" {
+  type    = bool
+  default = true
+}
+
 module "environment" {
   source = "../../modules/environment"
 
@@ -91,14 +102,16 @@ module "environment" {
     aws.us_east_1 = aws.us_east_1
   }
 
-  environment = "production"
-  root_domain = var.root_domain
-  github_repo = var.github_repo
-  vpc_cidr    = "10.30.0.0/16"
+  environment                = "production"
+  root_domain                = var.root_domain
+  github_repo                = var.github_repo
+  github_oidc_subject_prefix = var.github_oidc_subject_prefix
+  vpc_cidr                   = "10.30.0.0/16"
 
   integrations           = var.integrations
   seed_super_admin_email = var.seed_super_admin_email
   csp_report_only        = var.csp_report_only
+  course_previews        = var.course_previews
 
   # Data is protected: deletion protection, a final snapshot, a week of backups, versioned uploads.
   # Turn on db_multi_az when downtime during an AZ failure or maintenance is no longer acceptable.

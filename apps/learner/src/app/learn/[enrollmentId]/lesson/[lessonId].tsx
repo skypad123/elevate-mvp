@@ -18,9 +18,10 @@ import { AudioArtefact } from '@/components/media/AudioArtefact'
 import { VideoArtefact } from '@/components/media/VideoArtefact'
 import { QuizRunner } from '@/components/QuizRunner'
 import { RichText } from '@/components/RichText'
-import { ApiError, errorMessage } from '@/lib/api-error'
+import { ApiError, useErrorMessage } from '@/lib/api-error'
 import { formatMinutes } from '@/lib/format'
 import { learningKeys, saveProgress, useEnrollment, useLesson } from '@/lib/learning'
+import { usePreferences } from '@/lib/preferences'
 import { useBreakpoint } from '@/lib/responsive'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Badge, Button, Card, EmptyState, ProgressBar, Screen, Skeleton, Text } from '@/ui'
@@ -42,6 +43,8 @@ export default function LessonPlayer() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { isLg } = useBreakpoint()
+  const { t } = usePreferences()
+  const errorMessage = useErrorMessage()
   const lesson = useLesson(enrollmentId, lessonId)
   const enrollment = useEnrollment(enrollmentId)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -142,11 +145,13 @@ export default function LessonPlayer() {
         <EmptyState
           icon={Lock}
           tone={locked ? 'neutral' : 'danger'}
-          eyebrow={locked ? 'Locked' : undefined}
-          title={locked ? 'Finish the earlier lessons first' : 'Could not load this lesson'}
+          eyebrow={locked ? t('learnerLearn.lesson.locked.eyebrow') : undefined}
+          title={
+            locked ? t('learnerLearn.lesson.locked.title') : t('learnerLearn.lesson.loadError')
+          }
           body={errorMessage(lesson.error)}
           action={{
-            label: 'Back to course',
+            label: t('learnerLearn.backToCourse'),
             onPress: () => router.replace(`/learn/${enrollmentId}`),
           }}
         />
@@ -204,12 +209,16 @@ export default function LessonPlayer() {
             </View>
             <View style={{ flex: 1 }}>
               <Text variant="smallStrong" numberOfLines={1} tone={isActive ? 'brand' : 'ink'}>
-                {i + 1}. {a.title}
+                {t('learnerLearn.numbered', { number: i + 1, title: a.title })}
               </Text>
               <Text variant="caption" tone="tertiary">
-                {a.type}
-                {a.durationSeconds ? ` · ${formatMinutes(a.durationSeconds)}` : ''}
-                {a.progress.status === 'in_progress' ? ' · in progress' : ''}
+                {[
+                  t(`learnerLearn.artefactType.${a.type}`),
+                  formatMinutes(a.durationSeconds, t),
+                  a.progress.status === 'in_progress' ? t('learnerLearn.lesson.inProgress') : '',
+                ]
+                  .filter(Boolean)
+                  .join(t('learnerLearn.meta.separator'))}
               </Text>
             </View>
           </Pressable>
@@ -221,9 +230,11 @@ export default function LessonPlayer() {
   const content = active ? (
     <View style={{ gap: theme.space[4] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[2] }}>
-        <Badge label={active.type} tone="neutral" />
-        {active.progress.status === 'completed' ? <Badge label="Completed" tone="success" /> : null}
-        {active.durationSeconds ? <Badge label={formatMinutes(active.durationSeconds)} /> : null}
+        <Badge label={t(`learnerLearn.artefactType.${active.type}`)} tone="neutral" />
+        {active.progress.status === 'completed' ? (
+          <Badge label={t('learnerLearn.completed')} tone="success" />
+        ) : null}
+        {active.durationSeconds ? <Badge label={formatMinutes(active.durationSeconds, t)} /> : null}
       </View>
       <Text variant="h2">{active.title}</Text>
       {active.type === 'video' ? (
@@ -239,8 +250,8 @@ export default function LessonPlayer() {
           <Card muted>
             <Text tone="secondary">
               {active.mediaStatus === 'processing' || active.mediaStatus === 'pending'
-                ? 'This video is still processing. Check back shortly.'
-                : 'This video is unavailable.'}
+                ? t('learnerLearn.lesson.video.processing')
+                : t('learnerLearn.lesson.video.unavailable')}
             </Text>
           </Card>
         )
@@ -257,7 +268,7 @@ export default function LessonPlayer() {
           />
         ) : (
           <Card muted>
-            <Text tone="secondary">This audio is unavailable.</Text>
+            <Text tone="secondary">{t('learnerLearn.lesson.audio.unavailable')}</Text>
           </Card>
         )
       ) : null}
@@ -266,7 +277,7 @@ export default function LessonPlayer() {
           <RichText doc={active.content} />
           {active.progress.status !== 'completed' ? (
             <Button
-              label="Mark as read"
+              label={t('learnerLearn.lesson.markRead')}
               variant="primary"
               icon={Check}
               onPress={() => void persist(active.id, { status: 'completed' })}
@@ -289,12 +300,17 @@ export default function LessonPlayer() {
               queryKey: learningKeys.lesson(enrollmentId, lessonId),
             })
           }}
+          onAttemptEnded={() =>
+            void queryClient.invalidateQueries({
+              queryKey: learningKeys.lesson(enrollmentId, lessonId),
+            })
+          }
         />
       ) : null}
       {(active.type === 'video' || active.type === 'audio') &&
       active.progress.status !== 'completed' ? (
         <Button
-          label="Mark as watched"
+          label={t('learnerLearn.lesson.markWatched')}
           variant="ghost"
           size="sm"
           onPress={() => void persist(active.id, { status: 'completed' })}
@@ -310,7 +326,7 @@ export default function LessonPlayer() {
         }}
       >
         <Button
-          label="Previous"
+          label={t('learnerLearn.lesson.previous')}
           variant="secondary"
           icon={ArrowLeft}
           disabled={activeIndex <= 0}
@@ -318,7 +334,7 @@ export default function LessonPlayer() {
         />
         {activeIndex < artefacts.length - 1 ? (
           <Button
-            label="Next"
+            label={t('learnerLearn.lesson.next')}
             variant="primary"
             iconRight={ArrowRight}
             onPress={() => setActiveId(artefacts[activeIndex + 1]?.id ?? null)}
@@ -326,11 +342,11 @@ export default function LessonPlayer() {
         ) : l.next ? (
           l.next.status === 'locked' && !allDone ? (
             <Text variant="small" tone="tertiary">
-              Complete this lesson to unlock “{l.next.title}”
+              {t('learnerLearn.lesson.unlockNext', { title: l.next.title })}
             </Text>
           ) : (
             <Button
-              label={`Next lesson: ${l.next.title}`}
+              label={t('learnerLearn.lesson.nextLesson', { title: l.next.title })}
               variant="accent"
               iconRight={ArrowRight}
               onPress={() =>
@@ -343,7 +359,7 @@ export default function LessonPlayer() {
           )
         ) : (
           <Button
-            label="Back to course"
+            label={t('learnerLearn.backToCourse')}
             variant="accent"
             iconRight={ArrowRight}
             onPress={() => router.replace(`/learn/${enrollmentId}`)}
@@ -352,7 +368,10 @@ export default function LessonPlayer() {
       </View>
     </View>
   ) : (
-    <EmptyState title="This lesson has no content yet" body="Check back soon." />
+    <EmptyState
+      title={t('learnerLearn.lesson.empty.title')}
+      body={t('learnerLearn.lesson.empty.body')}
+    />
   )
 
   return (
@@ -370,10 +389,12 @@ export default function LessonPlayer() {
         </Link>
         <View style={{ gap: theme.space[2] }}>
           <Text variant="eyebrow" tone="tertiary">
-            Lesson {l.lesson.position + 1}
             {l.previous
-              ? ` · after ${lessonTitleById.get(l.previous.lessonId) ?? l.previous.title}`
-              : ''}
+              ? t('learnerLearn.lesson.numberAfter', {
+                  number: l.lesson.position + 1,
+                  title: lessonTitleById.get(l.previous.lessonId) ?? l.previous.title,
+                })
+              : t('learnerLearn.lesson.number', { number: l.lesson.position + 1 })}
           </Text>
           <Text variant="h1">{l.lesson.title}</Text>
           {l.lesson.summary ? <Text tone="secondary">{l.lesson.summary}</Text> : null}
@@ -385,7 +406,7 @@ export default function LessonPlayer() {
             <View style={{ width: 320 }}>
               <Card style={{ gap: theme.space[3] }}>
                 <Text variant="eyebrow" tone="tertiary">
-                  In this lesson
+                  {t('learnerLearn.lesson.contents')}
                 </Text>
                 {strip}
               </Card>
@@ -419,7 +440,7 @@ export default function LessonPlayer() {
                   >
                     {done ? <Check size={14} color={theme.colors.brand} strokeWidth={3} /> : null}
                     <Text variant="smallStrong" tone={isActive ? 'brand' : 'secondary'}>
-                      {i + 1}. {a.title}
+                      {t('learnerLearn.numbered', { number: i + 1, title: a.title })}
                     </Text>
                   </Pressable>
                 )
