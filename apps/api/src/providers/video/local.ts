@@ -1,5 +1,6 @@
 import type { StorageProvider } from '../storage'
 import type {
+  AnimatedPreview,
   MediaAssetRow,
   VideoAssetPatch,
   VideoProvider,
@@ -45,5 +46,10 @@ export class LocalVideoProvider implements VideoProvider {
 
   async parseWebhook(): Promise<VideoWebhookEvent> {
     throw new Error('The local video driver does not receive webhooks')
+  }
+
+  /** The local driver holds only the uploaded file, and has no way to cut a clip. */
+  async animatedPreview(): Promise<AnimatedPreview | null> {
+    return null
   }
 }

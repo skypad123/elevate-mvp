@@ -5,6 +5,7 @@ import {
   type CourseCard,
   type CoursePublicView,
   type Page,
+  previewIsShown,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { and, EmptyFilter, eq, exists, ilike, or, sql } from 'drizzle-orm'
@@ -41,7 +42,8 @@ export class CatalogService {
     this.media = new MediaService(deps)
   }
 
-  async toCard(course: CourseWithCard): Promise<CourseCard> {
+  /** `previewUrl` is given only by `list`; My Learning's cards show no clip. */
+  async toCard(course: CourseWithCard, previewUrl: string | null = null): Promise<CourseCard> {
     return {
       id: course.id,
       slug: course.slug,
@@ -50,6 +52,7 @@ export class CatalogService {
       category: course.category,
       priceCents: course.priceCents,
       thumbnailUrl: await this.media.publicUrl(course.thumbnail),
+      previewUrl,
       teacherName: course.profile.displayName,
       enrolCount: course.enrolCount,
       lessonCount: course.liveLessons.length,
@@ -115,7 +118,20 @@ export class CatalogService {
       offset,
     })
     const items: CourseCard[] = []
-    for (const row of rows.slice(0, query.limit)) items.push(await this.toCard(row))
+    const previewsOn = this.deps.env.COURSE_PREVIEWS
+    for (const row of rows.slice(0, query.limit)) {
+      // Whether the clip's video is still on the course is settled when the course is edited,
+      // not here (ADR 011).
+      const { previewKey } = row
+      const shown = previewIsShown({
+        enabled: row.previewEnabled,
+        previewKey,
+        sourceMediaId: row.previewSourceMediaId,
+        previewsOn,
+      })
+      const previewUrl = shown && previewKey ? await this.deps.storage.getUrl(previewKey) : null
+      items.push(await this.toCard(row, previewUrl))
+    }
     return {
       items,
       nextCursor: rows.length > query.limit ? encodeOffset(offset + query.limit) : null,

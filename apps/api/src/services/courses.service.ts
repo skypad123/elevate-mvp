@@ -1,15 +1,21 @@
 import {
   ANALYTICS_EVENTS,
   type ArtefactView,
+  allowedStarts,
   type Capability,
+  type CoursePreviewView,
   type CourseSummary,
   type CourseView,
   type CreateCourse,
   can,
   isEmptyDoc,
   type LessonView,
+  previewChangesLeft,
+  previewIsShown,
+  previewState,
   type QuizDefinition,
   quizDefinitionSchema,
+  resolvePreview,
   slugify,
   type UpdateCourse,
   validateCourseForSubmission,
@@ -24,6 +30,7 @@ import { isPayable } from '../lib/payout'
 import type { ProfileActor } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
 import { ChangeSetsService } from './change-sets.service'
+import { CoursePreviewService, isUsableVideo, videosOf } from './course-preview.service'
 import { MediaService } from './media.service'
 
 const EDITABLE_STATUSES = new Set(['draft', 'rejected', 'live'])
@@ -38,6 +45,13 @@ const CONTENT_CAPABILITIES: Capability[] = [
 type CourseRow = typeof s.courses.$inferSelect
 type LessonRow = typeof s.lessons.$inferSelect
 type ArtefactRow = typeof s.artefacts.$inferSelect
+type MediaRow = typeof s.mediaAssets.$inferSelect
+
+/** What the preview rule reads of a course's live lessons, in learner order. */
+type PreviewLesson = {
+  title: string
+  artefacts: Array<{ type: ArtefactRow['type']; title: string; media: MediaRow | null }>
+}
 
 /**
  * Which rows an edit reaches: the live rows (`null`), or the draft rows of a change set. Every
@@ -61,9 +75,11 @@ const inScope = (column: typeof s.lessons.changeSetId, scope: Scope) =>
 export class CoursesService {
   private readonly media: MediaService
   private readonly changeSets: ChangeSetsService
+  private readonly previews: CoursePreviewService
   constructor(private readonly deps: Deps) {
     this.media = new MediaService(deps)
     this.changeSets = new ChangeSetsService(deps)
+    this.previews = new CoursePreviewService(deps)
   }
 
   // ── loading ──────────────────────────────────────────────────────────────
@@ -141,6 +157,24 @@ export class CoursesService {
       })
     }
 
+    // The preview rule always reads the live rows. The draft view holds a change set's rows, so
+    // it loads the live ones once more.
+    const liveForPreview: PreviewLesson[] = scope
+      ? await db.query.lessons.findMany({
+          where: { courseId, changeSetId: { isNull: true } },
+          orderBy: { position: 'asc', createdAt: 'asc' },
+          columns: { title: true },
+          with: {
+            artefacts: {
+              orderBy: { position: 'asc', createdAt: 'asc' },
+              columns: { type: true, title: true },
+              with: { media: true },
+            },
+          },
+        })
+      : lessonRows
+    const preview = await this.previewView(course, liveForPreview)
+
     const payable = isPayable(course.profile.payoutAccount)
     const thumbnail = course.thumbnail ? await this.media.toView(course.thumbnail) : null
     const checklist = validateCourseForSubmission({
@@ -180,6 +214,7 @@ export class CoursesService {
       status: course.status,
       rejectionReason: course.rejectionReason,
       thumbnail,
+      preview,
       profile: {
         id: course.profile.id,
         displayName: course.profile.displayName,
@@ -202,6 +237,64 @@ export class CoursesService {
       publishedAt: course.publishedAt?.toISOString() ?? null,
       createdAt: course.createdAt.toISOString(),
       updatedAt: course.updatedAt.toISOString(),
+    }
+  }
+
+  /** The course view's `preview`, from the course row and its live lessons in learner order. */
+  private async previewView(
+    course: CourseRow,
+    lessons: readonly PreviewLesson[],
+  ): Promise<CoursePreviewView> {
+    const items = lessons.flatMap((l) => l.artefacts.map((a) => ({ ...a, lessonTitle: l.title })))
+    const setting = {
+      enabled: course.previewEnabled,
+      mediaId: course.previewMediaId,
+      startSeconds: course.previewStartSeconds,
+    }
+    const resolved = resolvePreview(setting, videosOf(items))
+    const videos: CoursePreviewView['videos'] = []
+    for (const item of items) {
+      const media = item.media
+      if (item.type !== 'video' || !media || !isUsableVideo(media)) continue
+      if (videos.some((v) => v.mediaId === media.id)) continue
+      const durationSeconds = media.durationSeconds ?? 0
+      videos.push({
+        mediaId: media.id,
+        lessonTitle: item.lessonTitle,
+        itemTitle: item.title,
+        durationSeconds,
+        starts: allowedStarts(durationSeconds),
+        changesLeft: previewChangesLeft(media.previewFetches),
+      })
+    }
+    const previewsOn = this.deps.env.COURSE_PREVIEWS
+    const source =
+      course.previewSourceMediaId !== null && course.previewSourceStartSeconds !== null
+        ? { mediaId: course.previewSourceMediaId, startSeconds: course.previewSourceStartSeconds }
+        : null
+    const shown = previewIsShown({
+      enabled: course.previewEnabled,
+      previewKey: course.previewKey,
+      sourceMediaId: course.previewSourceMediaId,
+      previewsOn,
+    })
+    return {
+      ...setting,
+      resolved,
+      videos,
+      clipUrl:
+        shown && course.previewKey ? await this.deps.storage.getUrl(course.previewKey) : null,
+      state: previewState({
+        setting,
+        resolved,
+        courseStatus: course.status,
+        previewKey: course.previewKey,
+        source,
+        previewsOn,
+        changesLeft: resolved
+          ? (videos.find((v) => v.mediaId === resolved.mediaId)?.changesLeft ?? 0)
+          : 0,
+      }),
     }
   }
 
@@ -388,8 +481,13 @@ export class CoursesService {
     return { artefact, course: parent.course, scope }
   }
 
-  /** The course after an edit, showing the rows the edit was made to. */
-  private edited(courseId: string, scope: Scope): Promise<CourseView> {
+  /**
+   * The course after an edit, showing the rows the edit was made to. Every content edit finishes
+   * here. A direct edit (the live scope) may have removed the video a hover-preview clip was cut
+   * from, so it deletes that clip; nothing checks again when the catalog is read (ADR 011).
+   */
+  private async edited(courseId: string, scope: Scope): Promise<CourseView> {
+    if (scope === null) await this.previews.retireIfVideoGone(courseId)
     return this.loadCourseView(courseId, { draft: scope !== null })
   }
 
@@ -421,9 +519,9 @@ export class CoursesService {
   }
 
   /**
-   * Course details: title, summary, description, category and thumbnail. Price is not among them
-   * (see `setPrice`), and they are not part of a change set: on a live course they need
-   * `course.editLive`, which a writer does not have.
+   * Course details: title, summary, description, category, thumbnail and the hover-preview
+   * setting. Price is not among them (see `setPrice`), and they are not part of a change set: on
+   * a live course they need `course.editLive`, which a writer does not have.
    */
   async update(actor: ProfileActor, courseId: string, patch: UpdateCourse): Promise<CourseView> {
     this.assertCanEditContent(actor)
@@ -448,9 +546,94 @@ export class CoursesService {
     }
     if (patch.title && patch.title !== course.title && course.status !== 'live')
       values.slug = await this.uniqueSlug(patch.title)
+    const previewAsked =
+      patch.previewEnabled !== undefined ||
+      patch.previewMediaId !== undefined ||
+      patch.previewStartSeconds !== undefined
+    Object.assign(values, await this.previewValues(actor, course, patch))
     if (Object.keys(values).length)
       await this.deps.db.update(s.courses).set(values).where(eq(s.courses.id, courseId))
+    const before = {
+      enabled: course.previewEnabled,
+      mediaId: course.previewMediaId,
+      startSeconds: course.previewStartSeconds,
+    }
+    const after = {
+      enabled: values.previewEnabled ?? before.enabled,
+      mediaId: values.previewMediaId !== undefined ? values.previewMediaId : before.mediaId,
+      startSeconds:
+        values.previewStartSeconds !== undefined ? values.previewStartSeconds : before.startSeconds,
+    }
+    if (
+      after.enabled !== before.enabled ||
+      after.mediaId !== before.mediaId ||
+      after.startSeconds !== before.startSeconds
+    ) {
+      // Written before the wait for Mux, so a crash during it can't leave a change unrecorded.
+      await recordAudit(this.deps, {
+        actorId: actor.userId,
+        action: 'course.preview',
+        entityType: 'course',
+        entityId: courseId,
+        profileId: actor.profileId,
+        metadata: { from: before, to: after },
+      })
+    }
+    // Any preview field asks for a new attempt, changed or not: this is how "Make clip" works. A
+    // failed refresh does not fail the save; the view says the clip is not up to date.
+    if (previewAsked) await this.previews.refresh(courseId)
     return this.loadCourseView(courseId)
+  }
+
+  /**
+   * The preview fields of a save that differ from the stored ones.
+   * - Turning off saves only the switch: a video or start in the same request is ignored.
+   * - A chosen video is checked only when it changes, so a stored choice whose video has since
+   *   left the course is not refused.
+   */
+  private async previewValues(
+    actor: ProfileActor,
+    course: CourseRow,
+    patch: UpdateCourse,
+  ): Promise<Partial<typeof s.courses.$inferInsert>> {
+    if (patch.previewEnabled === false) {
+      return course.previewEnabled ? { previewEnabled: false } : {}
+    }
+    const values: Partial<typeof s.courses.$inferInsert> = {}
+    if (patch.previewEnabled === true && !course.previewEnabled) values.previewEnabled = true
+    if (patch.previewMediaId !== undefined && patch.previewMediaId !== course.previewMediaId) {
+      if (patch.previewMediaId) {
+        await this.media.getProfileAsset(actor.profileId, patch.previewMediaId, { kind: 'video' })
+        const [onCourse] = await this.deps.db
+          .select({ id: s.artefacts.id })
+          .from(s.artefacts)
+          .innerJoin(s.lessons, eq(s.lessons.id, s.artefacts.lessonId))
+          .where(
+            and(
+              eq(s.lessons.courseId, course.id),
+              isNull(s.lessons.changeSetId),
+              isNull(s.artefacts.changeSetId),
+              eq(s.artefacts.type, 'video'),
+              eq(s.artefacts.mediaAssetId, patch.previewMediaId),
+            ),
+          )
+          .limit(1)
+        if (!onCourse) {
+          throw errors.unprocessable(
+            'preview_video_not_on_course',
+            'Choose a video that is on this course',
+          )
+        }
+      }
+      values.previewMediaId = patch.previewMediaId
+    }
+    if (
+      patch.previewStartSeconds !== undefined &&
+      patch.previewStartSeconds !== course.previewStartSeconds
+    ) {
+      values.previewStartSeconds = patch.previewStartSeconds
+    }
+    return values
   }
 
   /** The route requires `course.setPrice`; a price change is always written to the audit log. */

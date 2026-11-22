@@ -49,6 +49,10 @@ describe('catalogue', () => {
     expect(paged.body.nextCursor).toBeTruthy()
     const next = await t.api('GET', `/api/catalog/courses?limit=2&cursor=${paged.body.nextCursor}`)
     expect(next.body.items[0].id).not.toBe(paged.body.items[0].id)
+    // Seeded courses have no video, so no card has a hover-preview clip.
+    expect(all.body.items.every((c: { previewUrl: string | null }) => c.previewUrl === null)).toBe(
+      true,
+    )
     const categories = await t.api('GET', '/api/catalog/categories')
     expect(
       categories.body.items.find((c: { slug: string }) => c.slug === 'craft-making').count,

@@ -14,6 +14,7 @@ import { simpleEmail } from '../emails/templates'
 import { errors, HttpError } from '../lib/errors'
 import type { ProfileActor } from '../middleware/auth'
 import { recordAudit } from './audit.service'
+import { CoursePreviewService } from './course-preview.service'
 import { ownerAndManagerEmails } from './recipients'
 
 /**
@@ -373,7 +374,10 @@ function analyse(changeSet: ChangeSetRow, content: CourseContent) {
 }
 
 export class ChangeSetsService {
-  constructor(private readonly deps: Deps) {}
+  private readonly previews: CoursePreviewService
+  constructor(private readonly deps: Deps) {
+    this.previews = new CoursePreviewService(deps)
+  }
 
   /** The course's open change set, if it has one. */
   async findOpen(courseId: string, db: Executor = this.deps.db): Promise<ChangeSetRow | null> {
@@ -947,6 +951,9 @@ export class ChangeSetsService {
       return open
     })
 
+    // The transaction is where the hover-preview clip's video can leave the course. Neither call
+    // throws, and neither runs inside the transaction, which holds locks on all the content.
+    await this.previews.retireIfVideoGone(courseId)
     await recordAudit(this.deps, {
       actorId: actor.userId,
       action: 'change_set.approve',
@@ -955,6 +962,7 @@ export class ChangeSetsService {
       profileId: actor.profileId,
       metadata: { changeSetId: changeSet.id, openedBy: changeSet.openedBy },
     })
+    await this.previews.refresh(courseId)
     const writer = changeSet.openedBy
       ? await db.query.users.findFirst({ where: { id: changeSet.openedBy } })
       : null
