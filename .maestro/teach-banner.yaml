@@ -1,0 +1,38 @@
+# Learner app: the Teach banner at the end of Explore opens /teach, and once closed it stays
+# hidden after a relaunch (the 30-day return is unit-tested in src/lib/__tests__/teach-banner.test.tsx).
+# Runs signed out, so it needs no account, only the API on :4400: a failed course load hides the
+# banner, an empty list does not. Run against a dev build (see learner-preferences.yaml):
+#   maestro test .maestro/teach-banner.yaml
+appId: ${APP_ID}
+env:
+  APP_ID: sg.elevate.learner
+---
+- launchApp:
+    clearState: true
+# The banner sits after the first page of courses and "Load more".
+- scrollUntilVisible:
+    element:
+      id: "teach-banner-open"
+- tapOn:
+    id: "teach-banner-open"
+- assertVisible:
+    id: "teach-open"
+- tapOn:
+    id: "teach-back"
+- scrollUntilVisible:
+    element:
+      id: "teach-banner-close"
+- tapOn:
+    id: "teach-banner-close"
+- assertNotVisible:
+    id: "teach-banner-open"
+
+# Relaunch without clearing state: the closed banner stays hidden.
+- stopApp
+- launchApp
+- scrollUntilVisible:
+    element:
+      id: "explore-end"
+- assertNotVisible:
+    id: "teach-banner-open"
+- takeScreenshot: learner-teach-banner-closed

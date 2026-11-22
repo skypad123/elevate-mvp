@@ -20,6 +20,13 @@ maestro test .maestro/learner-preferences.yaml
 
 Android emulator: `-e API_URL=http://10.0.2.2:4400`. Screenshots land in the current directory.
 
+The Teach banner flow runs signed out, so it needs no account, only the API running (a failed
+course load hides the banner; an empty list does not):
+
+```bash
+maestro test .maestro/teach-banner.yaml
+```
+
 ## What is asserted
 
 - `app-root-<scheme>` testID on the root view (`apps/learner/src/app/_layout.tsx`) reports the
@@ -27,7 +34,11 @@ Android emulator: `-e API_URL=http://10.0.2.2:4400`. Screenshots land in the cur
 - The selected chip exposes `accessibilityState.selected`, so `selected: true` assertions work.
 - Translated labels (`我的学习`, `偏好设置`) confirm the language preference survived the relaunch.
 
-The flow ends by restoring `System` and `English`.
+`learner-preferences.yaml` ends by restoring `System` and `English`.
+
+`teach-banner.yaml` opens `/teach` from the banner at the end of Explore (`teach-banner-open`,
+then `teach-open` on the screen), closes the banner (`teach-banner-close`), and checks after a
+relaunch that it stays hidden, scrolling to `explore-end`, the last element on Explore.
 
 ## Unit tests
 

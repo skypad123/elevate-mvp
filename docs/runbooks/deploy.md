@@ -54,9 +54,9 @@ Branches: `main` is development (local only); `staging` and `production` deploy 
 - Serve each `dist/` as a static site with a rewrite of every path to `index.html` (React Router
   and expo-router are client-side routers; the public certificate URL `/c/{token}` depends on it).
   CloudFront does this through its error responses.
-- `VITE_API_URL` and `VITE_LEARNER_URL` (portals) and `EXPO_PUBLIC_API_URL` and
-  `EXPO_PUBLIC_WEB_URL` (learner) are compiled in at build time; the Deploy workflow sets them from
-  the GitHub Environment.
+- `VITE_API_URL` and `VITE_LEARNER_URL` (portals) and `EXPO_PUBLIC_API_URL`,
+  `EXPO_PUBLIC_WEB_URL` and `EXPO_PUBLIC_TEACH_URL` (learner) are compiled in at build time; the
+  Deploy workflow sets them from the GitHub Environment.
 - Security headers (`X-Frame-Options: DENY`, `Referrer-Policy`, HSTS and a CSP allowing the API,
   the uploads bucket, Mux, Stripe and Google Fonts) are set by the CloudFront response headers
   policy in `infra/terraform/modules/static_site`.

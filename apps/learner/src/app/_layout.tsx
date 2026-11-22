@@ -112,6 +112,8 @@ function RootNavigator() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="course/[slug]" />
           <Stack.Screen name="c/[token]" />
+          {/* Open signed in or out: what teaching on Elevate involves, and the link to Teach. */}
+          <Stack.Screen name="teach" />
           <Stack.Protected guard={!isSignedIn}>
             <Stack.Screen name="(auth)" />
           </Stack.Protected>

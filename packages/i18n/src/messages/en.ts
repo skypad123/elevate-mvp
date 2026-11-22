@@ -33,6 +33,7 @@ import { learnerCommonEn } from './areas/learnerCommon.en'
 import { learnerCourseEn } from './areas/learnerCourse.en'
 import { learnerExploreEn } from './areas/learnerExplore.en'
 import { learnerLearnEn } from './areas/learnerLearn.en'
+import { learnerTeachEn } from './areas/learnerTeach.en'
 import { membersEn } from './areas/members.en'
 import { paymentsEn } from './areas/payments.en'
 import { personalApplyEn } from './areas/personalApply.en'
@@ -72,6 +73,7 @@ export const enAreas: readonly Readonly<Record<string, string>>[] = [
   learnerCourseEn,
   learnerCheckoutEn,
   learnerLearnEn,
+  learnerTeachEn,
   learnerCertificateEn,
   emailEn,
 ]
@@ -102,6 +104,7 @@ export const en = {
   ...learnerCourseEn,
   ...learnerCheckoutEn,
   ...learnerLearnEn,
+  ...learnerTeachEn,
   ...learnerCertificateEn,
   ...emailEn,
 } as const

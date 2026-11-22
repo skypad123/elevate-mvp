@@ -4,6 +4,7 @@ import { LogOut } from 'lucide-react-native'
 import { useState } from 'react'
 import { View } from 'react-native'
 import { TAB_BAR_HEIGHT } from '@/components/PillTabBar'
+import { TeachProfileRow } from '@/components/TeachProfileRow'
 import { api } from '@/lib/api'
 import { unwrap, useErrorMessage } from '@/lib/api-error'
 import { usePreferences } from '@/lib/preferences'
@@ -138,6 +139,8 @@ export default function Profile() {
             </View>
           </View>
         </Card>
+
+        <TeachProfileRow />
 
         <Card style={{ gap: theme.space[3] }}>
           <Text variant="h3">{t('account.title')}</Text>
