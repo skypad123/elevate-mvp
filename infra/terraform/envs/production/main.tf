@@ -89,6 +89,11 @@ variable "csp_report_only" {
   default = true
 }
 
+variable "course_previews" {
+  type    = bool
+  default = true
+}
+
 module "environment" {
   source = "../../modules/environment"
 
@@ -106,6 +111,7 @@ module "environment" {
   integrations           = var.integrations
   seed_super_admin_email = var.seed_super_admin_email
   csp_report_only        = var.csp_report_only
+  course_previews        = var.course_previews
 
   # Data is protected: deletion protection, a final snapshot, a week of backups, versioned uploads.
   # Turn on db_multi_az when downtime during an AZ failure or maintenance is no longer acceptable.

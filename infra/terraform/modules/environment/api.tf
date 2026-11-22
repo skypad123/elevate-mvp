@@ -14,18 +14,19 @@ locals {
 
   api_environment = merge(
     {
-      NODE_ENV       = "production"
-      API_PORT       = tostring(local.api_port)
-      API_URL        = local.api_url
-      LEARNER_URL    = local.learner_url
-      TEACH_URL      = local.teach_url
-      SUPPORT_URL    = local.support_url
-      STORAGE_DRIVER = "s3"
-      S3_BUCKET      = aws_s3_bucket.uploads.bucket
-      S3_REGION      = local.region
-      MAIL_DRIVER    = var.integrations.resend ? "resend" : "console"
-      MAIL_FROM      = local.mail_from
-      VIDEO_DRIVER   = var.integrations.mux ? "mux" : "local"
+      NODE_ENV        = "production"
+      API_PORT        = tostring(local.api_port)
+      API_URL         = local.api_url
+      LEARNER_URL     = local.learner_url
+      TEACH_URL       = local.teach_url
+      SUPPORT_URL     = local.support_url
+      STORAGE_DRIVER  = "s3"
+      S3_BUCKET       = aws_s3_bucket.uploads.bucket
+      S3_REGION       = local.region
+      MAIL_DRIVER     = var.integrations.resend ? "resend" : "console"
+      MAIL_FROM       = local.mail_from
+      VIDEO_DRIVER    = var.integrations.mux ? "mux" : "local"
+      COURSE_PREVIEWS = tostring(var.course_previews)
     },
     var.seed_super_admin_email == null ? {} : { SEED_SUPER_ADMIN_EMAIL = var.seed_super_admin_email },
   )

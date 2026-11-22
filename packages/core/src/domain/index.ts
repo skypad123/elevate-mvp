@@ -1,5 +1,6 @@
 export * from './analytics'
 export * from './categories'
+export * from './course-preview'
 export * from './course-validation'
 export * from './dag'
 export * from './lesson-state'

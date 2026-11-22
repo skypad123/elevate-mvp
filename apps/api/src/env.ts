@@ -43,6 +43,11 @@ const envSchema = z.object({
   MUX_WEBHOOK_SECRET: z.string().optional(),
   MUX_SIGNING_KEY: z.string().optional(),
   MUX_PRIVATE_KEY: z.string().optional(),
+  /**
+   * Hover-preview clips on course cards (ADR 011). Off is a pause: the catalog returns no clip and
+   * none is made, but stored files stay and are still served.
+   */
+  COURSE_PREVIEWS: bool.default(true),
 
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),

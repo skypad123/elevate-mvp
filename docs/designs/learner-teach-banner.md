@@ -1,7 +1,7 @@
 # Teach banner on Explore
 
 -   **Author:** Sky Livingston
--   **Status:** Proposed
+-   **Status:** The Teach PR is built (2026-11-18). The learner PR is built (2026-11-19).
 -   **Date:** 2026-11-17
 
 ---
@@ -25,7 +25,7 @@ It does five things:
     profile's page.
 4.  **Puts Teach's sign-in step and its personal application in the visitor's language.**
     "Teach's sign-in step" means, throughout this document: the sign-in page, the verify page,
-    the sign-in code email, and the error sentences for the server's four sign-in error codes.
+    the sign-in code email, and the error sentences for the server's five sign-in error codes and its rate limit.
 5.  **Adds a "Teach on Elevate" row to the Profile tab,** so a signed-in visitor who closed the
     banner can still find the screen.
 
@@ -98,9 +98,9 @@ the `?lang` hand-off to Teach.
     verify page, the code email, the sign-in error sentences, the start page and the personal
     application form. Three limits:
     -   a language already stored in Teach wins over `?lang`;
-    -   other messages the server words stay English: the rate-limit message ("Too many
-        attempts. Try again in a few minutes."), field validation messages, and a response
-        with no message ("Something went wrong");
+    -   other messages the server words stay English: field validation messages, Support's
+        refusal of an account that is not staff, and a response with no message ("Something
+        went wrong");
     -   the emails Elevate sends about an application stay English.
 5.  **First applications can be counted.** Elevate can count first teacher applications from
     launch onwards and leave out the teachers it recruited by hand. The count includes invited
@@ -119,8 +119,8 @@ the `?lang` hand-off to Teach.
 -   **Translating Teach beyond its sign-in step and personal application.** The start page,
     dashboard and company application are already translated. The course builder, earnings and
     other Teach pages stay as they are, and so do the emails about an application.
--   **Translating every error the API can return.** This design maps only the four sign-in
-    error codes. The wider rule is [Question 3](#open-questions).
+-   **Translating every error the API can return.** This design maps only the five sign-in
+    error codes and `rate_limited`. The wider rule is [Question 3](#open-questions).
 -   **Changing how teachers apply.** The application's fields, Support's review and Stripe
     onboarding are unchanged.
 -   **A Teach app on phones.** Teach stays web-only.
@@ -335,18 +335,21 @@ The brief's Questions 6 (who doesn't see the banner) and 7 (the introduction) ar
     portal's `blurb` becomes a message key.
 -   **Errors:** a failed request is worded in one of two ways.
     -   **The sign-in error codes are translated:** when the server answers with the code
-        `link_invalid`, `link_expired`, `code_invalid` or `code_locked`, the page shows that
-        code's message from the catalog. The server's own English sentence is not shown. The
-        server defines all four codes, but today it can't answer `code_locked`: the fifth wrong
-        code uses the link up, so the next try answers `link_invalid` when the address has no
-        other unused link. The mapping keeps `code_locked` in case the server starts sending
-        it.
+        `link_invalid`, `link_used`, `link_expired`, `code_invalid`, `code_locked` or
+        `rate_limited`, the page shows that code's `apiError.<code>` message, the one the
+        learner app shows ([Question 3](#open-questions)). The server's own English sentence is
+        not shown. The server defines all five sign-in codes, but today it can't answer
+        `code_locked`: the fifth wrong code uses the link up, so the next try answers
+        `link_invalid` when the address has no other unused link. The mapping keeps
+        `code_locked` in case the server starts sending it. `rate_limited` is added because its
+        message already exists and the code-request step can hit it.
     -   **Everything else goes through `useErrorMessage()`:** this is the rule in
         [ADR 008](../adr/008-theming-preferences-i18n.md). That hook shows the server's message
         unchanged, and words only two sentences itself: the request never reached the server,
-        and a failure that isn't an API response. So the rate-limit message ("Too many
-        attempts. Try again in a few minutes."), "This account does not have access to Elevate
-        Support" and a response with no message ("Something went wrong") stay English.
+        and a failure that isn't an API response. So "This account does not have access to
+        Elevate Support" and a response with no message ("Something went wrong") stay English.
+        Mapping `forbidden` would replace Support's sentence with the generic "You do not have
+        access to this.".
 
     The mapping is the first use of a rule the author wants more widely
     ([Question 3](#open-questions)). ADR 008 and AGENTS.md gain the rule in its general form: a
@@ -411,7 +414,7 @@ The brief's Questions 6 (who doesn't see the banner) and 7 (the introduction) ar
         PR 4).
     -   **the learner catalog areas and test helpers:** these come with its PR 3.
 -   **Two pull requests:** they are named, to avoid confusion with the Chinese design's four.
-    1.  **The Teach PR:** the translated sign-in and verify pages, the four error messages, the
+    1.  **The Teach PR:** the translated sign-in and verify pages, the mapped error codes, the
         picker, `locale` on the sign-in request, and the translated personal application. It
         changes no file under `apps/learner` and no API code. It needs the Chinese design's
         PR 1, PR 2 and PR 4.
@@ -451,7 +454,7 @@ The brief's Questions 6 (who doesn't see the banner) and 7 (the introduction) ar
 | **An owner sees the banner**                         | The app can't tell who a signed-out visitor is. An owner whose account failed to load at launch, or who applied in Teach since the account was loaded, also sees it. The account is loaded again on a cold start, a new sign-in or a Profile save.   | Accepted: pressing through takes an owner to their own profile's page in Teach. A test covers "signed in with no user".                                                                                                            |
 | **The Chinese text is wrong or missing**             | The first words a teacher reads are badly translated, or a pull request can't pass its checks.                                                                                                                                                       | Sign-off by the reviewer in [Question 1](#open-questions) is a merge condition for both pull requests.                                                                                                                             |
 | **The Chinese design changes or slips**              | This design is built on four of its behaviours.                                                                                                                                                                                                      | They are listed in [Order of release](#order-of-release). If one changes, this design is revised before its pull requests start.                                                                                                   |
-| **The error mapping drifts from the server**         | The server renames or adds a sign-in error code, and the page shows English again.                                                                                                                                                                   | An API test pins the three codes the server can answer today. An unknown code falls back to the server's sentence, so nothing breaks.                                                                                              |
+| **The error mapping drifts from the server**         | The server renames or adds a sign-in error code, and the page shows English again.                                                                                                                                                                   | API tests pin the codes the server can answer today. An unknown code falls back to the server's sentence, so nothing breaks.                                                                                                       |
 | **A locked-out visitor reads the wrong sentence**    | After five wrong codes the server answers `link_invalid`, not `code_locked`, when the address has no other unused link. The visitor reads "not valid" where "too many incorrect codes" would be clearer.                                             | Accepted. This is today's behaviour in English too, and fixing it is an API change outside this design.                                                                                                                            |
 | **Opening the emailed link stores a language**       | Each sign-in through the emailed link stores the language of the page that asked for the code, when the browser has no language stored or has "Follow device" stored. A visitor who chose "Follow device" on purpose loses it at every link sign-in. | Accepted by the author. The visitor can pick "Follow device" again, and signing in with the typed code stores nothing.                                                                                                             |
 | **Support's sign-in turns Chinese**                  | A Support agent with a Chinese browser gets a Chinese sign-in page and code email.                                                                                                                                                                   | The picker on the sign-in page switches the language before a code is requested. The Support check in item 11 covers it.                                                                                                           |
@@ -741,7 +744,7 @@ The work lands in two pull requests, after the Chinese design's. Each must pass 
 and `npx turbo run typecheck test` on its own.
 
 1.  **The Teach PR:** it translates the shared sign-in and verify pages and Teach's personal
-    application, maps the four sign-in error codes, adds the language picker to the sign-in
+    application, maps the sign-in error codes, adds the language picker to the sign-in
     page, and sends `locale` with the sign-in request. No file under `apps/learner` changes, and
     no API code changes.
 2.  **The learner PR:** it adds the banner, the `/teach` screen, the Profile row, `teachUrl()`
@@ -768,7 +771,7 @@ sign-off is a merge condition.
     -   **The email step:** `portalAuth.signIn.eyebrow` ("Sign in"), `.emailLabel` ("Email"),
         `.emailPlaceholder` ("you@example.com"), `.request` ("Email me a sign-in code"),
         `.invalidEmail` ("Enter a valid email address"), `.noPasswords` ("One-time link and
-        code, no passwords. {back}") and `.back` ("Back").
+        code, no passwords. {back}"). The `{back}` link's label is `common.back`.
     -   **The code step:** `portalAuth.code.eyebrow` ("Check your inbox"), `.title` ("Enter the
         6-digit code"), `.sentTo` ("We sent a sign-in link and code to {email}. Click the link,
         or type the code here."), `.label` ("Code"), `.placeholder` ("123 456"), `.verify`
@@ -777,16 +780,7 @@ sign-off is a merge condition.
         ("Sign-in link"), `.title` ("We could not sign you in"), `.incomplete` ("This sign-in
         link is incomplete. Request a new one."), `.requestNew` ("Request a new link") and
         `.back` ("Back to start").
-    -   **The four error codes,** worded as the server words them today
-        (`apps/api/src/services/auth.service.ts`). The server can't answer `code_locked` today,
-        and the key is kept for when it can:
-        -   `portalAuth.error.link_invalid`: "That sign-in link or code is not valid. Request a
-            new one." The server uses this code for a link that was already used too, so that
-            case shows the same sentence.
-        -   `portalAuth.error.link_expired`: "That sign-in link has expired. Request a new one."
-        -   `portalAuth.error.code_invalid`: "That code is not right. Check the email and try
-            again."
-        -   `portalAuth.error.code_locked`: "Too many incorrect codes. Request a new one."
+    -   **No error keys:** the error codes use the shared `apiError` messages (item 4).
     -   **The blurbs:** `portalAuth.blurb.teach` ("Author courses, submit them for review and get
         paid through Stripe.") and `portalAuth.blurb.support` ("Internal tools: review courses,
         approve teachers, manage payments.").
@@ -818,7 +812,7 @@ sign-off is a merge condition.
         -   `personalApply.reviewerNote`: "Reviewer note"
     -   **The load error:**
         -   `personalApply.loadFailed.title`: "Could not load your application"
-        -   `personalApply.loadFailed.retry`: "Try again"
+        -   the retry button uses `common.tryAgain`
     -   **About you:**
         -   `personalApply.about.title`: "About you"
         -   `personalApply.displayName.hint`: "Shown on your courses and certificates."
@@ -870,9 +864,12 @@ sign-off is a merge condition.
 -   **Type / Scope**: web-ui helper.
 -   **Proposed Changes**:
     -   `signInErrorKey(error: unknown): MessageKey | null` returns
-        `` `portalAuth.error.${error.code}` `` when `error` is an `ApiError` whose `code` is
-        `link_invalid`, `link_expired`, `code_invalid` or `code_locked`, and null otherwise. The
-        four codes are one `as const` list, so the key type checks without a cast.
+        `` `apiError.${error.code}` `` when `error` is an `ApiError` whose `code` is
+        `link_invalid`, `link_used`, `link_expired`, `code_invalid`, `code_locked` or
+        `rate_limited`, and null otherwise. The codes are one `as const` list that `satisfies`
+        `UserErrorCode[]`, so the key type checks without a cast.
+    -   `useSignInErrorMessage()` words an error with that key, or with `useErrorMessage()`
+        when there is none. Both pages use it.
     -   `index.ts` exports it.
 
 ##### 5. Sign-in page
@@ -942,7 +939,9 @@ sign-off is a merge condition.
         -   a code tried after five wrong codes answers `link_invalid` too, because the fifth
             wrong code uses the link up. This case uses a single sign-in request, so the address
             has no other unused link. The existing test accepts either `link_invalid` or
-            `code_locked` here and is left as it is.
+            `code_locked` here and is left as it is;
+        -   two verifies of one link at once answer `link_used` to the loser (an existing test);
+        -   a sixth code request in the window answers `rate_limited`.
 
 ##### 10. Records
 
@@ -1097,6 +1096,8 @@ sign-off is a merge condition.
         `apps/learner/src/app/course/[slug].tsx` has.
     -   **The back link:** a `Link href="/"` wrapping a `Pressable` with the `ArrowLeft` icon
         and the text `t('nav.explore')`, as that file lays it out, with `testID` `teach-back`.
+        It also takes `dismissTo`, so it returns to the Explore already in the stack instead of
+        pushing a second tab navigator (found in review; the course page's link pushes).
     -   **Content,** from the `learnerTeach.screen` keys in item 20: the title (variant `h1`)
         and intro (`bodyLg`, tone `secondary`), then the three titled sections, each with an
         `h3` heading and `body` text. The six steps are a numbered list. The closing note comes

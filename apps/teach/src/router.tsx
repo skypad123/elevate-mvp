@@ -32,7 +32,7 @@ export const router = createBrowserRouter([
             api={api}
             audience="teach"
             portalName="Elevate Teach"
-            blurb="Author courses, submit them for review and get paid through Stripe."
+            blurbKey="portalAuth.blurb.teach"
           />
         ),
       },

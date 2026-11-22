@@ -58,4 +58,19 @@ resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
       days_after_initiation = 7
     }
   }
+
+  # A deleted hover-preview clip stays as an old version where the bucket is versioned; remove it a
+  # day later (ADR 011). Where versioning is suspended this does nothing.
+  rule {
+    id     = "expire-old-preview-versions"
+    status = "Enabled"
+
+    filter {
+      prefix = "public/previews/"
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 1
+    }
+  }
 }

@@ -1,5 +1,8 @@
+import { COURSE_PREVIEW } from '@elevate/core'
 import Mux from '@mux/mux-node'
 import type {
+  AnimatedPreview,
+  AnimatedPreviewOptions,
   MediaAssetRow,
   VideoAssetPatch,
   VideoProvider,
@@ -21,7 +24,11 @@ export class MuxVideoProvider implements VideoProvider {
   readonly driver = 'mux'
   private readonly mux: Mux
 
-  constructor(private readonly config: MuxConfig) {
+  /** `fetchImpl` is the global `fetch` unless a test passes a stub. */
+  constructor(
+    private readonly config: MuxConfig,
+    private readonly fetchImpl: typeof fetch = fetch,
+  ) {
     this.mux = new Mux({
       tokenId: config.tokenId,
       tokenSecret: config.tokenSecret,
@@ -113,4 +120,73 @@ export class MuxVideoProvider implements VideoProvider {
     }
     return { id: event.id, type: event.type, data: event.data }
   }
+
+  /**
+   * Signs a `gif` token (audience `g`) with the clip's options as claims, and fetches the animated
+   * WebP from Mux. This is the API's one plain HTTP request to another service, so it sets its own
+   * limits: a timeout, status 200 with `image/webp` only, and a size cap. Mux's error bodies are
+   * JSON, and without these checks one could be stored as a public `.webp`.
+   */
+  async animatedPreview(
+    asset: MediaAssetRow,
+    options: AnimatedPreviewOptions,
+  ): Promise<AnimatedPreview | null> {
+    if (!asset.playbackId) return null
+    try {
+      const token = await this.mux.jwt.signPlaybackId(asset.playbackId, {
+        type: 'gif',
+        expiration: '5m',
+        params: {
+          start: String(options.startSeconds),
+          end: String(options.endSeconds),
+          width: String(options.width),
+          fps: String(options.fps),
+        },
+      })
+      const url = `https://image.mux.com/${asset.playbackId}/animated.webp?token=${encodeURIComponent(token)}`
+      // The one signal covers the wait for the response and the reading of its body.
+      const response = await this.fetchImpl(url, {
+        signal: AbortSignal.timeout(COURSE_PREVIEW.fetchTimeoutMs),
+      })
+      const type = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+      const length = Number(response.headers.get('content-length') ?? Number.NaN)
+      if (
+        response.status !== 200 ||
+        type !== 'image/webp' ||
+        (Number.isFinite(length) && length > COURSE_PREVIEW.maxBytes)
+      ) {
+        await response.body?.cancel().catch(() => {})
+        return null
+      }
+      const bytes = await readCapped(response, COURSE_PREVIEW.maxBytes)
+      return bytes ? { bytes, mimeType: 'image/webp' } : null
+    } catch {
+      return null
+    }
+  }
+}
+
+/** The body's bytes, or `null` as soon as it passes `max`. */
+async function readCapped(response: Response, max: number): Promise<Uint8Array | null> {
+  if (!response.body) return new Uint8Array(await response.arrayBuffer())
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > max) {
+      await reader.cancel().catch(() => {})
+      return null
+    }
+    chunks.push(value)
+  }
+  const out = new Uint8Array(size)
+  let offset = 0
+  for (const c of chunks) {
+    out.set(c, offset)
+    offset += c.byteLength
+  }
+  return out
 }

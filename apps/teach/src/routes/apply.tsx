@@ -12,7 +12,8 @@ import {
   Textarea,
   useToast,
 } from '@elevate/web-ui'
-import { errorMessage, fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
+import { fieldErrors, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
+import { fillSlots, useErrorMessage, useT } from '@elevate/web-ui/preferences'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { type FormEvent, useRef, useState } from 'react'
@@ -30,6 +31,8 @@ export function ApplyPage() {
   const { user } = usePortalAuth()
   const personal = user?.profiles.find((p) => p.type === 'personal' && p.role === 'owner')
   const existing = useProfileView(personal?.id)
+  const t = useT()
+  const errorMessage = useErrorMessage()
   if (personal?.status === 'approved') return <Navigate to={profilePath(personal.id)} replace />
   // Wait for the earlier answers before showing the form, so it opens filled in. If they cannot be
   // read, say so rather than opening an empty form that would replace them.
@@ -38,11 +41,11 @@ export function ApplyPage() {
     return (
       <EmptyState
         tone="danger"
-        title="Could not load your application"
+        title={t('personalApply.loadFailed.title')}
         body={errorMessage(existing.error)}
         action={
           <Button variant="secondary" onClick={() => void existing.refetch()}>
-            Try again
+            {t('common.tryAgain')}
           </Button>
         }
       />
@@ -55,6 +58,8 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const t = useT()
+  const errorMessage = useErrorMessage()
   const [form, setForm] = useState<PersonalApplication>({
     displayName: existing?.displayName ?? user?.name ?? '',
     headline: existing?.headline ?? '',
@@ -88,8 +93,8 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
       await refreshUser()
       toast({
         tone: 'success',
-        title: 'Application sent',
-        description: 'We will email you when it has been reviewed.',
+        title: t('personalApply.sent.title'),
+        description: t('personalApply.sent.description'),
       })
       // The profile's own page shows the application status until it is approved.
       navigate(profilePath(profile.id), { replace: true })
@@ -98,7 +103,11 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
       setErrors(fields)
       focusFirstInvalid(formRef.current)
       if (Object.keys(fields).length === 0)
-        toast({ tone: 'danger', title: 'Could not submit', description: errorMessage(error) })
+        toast({
+          tone: 'danger',
+          title: t('personalApply.submit.failed'),
+          description: errorMessage(error),
+        })
     } finally {
       setBusy(false)
     }
@@ -109,29 +118,28 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
   return (
     <div className="space-y-8 animate-rise">
       <div className="space-y-3">
-        <Eyebrow>{isResubmission ? 'Update your application' : 'Become a teacher'}</Eyebrow>
+        <Eyebrow>
+          {t(isResubmission ? 'personalApply.eyebrow.reapply' : 'personalApply.eyebrow.apply')}
+        </Eyebrow>
         <h1 className="font-display text-display font-semibold leading-tight text-ink">
-          Teach what you practise.
+          {t('personalApply.title')}
         </h1>
-        <p className="max-w-2xl text-body-lg text-ink-secondary">
-          Elevate is a small, curated platform. Tell us who you are, what you teach and show us a
-          few minutes of you teaching. A human reviews every application, usually within two working
-          days.
-        </p>
+        <p className="max-w-2xl text-body-lg text-ink-secondary">{t('personalApply.intro')}</p>
         {existing ? null : (
           <p className="text-small text-ink-secondary">
-            This application is for a person teaching under their own name, a sole proprietor
-            included. Teaching as a private limited company or an LLP?{' '}
-            <Link to="/apply/company" className="font-semibold text-brand-fg hover:underline">
-              Apply as a company instead
-            </Link>
-            .
+            {fillSlots(t('personalApply.companyInstead'), {
+              link: (
+                <Link to="/apply/company" className="font-semibold text-brand-fg hover:underline">
+                  {t('personalApply.companyInstead.link')}
+                </Link>
+              ),
+            })}
           </p>
         )}
         {isResubmission && existing?.reviewNote ? (
           <div className="rounded-card border border-warning bg-warning-tint p-4 text-small text-ink">
             <p className="mb-1 flex items-center gap-2 font-semibold">
-              <Badge tone="warning">Reviewer note</Badge>
+              <Badge tone="warning">{t('personalApply.reviewerNote')}</Badge>
             </p>
             {existing.reviewNote}
           </div>
@@ -140,10 +148,12 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
 
       <form ref={formRef} onSubmit={submit} className="space-y-6">
         <Card as="section" className="space-y-5">
-          <h2 className="font-display text-h2 font-semibold text-ink">About you</h2>
+          <h2 className="font-display text-h2 font-semibold text-ink">
+            {t('personalApply.about.title')}
+          </h2>
           <Input
-            label="Display name"
-            hint="Shown on your courses and certificates."
+            label={t('profileField.displayName')}
+            hint={t('personalApply.displayName.hint')}
             value={form.displayName}
             onChange={set('displayName')}
             error={errors.displayName}
@@ -151,8 +161,8 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
             maxLength={80}
           />
           <Input
-            label="Headline"
-            hint="One line, e.g. “Ceramicist and studio teacher, Jalan Bahar”."
+            label={t('profileField.headline')}
+            hint={t('personalApply.headline.hint')}
             value={form.headline}
             onChange={set('headline')}
             error={errors.headline}
@@ -160,8 +170,8 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
             maxLength={120}
           />
           <Textarea
-            label="Bio"
-            hint="50–3000 characters. Learners read this on your course pages."
+            label={t('profileField.bio')}
+            hint={t('personalApply.bio.hint')}
             value={form.bio}
             onChange={set('bio')}
             error={errors.bio}
@@ -172,11 +182,11 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
 
         <Card as="section" className="space-y-5">
           <h2 className="font-display text-h2 font-semibold text-ink">
-            Credentials and experience
+            {t('personalApply.experience.title')}
           </h2>
           <Textarea
-            label="Credentials"
-            hint="Qualifications, years of practice, where you have taught."
+            label={t('personalApply.credentials')}
+            hint={t('personalApply.credentials.hint')}
             value={form.credentials}
             onChange={set('credentials')}
             error={errors.credentials}
@@ -187,27 +197,25 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
 
         <Card as="section" className="space-y-5">
           <div>
-            <h2 className="font-display text-h2 font-semibold text-ink">Teaching sample</h2>
-            <p className="mt-1 text-small text-ink-secondary">
-              Upload a short video of you teaching, or paste a link to one. Either is fine.
-            </p>
+            <h2 className="font-display text-h2 font-semibold text-ink">
+              {t('personalApply.sample.title')}
+            </h2>
+            <p className="mt-1 text-small text-ink-secondary">{t('personalApply.sample.intro')}</p>
           </div>
           <MediaUploader
             api={api}
             kind="video"
             value={sample}
             onChange={setSample}
-            label="Upload a video"
-            hint="MP4 or MOV, up to a few minutes"
+            label={t('personalApply.sample.upload')}
+            hint={t('personalApply.sample.upload.hint')}
           />
           {existing?.teachingSampleMediaId && !sample ? (
-            <p className="text-small text-ink-tertiary">
-              The video from your last application is kept unless you upload a new one.
-            </p>
+            <p className="text-small text-ink-tertiary">{t('personalApply.sample.kept')}</p>
           ) : null}
           <Input
-            label="Or a link"
-            placeholder="https://youtube.com/…"
+            label={t('personalApply.sample.link')}
+            placeholder={t('personalApply.sample.link.placeholder')}
             value={form.teachingSampleUrl ?? ''}
             onChange={set('teachingSampleUrl')}
             error={errors.teachingSampleUrl}
@@ -216,10 +224,10 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
         </Card>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-small text-ink-tertiary">
-            By applying you agree to the teacher agreement: you own your content; Elevate holds a
-            non-exclusive hosting licence while it is listed.
-          </p>
+          <div className="space-y-2">
+            <p className="text-small text-ink-tertiary">{t('personalApply.agreement')}</p>
+            <p className="text-small text-ink-tertiary">{t('personalApply.agreementPreviews')}</p>
+          </div>
           <Button
             type="submit"
             variant="accent"
@@ -228,7 +236,7 @@ function ApplicationForm({ existing }: { existing: ProfileView | null }) {
             iconRight={ArrowRight}
             className="shrink-0"
           >
-            {isResubmission ? 'Resubmit' : 'Submit application'}
+            {t(isResubmission ? 'personalApply.submit.reapply' : 'personalApply.submit.apply')}
           </Button>
         </div>
       </form>

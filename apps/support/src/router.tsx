@@ -24,7 +24,7 @@ export const router = createBrowserRouter([
             api={api}
             audience="support"
             portalName="Elevate Support"
-            blurb="Internal tools: review courses, approve teachers, manage payments."
+            blurbKey="portalAuth.blurb.support"
           />
         ),
       },

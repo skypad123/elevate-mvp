@@ -1,4 +1,6 @@
 import type {
+  AnimatedPreview,
+  AnimatedPreviewOptions,
   MediaAssetRow,
   VideoAssetPatch,
   VideoProvider,
@@ -11,6 +13,13 @@ export class FakeVideoProvider implements VideoProvider {
   readonly driver = 'fake'
   readonly uploads = new Map<string, { assetId: string; muxAssetId: string }>()
   private counter = 0
+
+  /** Every `animatedPreview` call, in order. */
+  readonly previewCalls: Array<{ assetId: string; options: AnimatedPreviewOptions }> = []
+  /** What `animatedPreview` does: return the fixed bytes, return `null`, or throw. */
+  previewMode: 'ok' | 'null' | 'throw' = 'ok'
+  /** Awaited at the start of each `animatedPreview` call, so a test can change the course meanwhile. */
+  onPreview?: () => unknown | Promise<unknown>
 
   async createUpload(input: { assetId: string }): Promise<VideoUploadTarget> {
     const uploadId = `upl_${++this.counter}`
@@ -41,6 +50,17 @@ export class FakeVideoProvider implements VideoProvider {
     if (headers.get('mux-signature') !== 'fake-valid') throw new Error('invalid signature')
     const parsed = JSON.parse(rawBody) as VideoWebhookEvent
     return parsed
+  }
+
+  async animatedPreview(
+    asset: MediaAssetRow,
+    options: AnimatedPreviewOptions,
+  ): Promise<AnimatedPreview | null> {
+    if (this.onPreview) await this.onPreview()
+    this.previewCalls.push({ assetId: asset.id, options })
+    if (this.previewMode === 'throw') throw new Error('fake preview failure')
+    if (this.previewMode === 'null') return null
+    return { bytes: new Uint8Array([0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4]), mimeType: 'image/webp' }
   }
 
   /** Builds the two webhook deliveries Mux sends for an upload. */

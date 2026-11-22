@@ -157,8 +157,8 @@ export function CourseBuilder() {
         <TabsContent value="details">
           {proposes ? (
             <p className="mb-4 text-small text-ink-secondary">
-              The title, description, cover image and price of a live course are for the owner or a
-              manager to change.
+              The title, description, cover image, hover preview and price of a live course are for
+              the owner or a manager to change.
             </p>
           ) : null}
           <DetailsForm key={c.updatedAt} course={c} locked={locked || proposes} />

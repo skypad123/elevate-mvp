@@ -89,6 +89,11 @@ variable "csp_report_only" {
   default = true
 }
 
+variable "course_previews" {
+  type    = bool
+  default = true
+}
+
 variable "private_access_extra_cidrs" {
   description = "IPv4 CIDRs let into staging besides the Tailscale connector (a fallback, e.g. an office IP)."
   type        = list(string)
@@ -112,6 +117,7 @@ module "environment" {
   integrations           = var.integrations
   seed_super_admin_email = var.seed_super_admin_email
   csp_report_only        = var.csp_report_only
+  course_previews        = var.course_previews
 
   # Only the tailnet can open staging (infra/README.md, "Private staging").
   private_access             = true

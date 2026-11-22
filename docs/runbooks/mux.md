@@ -33,3 +33,9 @@ while it is pending or processing.
 Playback policies are `signed`, so every HLS and thumbnail URL carries a short-lived JWT minted by
 the API only after it has checked that the viewer owns the asset, is staff, or is enrolled in a
 course whose lesson is unlocked.
+
+One exception: the hover-preview clip on a course card
+([ADR 011](../adr/011-course-preview-clips.md)). The API signs a `gif` token (audience `g`, five
+minutes) once, fetches a 4-second animated WebP from `image.mux.com/<playbackId>/animated.webp`,
+and stores it as a public file. The token is used once and never leaves the API; the stored clip
+needs no token. It uses the signing key above and needs no new Mux credential.

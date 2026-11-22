@@ -41,7 +41,25 @@ export interface VideoProvider {
   signPlayback(asset: MediaAssetRow): Promise<Extract<PlaybackInfo, { kind: 'video' }>>
   /** Verifies and parses a webhook delivery. Throws on a bad signature. */
   parseWebhook(rawBody: string, headers: Headers): Promise<VideoWebhookEvent>
+  /**
+   * A short silent animated WebP of the video, for the hover preview on a course card (ADR 011).
+   * `null` when no clip can be made: no playback ID, a refusal, an error, a timeout, a body that
+   * is not WebP or is too large. It never throws for those.
+   */
+  animatedPreview(
+    asset: MediaAssetRow,
+    options: AnimatedPreviewOptions,
+  ): Promise<AnimatedPreview | null>
 }
+
+export type AnimatedPreviewOptions = {
+  startSeconds: number
+  endSeconds: number
+  width: number
+  fps: number
+}
+
+export type AnimatedPreview = { bytes: Uint8Array; mimeType: 'image/webp' }
 
 /** Translates a provider webhook into a patch for the matching media row. Pure, so it is testable. */
 export function patchForVideoEvent(

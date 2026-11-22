@@ -34,11 +34,12 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 - New user preference = a field with a `.default()` in `packages/core/src/contracts/preferences.ts`
   plus a row in `PreferenceRows` (web) and the learner Profile card.
 - Translated pages (the whole learner app, navigation, Settings/Preferences/Profile, the Teach
-  dashboard and start page, and the teaching-profile screens of Teach and Support) have no English
-  literals: a new string there is a key in that page's area (a learner screen's in a `learner*` area),
+  dashboard and start page, the teaching-profile screens of Teach and Support, their sign-in and
+  verify pages, and Teach's personal application) have no English literals: a new string there is a key in that page's area (a learner screen's in a `learner*` area),
   `packages/i18n/src/messages/areas/<area>.en.ts` and `<area>.zh.ts`. A message is a whole sentence;
   enum labels, plurals, sentences with links, dates, lists and error text (`useErrorMessage()`)
-  follow the patterns in `docs/adr/008-*`. Other pages are English until one is translated whole.
+  follow the patterns in `docs/adr/008-*`. A page may map an `error.code` it knows to a message
+  key; the server's message is the fallback. Other pages are English until one is translated whole.
 - The learner app words API errors from their codes, never from the API's English `message`: an
   error a learner can reach has a code in `USER_ERROR_CODES` (`packages/core/src/contracts/errors.ts`)
   and a message `apiError.<code>`, one code per meaning, with variable parts in `details` (ADR 010).
@@ -70,6 +71,11 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 - Learner emails: the receipt, certificate, refund and second-payment refund emails use
   `users.locale ?? 'en'`; the sign-in code email uses the request's `locale`. See ADR 010. A new
   string in a learner email is a key in the `email` area. Teacher and Support emails stay English.
+- A course's hover-preview clip is made, replaced or cleared only by `CoursePreviewService`. A clip
+  always gets a new `public/previews/` key, because public files are cached as immutable. A direct
+  edit to a live course's lessons or items finishes through `CoursesService.edited`, which deletes a
+  clip whose video has left the course; nothing checks that again when the catalog is read
+  (ADR 011).
 - Run `npm run lint` (Biome) and `npx turbo run typecheck test` before committing.
 
 ## Expo conventions (apps/learner)
