@@ -1,0 +1,366 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "81231a4c-16ab-4b0a-967b-394a0f0ec504",
+  "prevIds": [
+    "184fcaf0-7268-4232-b289-8bbacdd0def2"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "courses",
+        "preview_enabled"
+      ],
+      "writes": [
+        "s|col|public.courses.preview_enabled",
+        "n|col|public.courses.preview_enabled",
+        "e|col|public.courses.preview_enabled"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "courses",
+        "preview_media_id"
+      ],
+      "writes": [
+        "s|col|public.courses.preview_media_id",
+        "n|col|public.courses.preview_media_id",
+        "e|col|public.courses.preview_media_id"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "courses",
+        "preview_start_seconds"
+      ],
+      "writes": [
+        "s|col|public.courses.preview_start_seconds",
+        "n|col|public.courses.preview_start_seconds",
+        "e|col|public.courses.preview_start_seconds"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "courses",
+        "preview_key"
+      ],
+      "writes": [
+        "s|col|public.courses.preview_key",
+        "n|col|public.courses.preview_key",
+        "e|col|public.courses.preview_key"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "courses",
+        "preview_source_media_id"
+      ],
+      "writes": [
+        "s|col|public.courses.preview_source_media_id",
+        "n|col|public.courses.preview_source_media_id",
+        "e|col|public.courses.preview_source_media_id"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "courses",
+        "preview_source_start_seconds"
+      ],
+      "writes": [
+        "s|col|public.courses.preview_source_start_seconds",
+        "n|col|public.courses.preview_source_start_seconds",
+        "e|col|public.courses.preview_source_start_seconds"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "media_assets",
+        "preview_fetches"
+      ],
+      "writes": [
+        "s|col|public.media_assets.preview_fetches",
+        "n|col|public.media_assets.preview_fetches",
+        "e|col|public.media_assets.preview_fetches"
+      ],
+      "reads": [
+        "n|tbl|public.media_assets",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "courses"
+      ],
+      "writes": [
+        "s|fk|public.courses.courses_preview_media_id_media_assets_id_fkey",
+        "n|fk|public.courses.courses_preview_media_id_media_assets_id_fkey",
+        "e|fk|public.courses.courses_preview_media_id_media_assets_id_fkey",
+        "n|con|public.courses.courses_preview_media_id_media_assets_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.courses.preview_media_id",
+        "n|col|public.media_assets.id",
+        "e|uniqueness|public.media_assets.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "courses"
+      ],
+      "writes": [
+        "s|fk|public.courses.courses_preview_source_media_id_media_assets_id_fkey",
+        "n|fk|public.courses.courses_preview_source_media_id_media_assets_id_fkey",
+        "e|fk|public.courses.courses_preview_source_media_id_media_assets_id_fkey",
+        "n|con|public.courses.courses_preview_source_media_id_media_assets_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|tbl|public.media_assets",
+        "n|sch|public",
+        "n|col|public.courses.preview_source_media_id",
+        "n|col|public.media_assets.id",
+        "e|uniqueness|public.media_assets.id"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "public",
+        "courses"
+      ],
+      "writes": [
+        "s|ck|public.courses.courses_preview_start_seconds_non_negative",
+        "n|ck|public.courses.courses_preview_start_seconds_non_negative",
+        "e|ck|public.courses.courses_preview_start_seconds_non_negative",
+        "n|con|public.courses.courses_preview_start_seconds_non_negative"
+      ],
+      "reads": [
+        "n|tbl|public.courses",
+        "n|sch|public",
+        "n|col|public.courses.preview_start_seconds"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "courses",
+        "name": "preview_enabled",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "true",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "courses",
+        "name": "preview_media_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "courses",
+        "name": "preview_start_seconds",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "courses",
+        "name": "preview_key",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "courses",
+        "name": "preview_source_media_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "courses",
+        "name": "preview_source_start_seconds",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "media_assets",
+        "name": "preview_fetches",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "courses",
+        "name": "courses_preview_media_id_media_assets_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "preview_media_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "media_assets",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "courses",
+        "name": "courses_preview_source_media_id_media_assets_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "preview_source_media_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "media_assets",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "courses",
+        "name": "courses_preview_start_seconds_non_negative",
+        "value": "\"preview_start_seconds\" is null or \"preview_start_seconds\" >= 0",
+        "entityType": "checks"
+      }
+    }
+  ]
+}
