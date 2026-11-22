@@ -161,13 +161,47 @@ gh workflow run deploy.yml --ref staging
 
 A deploy:
 
-1. builds the API image and pushes it to ECR, tagged with the commit SHA (a commit that already
+1. checks that the commit's Terraform has been applied to the environment, and stops before
+   changing anything if it has not (see "Terraform before deploy" below);
+2. builds the API image and pushes it to ECR, tagged with the commit SHA (a commit that already
    has an image, such as one promoted from staging, reuses it);
-2. runs the database migrations as a one-off task, and stops if they fail, leaving the running API
+3. runs the database migrations as a one-off task, and stops if they fail, leaving the running API
    untouched;
-3. starts the new API task, waits for it to pass health checks, then stops the old one;
-4. builds the three web apps with that environment's URLs, uploads them to S3 and invalidates
+4. starts the new API task, waits for it to pass health checks, then stops the old one;
+5. builds the three web apps with that environment's URLs, uploads them to S3 and invalidates
    CloudFront.
+
+#### Terraform before deploy
+
+Every `terraform apply` stores a hash of the Terraform it applied in the SSM parameter
+`/elevate/<environment>/deploy/terraform-fingerprint`. The hash covers `envs/<environment>/`
+(the `.tf` files and the provider lock file) and everything under `modules/`. The deploy hashes the
+same files at the commit it is deploying, using `infra/scripts/terraform-fingerprint.sh`. If the
+two hashes differ, that commit changed the environment's Terraform and nobody has applied it yet,
+so the deploy fails at its first step with a message saying which directory to apply. Then:
+
+```bash
+git switch staging && git pull           # the commit the failed run deployed
+cd infra/terraform/envs/staging
+terraform plan
+terraform apply
+gh run rerun <run-id> --failed           # or re-run the failed jobs from the run's page
+```
+
+Some things to know:
+
+- Apply from a clean checkout of a commit with the same Terraform as the one being deployed. That
+  can be the branch after the merge, or the pull request's head commit before it. Terraform hashes
+  the files on disk, so applying with uncommitted edits records a hash that no commit has, and the
+  next deploy stops again.
+- `terraform.tfvars` and the `bootstrap` stack are not covered. Changes to them still need their
+  own apply, as before.
+- To see whether an environment is up to date without deploying, compare
+  `infra/scripts/terraform-fingerprint.sh staging` with
+  `aws ssm get-parameter --name /elevate/staging/deploy/terraform-fingerprint --query Parameter.Value --output text`.
+- The check arrived in a commit that also adds the parameter and the deploy role's permission to
+  read it. Each environment therefore needs one apply from that commit, or a later one, before its
+  next deploy will pass.
 
 ### 7. Check it
 
@@ -290,8 +324,9 @@ learns which addresses to route from the DNS lookups. Linux devices also need
   the waiting Deploy run.
 - **Change infrastructure or configuration**: edit `infra/terraform`, open a pull request (the
   **Infra** workflow checks formatting and validity), then `terraform plan` and `apply` from
-  `envs/<environment>` yourself. Changes to the API's environment variables take effect on the
-  next deploy.
+  `envs/<environment>` yourself. Apply before you merge into the environment's branch: a deploy
+  whose Terraform has not been applied stops at its first step ("Terraform before deploy").
+  Changes to the API's environment variables take effect on the next deploy.
 - **Roll back**: `git revert` the commit on the environment's branch and push. The deploy builds
   and rolls out the reverted code like any other commit. Database migrations are not reversed, so
   keep them additive. The one-time reset below is the exception: it cannot be rolled back.
