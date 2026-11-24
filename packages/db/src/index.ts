@@ -6,6 +6,7 @@ export { learnerRelations } from './learner-relations'
 export { migrationsFolder } from './migrations-folder'
 export { pendingMigrations } from './pending-migrations'
 export type { PgliteDb, PgliteLearnerDb } from './pglite'
+export { apiRoleGrantStatements, applyApiRole } from './roles'
 export * as schema from './schema'
 export * from './schema'
 
