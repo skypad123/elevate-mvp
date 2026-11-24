@@ -45,4 +45,14 @@ export const apiErrorEn = {
   'apiError.attempt_expired': 'Time ran out for this attempt.',
 
   'apiError.not_complete': 'Finish the course to get your certificate.',
+
+  'apiError.check_in_not_open': 'Check-in for this class is not open yet.',
+  'apiError.check_in_closed': 'Check-in for this class has closed.',
+  'apiError.check_in_locked': 'Too many wrong codes. Try again in a few minutes.',
+  'apiError.check_in_code_wrong': 'That code is not right. Type the code showing now.',
+  'apiError.check_in_code_expired': 'That code has expired. Type the code showing now.',
+  'apiError.check_in_overturned':
+    'Your check-in for this class was overturned. Speak to your instructor.',
+  'apiError.dispute_window_closed': 'The time to dispute this has passed.',
+  'apiError.already_disputed': 'You have already disputed this.',
 } as const

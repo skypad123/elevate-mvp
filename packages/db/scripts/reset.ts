@@ -3,7 +3,8 @@ import { createDb } from '../src/client'
 
 if (process.env.NODE_ENV === 'production')
   throw new Error('refusing to reset a production database')
-const url = process.env.DATABASE_URL
+// Runs as the owner, like the migrations: `MIGRATION_DATABASE_URL` when set, else `DATABASE_URL`.
+const url = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL
 if (!url) throw new Error('DATABASE_URL is not set')
 
 const { db, pool } = createDb(url)

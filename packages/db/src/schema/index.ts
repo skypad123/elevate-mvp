@@ -1,4 +1,5 @@
 export * from './auth'
+export * from './classes'
 export * from './commerce'
 export * from './courses'
 export * from './enums'

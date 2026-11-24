@@ -61,3 +61,16 @@ export const progressStatusEnum = pgEnum('progress_status', [
   'completed',
 ])
 export const webhookProviderEnum = pgEnum('webhook_provider', ['stripe', 'mux'])
+/** How a scheduled class meets. An in-person class measures check-ins against its venue. */
+export const classDeliveryEnum = pgEnum('class_delivery', ['in_person', 'remote'])
+/** A scheduled class's status. Part 2 adds more values. */
+export const classStatusEnum = pgEnum('class_status', ['draft', 'published'])
+/** What one attendance row records. Rows are only ever inserted (see `classes.ts`). */
+export const attendanceEventTypeEnum = pgEnum('attendance_event_type', [
+  'attempt_refused',
+  'check_in',
+  'overturn',
+  'manual_mark',
+  'dispute',
+  'dispute_decision',
+])

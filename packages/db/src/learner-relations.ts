@@ -1,6 +1,6 @@
 import { defineRelations } from 'drizzle-orm'
 import { userRoles, users } from './schema/auth'
-import { enrollments } from './schema/commerce'
+import { selfPacedEnrollments } from './schema/commerce'
 import {
   courses,
   liveArtefacts,
@@ -16,6 +16,8 @@ import { profiles } from './schema/profiles'
  * The relations learner-facing code reads through. Course content is reachable only by the four
  * views (`live_lessons`, `live_artefacts`, `live_quizzes`, `live_lesson_prerequisites`), which
  * leave out a writer's draft rows, so a client built from this set cannot return a draft.
+ * Its `enrollments` is the `self_paced_enrollments` view, which leaves out class enrollments, so
+ * a read through it cannot return one either (docs/designs/scheduled-classes-attendance.md).
  *
  * The content keys are named `live…` on purpose: they differ from the raw relations' keys
  * (`lessons`, `artefacts`, `quiz`, `prerequisites`), which is how `schema-guard.test.ts` tells a
@@ -31,7 +33,9 @@ const tables = {
   liveArtefacts,
   liveQuizzes,
   liveLessonPrerequisites,
-  enrollments,
+  // The view of self-paced enrollments, under the table's key: learner code reads `enrollments`
+  // and never sees a class enrollment.
+  enrollments: selfPacedEnrollments,
   artefactProgress,
   quizAttempts,
   certificates,

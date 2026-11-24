@@ -38,4 +38,14 @@ export const apiErrorZh = {
   'apiError.attempt_expired': '本次作答已超时。',
 
   'apiError.not_complete': '完成课程即可获得证书。',
+
+  // Drafted by Claude for scheduled classes; awaiting the author's sign-off.
+  'apiError.check_in_not_open': '本堂课尚未开放签到。',
+  'apiError.check_in_closed': '本堂课的签到已结束。',
+  'apiError.check_in_locked': '签到码错误次数过多，请几分钟后再试。',
+  'apiError.check_in_code_wrong': '签到码不正确，请输入当前显示的签到码。',
+  'apiError.check_in_code_expired': '此签到码已过期，请输入当前显示的签到码。',
+  'apiError.check_in_overturned': '您本堂课的签到已被撤销，请联系讲师。',
+  'apiError.dispute_window_closed': '申诉期限已过。',
+  'apiError.already_disputed': '您已对此提出申诉。',
 } satisfies Record<keyof typeof apiErrorEn, string>
