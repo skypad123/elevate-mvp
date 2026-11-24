@@ -1,6 +1,17 @@
-import { sql } from 'drizzle-orm'
-import { boolean, index, integer, jsonb, snakeCase, text, unique, uuid } from 'drizzle-orm/pg-core'
+import { isNull, sql } from 'drizzle-orm'
+import {
+  type AnyPgColumn,
+  boolean,
+  index,
+  integer,
+  jsonb,
+  snakeCase,
+  text,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core'
 import { users } from './auth'
+import { classes } from './classes'
 import { citext, createdAt, id, ts, updatedAt } from './columns'
 import { courses } from './courses'
 import { enrollmentModeEnum, enrollmentStatusEnum, paymentStatusEnum, promoTypeEnum } from './enums'
@@ -24,7 +35,10 @@ export const promoCodes = snakeCase.table('promo_codes', {
   createdAt: createdAt(),
 })
 
-/** Placeholder for class-based attendance (unused in MVP, present per spec). */
+/**
+ * The old placeholder for class attendance. Superseded by `attendance_events` (see `classes.ts`):
+ * nothing may write it.
+ */
 export type AttendanceRecord = {
   sessionId: string
   checkedInAt: string
@@ -43,20 +57,42 @@ export const enrollments = snakeCase.table(
       .references(() => courses.id, { onDelete: 'restrict' }),
     mode: enrollmentModeEnum().notNull().default('self_directed'),
     status: enrollmentStatusEnum().notNull().default('pending_payment'),
+    /** Superseded by `attendance_events`; never written. */
     attendanceRecords: jsonb().$type<AttendanceRecord[]>().notNull().default(sql`'[]'::jsonb`),
     promoCodeId: uuid().references(() => promoCodes.id, { onDelete: 'set null' }),
     stripeCheckoutSessionId: text().unique(),
+    /**
+     * Null for a self-paced enrollment (every row before scheduled classes); set for a class
+     * enrollment. `classes.ts` imports this file, hence the typed callback.
+     */
+    classId: uuid().references((): AnyPgColumn => classes.id, { onDelete: 'restrict' }),
     enrolledAt: ts(),
     completedAt: ts(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
-    unique().on(t.userId, t.courseId),
+    // One self-paced enrollment per learner and course, and one enrollment per learner and class.
+    uniqueIndex('enrollments_one_self_paced_per_course')
+      .on(t.userId, t.courseId)
+      .where(sql`${t.classId} is null`),
+    uniqueIndex('enrollments_one_per_class')
+      .on(t.userId, t.classId)
+      .where(sql`${t.classId} is not null`),
     index().on(t.courseId, t.status),
     index().on(t.userId, t.status),
+    index().on(t.classId),
   ],
 )
+
+/**
+ * The enrollments that are not class enrollments. The learner database client's `enrollments`
+ * reads this view (see `learner-relations.ts`), so existing learner reads keep meaning
+ * "self-paced" and a class enrollment looked up through it is not found.
+ */
+export const selfPacedEnrollments = snakeCase
+  .view('self_paced_enrollments')
+  .as((qb) => qb.select().from(enrollments).where(isNull(enrollments.classId)))
 
 export const payments = snakeCase.table(
   'payments',

@@ -1,5 +1,6 @@
 import { defineRelations } from 'drizzle-orm'
 import { identities, magicLinks, sessions, userRoles, users } from './auth'
+import { attendanceEventLocations, attendanceEvents, classBlocks, classes } from './classes'
 import { enrollments, payments, promoCodes, refunds } from './commerce'
 import {
   artefacts,
@@ -49,6 +50,10 @@ const tables = {
   artefactProgress,
   quizAttempts,
   certificates,
+  classes,
+  classBlocks,
+  attendanceEvents,
+  attendanceEventLocations,
   webhookEvents,
   auditLog,
   analyticsEvents,
@@ -204,6 +209,12 @@ export const relations = defineRelations(tables, (r) => ({
     attempts: r.many.quizAttempts({ from: r.enrollments.id, to: r.quizAttempts.enrollmentId }),
     payments: r.many.payments({ from: r.enrollments.id, to: r.payments.enrollmentId }),
     certificate: r.one.certificates({ from: r.enrollments.id, to: r.certificates.enrollmentId }),
+    /** Null for a self-paced enrollment. */
+    class: r.one.classes({ from: r.enrollments.classId, to: r.classes.id }),
+    attendanceEvents: r.many.attendanceEvents({
+      from: r.enrollments.id,
+      to: r.attendanceEvents.enrollmentId,
+    }),
   },
   payments: {
     enrollment: r.one.enrollments({
@@ -250,6 +261,45 @@ export const relations = defineRelations(tables, (r) => ({
       from: r.certificates.enrollmentId,
       to: r.enrollments.id,
       optional: false,
+    }),
+  },
+  classes: {
+    profile: r.one.profiles({ from: r.classes.profileId, to: r.profiles.id, optional: false }),
+    course: r.one.courses({ from: r.classes.courseId, to: r.courses.id, optional: false }),
+    instructor: r.one.users({
+      from: r.classes.instructorUserId,
+      to: r.users.id,
+      optional: false,
+    }),
+    blocks: r.many.classBlocks({ from: r.classes.id, to: r.classBlocks.classId }),
+    enrollments: r.many.enrollments({ from: r.classes.id, to: r.enrollments.classId }),
+  },
+  classBlocks: {
+    class: r.one.classes({ from: r.classBlocks.classId, to: r.classes.id, optional: false }),
+    events: r.many.attendanceEvents({ from: r.classBlocks.id, to: r.attendanceEvents.blockId }),
+  },
+  attendanceEvents: {
+    class: r.one.classes({ from: r.attendanceEvents.classId, to: r.classes.id, optional: false }),
+    block: r.one.classBlocks({
+      from: r.attendanceEvents.blockId,
+      to: r.classBlocks.id,
+      optional: false,
+    }),
+    enrollment: r.one.enrollments({
+      from: r.attendanceEvents.enrollmentId,
+      to: r.enrollments.id,
+      optional: false,
+    }),
+    learner: r.one.users({
+      from: r.attendanceEvents.learnerUserId,
+      to: r.users.id,
+      optional: false,
+    }),
+    actor: r.one.users({ from: r.attendanceEvents.actorUserId, to: r.users.id, optional: false }),
+    /** Absent when no reading was sent, or once the coordinates are erased. */
+    location: r.one.attendanceEventLocations({
+      from: r.attendanceEvents.id,
+      to: r.attendanceEventLocations.eventId,
     }),
   },
 }))

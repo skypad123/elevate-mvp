@@ -15,6 +15,7 @@ export type AnyDb = Db | PgliteDb
 /**
  * The client learner-facing services read course content with. Its relations reach lessons,
  * artefacts, quizzes and prerequisite links only through the live views, so it has no
- * `query.lessons`, `query.artefacts`, `query.quizzes` or `query.lessonPrerequisites`.
+ * `query.lessons`, `query.artefacts`, `query.quizzes` or `query.lessonPrerequisites`. Its
+ * `enrollments` is the `self_paced_enrollments` view, so it also leaves out class enrollments.
  */
 export type LearnerDb = NodeLearnerDb | PgliteLearnerDb
