@@ -48,6 +48,16 @@ export const USER_ERROR_CODES = [
 
   // Certificates (certificates.service.ts)
   'not_complete',
+
+  // Classes (attendance.service.ts)
+  'check_in_not_open', // details.opensAt
+  'check_in_closed', // details.closesAt
+  'check_in_locked', // five wrong or expired codes; details.lockedUntil
+  'check_in_code_wrong', // details.attemptsLeft
+  'check_in_code_expired', // details.attemptsLeft
+  'check_in_overturned', // the instructor overturned this block's check-in
+  'dispute_window_closed', // details.disputeUntil
+  'already_disputed',
 ] as const
 
 export type UserErrorCode = (typeof USER_ERROR_CODES)[number]

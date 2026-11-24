@@ -1,6 +1,7 @@
 export * from './auth'
 export * from './catalog'
 export * from './checkout'
+export * from './classes'
 export * from './common'
 export * from './errors'
 export * from './learning'
