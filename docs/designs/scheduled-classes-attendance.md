@@ -1064,6 +1064,12 @@ Each entry is one file unless it says otherwise, and gives the change and the
 reason. Entries name the function or query to change; line numbers are a guide
 and move as earlier entries land.
 
+**Phase 1 is built.** Its entries, 1.1 to 1.20, were built in commits
+`58ab5dc`, `4be1739`, `99c894b` and `e62c2d3`, and merged on 2026-11-24. Those
+entries were corrected afterwards to describe what was built, where the build
+found the plan wrong or silent. Each correction is marked "As built". Phases 2
+to 7 are not built.
+
 ### Shared definitions used by the entries
 
 **Values.** These are the strings the API sends and stores.
@@ -1196,6 +1202,11 @@ behaviour those tests cover did not change.
   on (block, enrollment) where `type = 'check_in'`, and
   `attendance_events_one_per_referred_event` on (`refers_to_event_id`, `type`)
   where `refers_to_event_id is not null`.
+- **As built:** `classes.venue_set_by` and `classes.created_by` reference
+  `users` and are set to null when the user is deleted, as
+  `promoCodes.createdBy` is. `refers_to_event_id` restricts on delete. A check
+  constraint, `class_blocks_ends_after_starts`, makes the database refuse a
+  block whose end is not after its start.
 - **Why:** Classes, blocks, attendance and coordinates each need their own
   table: the old list on the enrollment row cannot be audited, and coordinates
   must be erasable without touching an event.
@@ -1271,18 +1282,31 @@ behaviour those tests cover did not change.
   alter default privileges in schema public grant usage on sequences to <role>;
   ```
 
-  `applyApiRole(pool, { user, password })` takes one client from the pool and
-  runs, between `begin` and `commit`: a `do` block that looks the role up in
-  `pg_roles` and runs `create role <user> login nosuperuser nocreatedb
-  nocreaterole password <literal>` when it is missing, or `alter role` with the
-  same attributes and password when it exists; then the statements above. The
-  password is quoted with the client's `escapeLiteral`, because Postgres
-  accepts no bound values in these statements, and the statement is never
-  logged.
+  `applyApiRole(pool, { user, password })` throws on an empty password. It
+  takes one client from the pool and runs, between `begin` and `commit`:
+  1. `select 1 from pg_roles where rolname = $1`, with the role name as a bound
+     value;
+  2. `create role <user> login nosuperuser nocreatedb nocreaterole password
+     <literal>` when step 1 found nothing, or `alter role` with the same
+     attributes and password when it found the role;
+  3. the statements above.
+
+  The password is quoted with the client's `escapeLiteral`, because Postgres
+  accepts no bound values in `create role` and `alter role`, and the statement
+  is never logged. On an error it rolls back and rethrows.
+- **As built:** The plan first put steps 1 and 2 inside one `do $$ ... $$`
+  block. A password that contains `$$` ends that block early, and
+  `escapeLiteral` does not guard against it. The lookup is its own statement
+  so the password is never inside a dollar-quoted body. The build checked this
+  on Postgres 17 with a password containing `$$`, a quote and a space, on a
+  first run and a second.
 - **Why:** One place defines what the API's database user may do, shared by
   the migration task and the tests. A check recorded in the consolidated
   review report showed each statement form runs on PGlite 0.5.16 and gives the
-  intended refusals.
+  intended refusals. The list does not stop the API's user creating a table.
+  That refusal comes from Postgres 15 and later, where the `public` schema no
+  longer lets every user create in it. RDS runs Postgres 17 and PGlite behaves
+  the same; on an older Postgres the user could create tables.
 
 #### 1.9 `packages/db/src/pglite.ts` and `packages/db/src/index.ts` (Modify)
 
@@ -1319,6 +1343,10 @@ behaviour those tests cover did not change.
   and `attendance.take` to `WRITER`, and `class.read` and `attendance.read` to
   `STAFF`. Owner and manager receive all five through `ALL` and `MANAGER`. None
   is added to `UNAPPROVED`.
+- **As built:** `can()` has never limited staff by a profile's status, and this
+  entry does not change that. Staff keep `class.read` and `attendance.read` on
+  a profile that is not approved. An owner, manager or writer has none of the
+  five before approval.
 - **Why:** The capability table in the Technical Plan.
 
 #### 1.13 `packages/core/src/domain/attendance.ts` (Create)
@@ -1326,6 +1354,9 @@ behaviour those tests cover did not change.
 - **Change:** The `attendance.ts` constants and the value lists above.
   Functions:
   - `checkInWindow(block)` returns `opensAt` and `closesAt`.
+  - `checkInWindowStatus(block, now)` returns `not_open_yet`, `open` or
+    `closed`. The window is open at exactly `opensAt` and at exactly
+    `closesAt`.
   - `distanceMeters(a, b)`.
   - `locationStatus({ delivery, venue, sent })` implements step 7 of Check-in
     and returns one of the seven `location_status` values.
@@ -1333,11 +1364,27 @@ behaviour those tests cover did not change.
     above.
   - `attendanceState(events, now)` returns `{ state, flagReason, subState,
     disputeUntil }` by the two precedence orders above.
-  - `canOverturn`, `canManualMark`, `canDispute` and `canDecide` each take the
-    learner's events for the block and the time, and return `true` or the error
-    code from the tables above.
+  - `canOverturn(events, now)` and `canManualMark(events, now)` take the
+    learner's events for the block and the time. `canDispute(events,
+    markEventId, now)` and `canDecide(events, disputeEventId, now)` also take
+    the event being acted on. Each returns `true` or the error code from the
+    tables above. `canDispute` tests in this order: the mark exists and stands
+    (`not_found`), the 7 days have not passed (`dispute_window_closed`), no
+    dispute exists yet (`already_disputed`).
+  - `canCheckIn(events)` returns `true`; `repeat` when the learner has a
+    standing check-in or manual mark; or `overturned` when their check-in for
+    the block was overturned.
   - `checkInMix(rows)` takes `{ state, flagReason }` per learner and returns
     the seven `CheckInMix` fields.
+- **As built:** The file also exports the lists `ATTENDANCE_EVENT_TYPES`,
+  `ATTENDANCE_ACTOR_ROLES`, `NO_READING_STATUSES` and `CLASS_AUDIT_ACTIONS`.
+  Three edges the plan left open were settled:
+  - A refusal exactly 10 minutes old still counts toward the lockout.
+  - A reading with an accuracy of exactly 500 m is accurate enough;
+    `inaccurate` means more than 500.
+  - `locationStatus` throws when an in-person class has a reading and no venue
+    position. The API must not reach it in that state, because no code is
+    shown until the venue is set.
 - **Why:** The API, both portals and the learner app must agree on one
   definition of a learner's state.
 
@@ -1360,6 +1407,10 @@ behaviour those tests cover did not change.
   `Intl.DateTimeFormat`, with no new dependency. `validateBlocks(blocks)`
   returns every problem as `{ index, problem }`, with the problems in the Teach
   error table.
+- **As built:** The file also exports `isValidZonedDateTime` and the list
+  `BLOCK_PROBLEMS`. A wall-clock time that falls in a daylight-saving gap
+  moves forward, and one that occurs twice takes the earlier instant.
+  `too_many` is reported once for each block past the sixtieth.
 - **Why:** `ClassesService` converts the wall-clock dates and times a request
   carries into instants; the portals convert instants back for display, and
   the schedule editor shows each problem beside its row.
@@ -1442,6 +1493,11 @@ behaviour those tests cover did not change.
 
   No response type has a field for the code secret. Only `SupportClassBlock`
   has coordinates.
+- **As built:** In `checkInSchema`, `appVersion` and `clientTime` are
+  optional. The schema checks the code's length and not its characters, so a
+  code with a character outside the alphabet is stored as a `code_wrong`
+  refusal and counts toward the lockout; it is not a validation error.
+  `ClassSummary.firstBlockStartsAt` and `lastBlockEndsAt` are `string | null`.
 - **Why:** Routes validate with these and three clients type against them.
 
 #### 1.17 `packages/core/src/domain/index.ts` and `packages/core/src/contracts/index.ts` (Modify)
@@ -1463,8 +1519,8 @@ behaviour those tests cover did not change.
 - **Change:** One message per new code. The English text is in the
   learner-facing error table.
 - **Why:** `catalog.test.ts` fails when a learner-visible code has no message,
-  so the messages land in the same phase as the codes. The Chinese text needs
-  the author's sign-off before merge.
+  so the messages land in the same phase as the codes. The author signed
+  off the Chinese text on 2026-11-24.
 
 #### 1.20 `packages/core/test/` (Modify one, create three)
 

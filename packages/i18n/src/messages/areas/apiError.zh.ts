@@ -39,7 +39,7 @@ export const apiErrorZh = {
 
   'apiError.not_complete': '完成课程即可获得证书。',
 
-  // Drafted by Claude for scheduled classes; awaiting the author's sign-off.
+  // Scheduled classes: drafted by Claude, signed off by the author on 2026-11-24.
   'apiError.check_in_not_open': '本堂课尚未开放签到。',
   'apiError.check_in_closed': '本堂课的签到已结束。',
   'apiError.check_in_locked': '签到码错误次数过多，请几分钟后再试。',
