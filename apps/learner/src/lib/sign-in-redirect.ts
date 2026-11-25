@@ -6,7 +6,14 @@ import { readInitialPath } from './initial-path'
  * The routes `app/_layout.tsx` and `app/(tabs)/_layout.tsx` guard with `isSignedIn`. Keep this in
  * step with those `Protected` groups.
  */
-const SIGNED_IN_ONLY = [/^\/learning\/?$/, /^\/profile\/?$/, /^\/checkout\//, /^\/learn\//]
+const SIGNED_IN_ONLY = [
+  /^\/learning\/?$/,
+  /^\/profile\/?$/,
+  /^\/checkout\//,
+  /^\/learn\//,
+  // The class screen, not the check-in screen (`/class/check-in/<id>`), which opens signed out.
+  /^\/class\/[^/]+\/?$/,
+]
 
 export function needsSignIn(path: string): boolean {
   const pathname = path.split('?')[0] ?? ''

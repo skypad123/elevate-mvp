@@ -21,7 +21,14 @@ jest.mock('expo-localization', () => {
 // be offline. A call nobody set up answers undefined, which the code under test treats as a failure.
 jest.mock('@/lib/api', () => ({
   api: {
-    me: { $patch: jest.fn() },
+    me: {
+      $patch: jest.fn(),
+      classes: {
+        $get: jest.fn(),
+        blocks: { ':blockId': { $get: jest.fn(), 'check-in': { $post: jest.fn() } } },
+        attendance: { ':eventId': { dispute: { $post: jest.fn() } } },
+      },
+    },
     auth: {
       'magic-link': { $post: jest.fn() },
       verify: { $post: jest.fn() },

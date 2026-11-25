@@ -23,6 +23,9 @@
  *   attempt 作答（次） · pass mark 及格线 · score 得分 · locked 未解锁 · certificate 证书 ·
  *   verify 验证 · Certificate of completion 结业证书 · item types 视频 / 音频 / 图文 / 测验.
  *   Counters: 门课程 · 个课时 · 项内容 · 道题 · 次.
+ * - Scheduled classes: class 班级 · session (one block of a class) 课节, 这节课 · check in 签到 ·
+ *   check-in code 签到码 · instructor 讲师 · venue 上课地点 · remote 线上 · mark present 标记为出席 ·
+ *   overturn 撤销 · dispute 申诉 · upheld 维持 · voided 作废.
  *
  * Style: address the reader as 您; a half-width space between Chinese and Latin letters or
  * digits; full-width punctuation (，。：；？！（）“”) in Chinese sentences.
@@ -40,6 +43,7 @@ import { invitationZh } from './areas/invitation.zh'
 import { learnerAuthZh } from './areas/learnerAuth.zh'
 import { learnerCertificateZh } from './areas/learnerCertificate.zh'
 import { learnerCheckoutZh } from './areas/learnerCheckout.zh'
+import { learnerClassZh } from './areas/learnerClass.zh'
 import { learnerCommonZh } from './areas/learnerCommon.zh'
 import { learnerCourseZh } from './areas/learnerCourse.zh'
 import { learnerExploreZh } from './areas/learnerExplore.zh'
@@ -86,6 +90,7 @@ export const zhAreas: readonly Readonly<Record<string, string>>[] = [
   learnerLearnZh,
   learnerTeachZh,
   learnerCertificateZh,
+  learnerClassZh,
   emailZh,
 ]
 
@@ -117,5 +122,6 @@ export const zh: Partial<Messages> = {
   ...learnerLearnZh,
   ...learnerTeachZh,
   ...learnerCertificateZh,
+  ...learnerClassZh,
   ...emailZh,
 }
