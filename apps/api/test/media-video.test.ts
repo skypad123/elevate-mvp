@@ -1,3 +1,4 @@
+import { schema as s } from '@elevate/db'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -97,6 +98,43 @@ describe('video uploads through the video provider', () => {
       data: { id: 'ast_unknown', playback_ids: [] },
     })
     expect(await unmatched.json()).toMatchObject({ outcome: 'unmatched' })
+  })
+
+  it('never handles a stored Mux event again, even one that failed or never finished', async () => {
+    const created = await t.api('POST', '/api/media/uploads', {
+      token,
+      body: { kind: 'video', filename: 'stored.mp4', mimeType: 'video/mp4', sizeBytes: 1000 },
+    })
+    const uploadId = [...t.video.uploads.keys()].at(-1) as string
+    const { ready } = t.video.eventsFor(uploadId)
+    const failed = { id: `evt_failed_${uploadId}`, type: ready.type, data: ready.data }
+    const unfinished = { id: `evt_unfinished_${uploadId}`, type: ready.type, data: ready.data }
+    const hourAgo = new Date(t.now().getTime() - 60 * 60 * 1000)
+    await t.db.insert(s.webhookEvents).values([
+      {
+        provider: 'mux',
+        eventId: failed.id,
+        type: failed.type,
+        payload: failed,
+        receivedAt: hourAgo,
+        processedAt: hourAgo,
+        error: 'database was down',
+      },
+      {
+        provider: 'mux',
+        eventId: unfinished.id,
+        type: unfinished.type,
+        payload: unfinished,
+        receivedAt: hourAgo,
+      },
+    ])
+    for (const event of [failed, unfinished]) {
+      const res = await muxPost(event)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ received: true, duplicate: true })
+    }
+    const asset = await t.api('GET', `/api/media/assets/${created.body.asset.id}`, { token })
+    expect(asset.body.asset.status).toBe('pending')
   })
 
   it('serves audio through storage with a signed playback url', async () => {
