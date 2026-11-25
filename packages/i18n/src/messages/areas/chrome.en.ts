@@ -17,6 +17,7 @@ export const chromeEn = {
   'nav.signOut': 'Sign out',
   'nav.members': 'Members',
   'nav.profiles': 'Profiles',
+  'nav.classes': 'Classes',
   // Support, for someone who is signed in but is not staff
   'staffOnly.title': 'Staff only',
   'staffOnly.body': '{email} does not have Support access.',

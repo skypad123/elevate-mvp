@@ -23,3 +23,15 @@ export const courseKeys = {
   changeSet: (profileId: string, courseId: string) =>
     ['teach', profileId, 'course', courseId, 'change-set'] as const,
 }
+
+/** Scheduled classes. Everything under one class starts with `detail`, so it can go at once. */
+export const classKeys = {
+  list: (profileId: string) => ['teach', profileId, 'classes'] as const,
+  detail: (profileId: string, id: string) => ['teach', profileId, 'class', id] as const,
+  roster: (profileId: string, id: string, blockId: string) =>
+    ['teach', profileId, 'class', id, 'block', blockId, 'roster'] as const,
+  codes: (profileId: string, id: string, blockId: string) =>
+    ['teach', profileId, 'class', id, 'block', blockId, 'codes'] as const,
+  disputes: (profileId: string, id: string) =>
+    ['teach', profileId, 'class', id, 'disputes'] as const,
+}
