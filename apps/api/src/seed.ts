@@ -10,6 +10,10 @@ import { createStorage } from './providers/storage'
  *   node dist/seed.js --admin-only   the super admin and nothing else
  *
  * Thumbnails go through the API's own storage provider, so they land in S3 where S3 is configured.
+ *
+ * With `CLASSES` on, `--demo` also creates the demo class and its class learners, and adds the
+ * comma-separated addresses in `SEED_CLASS_LEARNER_EMAILS` to it (passed as an override on the
+ * one-off task). With `CLASSES` off it creates no class data.
  */
 const mode = process.argv.includes('--demo')
   ? 'demo'
@@ -28,6 +32,13 @@ if (!superAdminEmail) {
   process.exit(1)
 }
 
+function splitEmails(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean)
+}
+
 const storage = createStorage(env)
 const { db, pool } = createDb(env.DATABASE_URL)
 try {
@@ -39,6 +50,8 @@ try {
       put: (key, body, mimeType) => storage.put(key, body, mimeType),
     },
     log: (message) => console.log(`seed: ${message}`),
+    classes: env.CLASSES,
+    classLearnerEmails: splitEmails(env.SEED_CLASS_LEARNER_EMAILS),
   })
   console.log(`seed (${mode}) finished`)
 } finally {

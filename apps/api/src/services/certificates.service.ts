@@ -46,7 +46,8 @@ export class CertificatesService {
     const { db, storage, mailer, env } = this.deps
     const existing = await db.query.certificates.findFirst({ where: { enrollmentId } })
     if (existing) return this.view(existing)
-    const enrollment = await db.query.enrollments.findFirst({
+    // Through the learner client: a class enrollment does not earn the self-paced certificate.
+    const enrollment = await this.deps.learnerDb.query.enrollments.findFirst({
       where: { id: enrollmentId },
       with: { user: true, course: { with: { profile: true } } },
     })
@@ -124,7 +125,7 @@ export class CertificatesService {
   }
 
   async forEnrollment(user: SessionUser, enrollmentId: string): Promise<CertificateView> {
-    const enrollment = await this.deps.db.query.enrollments.findFirst({
+    const enrollment = await this.deps.learnerDb.query.enrollments.findFirst({
       where: { id: enrollmentId },
       with: { certificate: true, user: { columns: { name: true, email: true } } },
     })

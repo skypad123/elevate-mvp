@@ -11,6 +11,7 @@ import { authRoutes } from './routes/auth'
 import { catalogRoutes } from './routes/catalog'
 import { certificateRoutes } from './routes/certificates'
 import { checkoutRoutes } from './routes/checkout'
+import { classRoutes } from './routes/classes'
 import { filesRoutes } from './routes/files'
 import { healthRoutes } from './routes/health'
 import { learningRoutes } from './routes/learning'
@@ -18,6 +19,7 @@ import { meRoutes } from './routes/me'
 import { mediaRoutes } from './routes/media'
 import { supportRoutes } from './routes/support'
 import { teachRoutes } from './routes/teach'
+import { teachClassRoutes } from './routes/teach-classes'
 import { webhookRoutes } from './routes/webhooks'
 
 export function createApp(deps: Deps) {
@@ -56,10 +58,12 @@ export function createApp(deps: Deps) {
     .route('/auth', authRoutes(deps))
     .route('/me', meRoutes(deps))
     .route('/me/enrollments', learningRoutes(deps))
+    .route('/me/classes', classRoutes(deps))
     .route('/media', mediaRoutes(deps))
     .route('/files', filesRoutes(deps))
     .route('/webhooks', webhookRoutes(deps))
     .route('/teach', teachRoutes(deps))
+    .route('/teach', teachClassRoutes(deps))
     .route('/support', supportRoutes(deps))
     .route('/catalog', catalogRoutes(deps))
     .route('/checkout', checkoutRoutes(deps))

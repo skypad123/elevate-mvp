@@ -6,6 +6,8 @@ import { type SeedStorage, seedDatabase } from '../src/seed'
 /**
  * Local development seed (`npm run db:seed`): the full demo data, with thumbnails written to the
  * local storage folder. Deployed environments seed from the API image instead (`node dist/seed.js`).
+ * With `CLASSES` on it also creates the demo class, with the addresses in
+ * `SEED_CLASS_LEARNER_EMAILS` (comma-separated) among its learners.
  */
 const url = process.env.DATABASE_URL
 if (!url) throw new Error('DATABASE_URL is not set (copy .env.example to .env)')
@@ -30,5 +32,10 @@ await seedDatabase(db, {
   mode: 'demo',
   storage,
   log: (m) => console.log(`seed: ${m}`),
+  classes: ['1', 'true', 'yes', 'on'].includes((process.env.CLASSES ?? '').toLowerCase()),
+  classLearnerEmails: (process.env.SEED_CLASS_LEARNER_EMAILS ?? '')
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean),
 })
 await pool.end()

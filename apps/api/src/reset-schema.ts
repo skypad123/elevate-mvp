@@ -8,12 +8,15 @@ import { sql } from 'drizzle-orm'
  *
  * It refuses to run unless `ALLOW_SCHEMA_RESET=yes` is set for that one task. The variable is
  * never part of the service's configuration, so a normal deploy cannot reach this.
+ *
+ * It needs the database owner, so it connects with `MIGRATION_DATABASE_URL` when that is set (the
+ * migration task carries the owner under that name), else `DATABASE_URL`.
  */
 if (process.env.ALLOW_SCHEMA_RESET !== 'yes') {
   console.error('refusing to reset the schema: set ALLOW_SCHEMA_RESET=yes for this one task')
   process.exit(1)
 }
-const url = process.env.DATABASE_URL
+const url = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL
 if (!url) throw new Error('DATABASE_URL is not set')
 
 /** Host and database name only: the URL also holds the password. */

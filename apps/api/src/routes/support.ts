@@ -8,6 +8,8 @@ import {
   refundSchema,
   rejectSchema,
   reviewNoteSchema,
+  type SupportFeatures,
+  supportClassSearchSchema,
   transactionsQuerySchema,
 } from '@elevate/core'
 import { Hono } from 'hono'
@@ -15,7 +17,9 @@ import { z } from 'zod'
 import type { Deps } from '../deps'
 import { validate } from '../lib/validate'
 import { type AppEnv, ensureUser, requireRole, uuidParam } from '../middleware/auth'
+import { requireClasses } from '../middleware/classes-enabled'
 import { AnalyticsService } from '../services/analytics.service'
+import { AttendanceService } from '../services/attendance.service'
 import { LegalEntitiesService } from '../services/legal-entities.service'
 import { PeopleService } from '../services/people.service'
 import { ProfilesService } from '../services/profiles.service'
@@ -37,6 +41,10 @@ export const supportRoutes = (deps: Deps) => {
   const review = new ReviewService(deps)
   const transactions = new TransactionsService(deps)
   const analytics = new AnalyticsService(deps)
+  const attendance = new AttendanceService(deps)
+  const classesOn = requireClasses(deps)
+  const classId = uuidParam('id', 'Class')
+  const blockId = uuidParam('blockId', 'Block')
   return (
     new Hono<AppEnv>()
       .use('*', requireRole('support_agent'))
@@ -187,5 +195,23 @@ export const supportRoutes = (deps: Deps) => {
         c.json(await transactions.audit(c.req.valid('query').cursor), 200),
       )
       .get('/analytics', async (c) => c.json({ analytics: await analytics.summary() }, 200))
+      // ── scheduled classes: read only; there is no write route ──
+      // What the portal's navigation needs; answers whether or not classes are on.
+      .get('/features', async (c) => {
+        const features: SupportFeatures = { classes: deps.env.CLASSES }
+        return c.json(features, 200)
+      })
+      .get('/classes', classesOn, validate('query', supportClassSearchSchema), async (c) => {
+        const items = await attendance.supportSearch(c.req.valid('query'))
+        return c.json({ items }, 200)
+      })
+      .get('/classes/:id', classesOn, classId, async (c) => {
+        const detail = await attendance.supportClass(c.req.param('id'))
+        return c.json({ class: detail }, 200)
+      })
+      .get('/classes/:id/blocks/:blockId', classesOn, classId, blockId, async (c) => {
+        const block = await attendance.supportBlock(c.req.param('id'), c.req.param('blockId'))
+        return c.json({ block }, 200)
+      })
   )
 }

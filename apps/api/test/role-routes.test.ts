@@ -17,6 +17,10 @@ import { createTestApp, type TestApp } from './helpers/test-app'
  * - `membership`: leaving. It needs no capability, only a membership, and has its own test.
  * - `owner`: resubmitting a company's application. `profile.edit` lets the request in, and then
  *   only the owner may do it.
+ * - `instructor`: the code, venue-location, overturn and manual-mark routes of a class.
+ *   `attendance.take`, and the actor must be the class's assigned instructor. The fixture's class
+ *   is taught by a writer, so here that is "a writer with `attendance.take`".
+ * - `roster`: a block's roster. `class.read`, then `attendance.read` or being the instructor.
  */
 type Status = 'draft' | 'rejected' | 'pending_review' | 'live'
 type Fixture = Awaited<ReturnType<TestApp['createCourse']>> & {
@@ -24,12 +28,25 @@ type Fixture = Awaited<ReturnType<TestApp['createCourse']>> & {
   invitationId: string
   /** A writer on the profile, other than whoever is calling. */
   memberId: string
+  /** A published, in-person class of the course, with its venue set and one block open now. */
+  classId: string
+  blockId: string
+  /** The class's instructor: a writer on the profile. */
+  instructorUserId: string
+  /** A class learner whose check-in in the block is flagged. */
+  flaggedEnrollmentId: string
+  /** A class learner with no events in the block. */
+  absentEnrollmentId: string
+  /** A class learner's dispute of a manual mark, with no decision. */
+  disputeEventId: string
+  /** A draft class with no blocks. */
+  deletableClassId: string
 }
 type Route = {
   method: string
   /** As registered, after `/teach/profiles/:profileId/`. */
   pattern: string
-  capability: Capability | 'content' | 'details' | 'membership' | 'owner'
+  capability: Capability | 'content' | 'details' | 'membership' | 'owner' | 'instructor' | 'roster'
   path: (f: Fixture) => string
   body?: (f: Fixture) => unknown
 }
@@ -254,6 +271,98 @@ const ROUTES: Route[] = [
     capability: 'changeSet.review',
     path: (f) => `/courses/${f.courseId}/change-set/discard`,
   },
+  // ── classes ──
+  { method: 'GET', pattern: 'classes', capability: 'class.read', path: () => '/classes' },
+  {
+    method: 'POST',
+    pattern: 'classes',
+    capability: 'class.manage',
+    path: () => '/classes',
+    body: (f) => ({
+      courseId: f.courseId,
+      name: 'A class made by the table',
+      delivery: 'remote',
+      seats: 10,
+      instructorUserId: f.instructorUserId,
+      blocks: [{ date: '2026-12-01', startTime: '09:00', endTime: '12:00' }],
+    }),
+  },
+  {
+    method: 'GET',
+    pattern: 'classes/:id',
+    capability: 'class.read',
+    path: (f) => `/classes/${f.classId}`,
+  },
+  {
+    method: 'PATCH',
+    pattern: 'classes/:id',
+    capability: 'class.manage',
+    path: (f) => `/classes/${f.classId}`,
+    body: () => ({ name: 'Renamed by the table' }),
+  },
+  {
+    // Already published, so it answers 200 and changes nothing.
+    method: 'POST',
+    pattern: 'classes/:id/publish',
+    capability: 'class.manage',
+    path: (f) => `/classes/${f.classId}/publish`,
+  },
+  {
+    // The instructor it already has, so nothing changes.
+    method: 'PUT',
+    pattern: 'classes/:id/instructor',
+    capability: 'class.manage',
+    path: (f) => `/classes/${f.classId}/instructor`,
+    body: (f) => ({ userId: f.instructorUserId }),
+  },
+  {
+    method: 'GET',
+    pattern: 'classes/:id/blocks/:blockId/roster',
+    capability: 'roster',
+    path: (f) => `/classes/${f.classId}/blocks/${f.blockId}/roster`,
+  },
+  {
+    method: 'GET',
+    pattern: 'classes/:id/blocks/:blockId/code',
+    capability: 'instructor',
+    path: (f) => `/classes/${f.classId}/blocks/${f.blockId}/code`,
+  },
+  {
+    method: 'PUT',
+    pattern: 'classes/:id/venue-location',
+    capability: 'instructor',
+    path: (f) => `/classes/${f.classId}/venue-location`,
+    body: () => ({ lat: 1.29, lng: 103.85, accuracyM: 10 }),
+  },
+  {
+    method: 'POST',
+    pattern: 'classes/:id/blocks/:blockId/learners/:enrollmentId/overturn',
+    capability: 'instructor',
+    path: (f) =>
+      `/classes/${f.classId}/blocks/${f.blockId}/learners/${f.flaggedEnrollmentId}/overturn`,
+    body: () => ({ reasonCode: 'not_in_room' }),
+  },
+  {
+    method: 'POST',
+    pattern: 'classes/:id/blocks/:blockId/learners/:enrollmentId/manual-mark',
+    capability: 'instructor',
+    path: (f) =>
+      `/classes/${f.classId}/blocks/${f.blockId}/learners/${f.absentEnrollmentId}/manual-mark`,
+    body: () => ({ reasonCode: 'no_phone', idDocumentType: 'nric' }),
+  },
+  {
+    method: 'GET',
+    pattern: 'classes/:id/disputes',
+    capability: 'attendance.review',
+    path: (f) => `/classes/${f.classId}/disputes`,
+  },
+  {
+    method: 'POST',
+    pattern: 'classes/:id/disputes/:eventId/decision',
+    capability: 'attendance.review',
+    path: (f) => `/classes/${f.classId}/disputes/${f.disputeEventId}/decision`,
+    body: () => ({ decision: 'upheld', reason: 'Checked with the instructor.' }),
+  },
   {
     method: 'DELETE',
     pattern: 'invitations/:id',
@@ -284,6 +393,12 @@ const ROUTES: Route[] = [
     capability: 'course.delete',
     path: (f) => `/courses/${f.courseId}`,
   },
+  {
+    method: 'DELETE',
+    pattern: 'classes/:id',
+    capability: 'class.manage',
+    path: (f) => `/classes/${f.deletableClassId}`,
+  },
 ]
 
 let t: TestApp
@@ -308,16 +423,101 @@ function allowed(actor: Actor, route: Route, status: Status = 'draft'): boolean 
     return can(actor, status === 'live' ? 'course.editLive' : 'course.editDraft')
   }
   if (route.capability === 'owner') return actor.role === 'owner' && can(actor, 'profile.edit')
+  if (route.capability === 'instructor') {
+    return can(actor, 'attendance.take') && actor.role === 'writer'
+  }
+  if (route.capability === 'roster') {
+    return can(actor, 'class.read') && (can(actor, 'attendance.read') || actor.role === 'writer')
+  }
   return can(actor, route.capability)
 }
 
 let fixtures = 0
+
+/** One attendance row, written straight to the database. */
+async function attendanceRow(
+  values: Pick<
+    typeof s.attendanceEvents.$inferInsert,
+    'classId' | 'blockId' | 'enrollmentId' | 'learnerUserId' | 'type' | 'actorUserId' | 'actorRole'
+  > &
+    Partial<typeof s.attendanceEvents.$inferInsert>,
+) {
+  const [row] = await t.db
+    .insert(s.attendanceEvents)
+    .values({ requestId: 'fixture', createdAt: t.now(), ...values })
+    .returning()
+  if (!row) throw new Error('failed to write an attendance row')
+  return row
+}
+
+/**
+ * A published, in-person class of the course with its venue set and one block open now, taught
+ * by `instructorUserId`: a learner with a flagged check-in, a learner with nothing, and a learner
+ * whose manual mark is disputed.
+ */
+async function classFixture(profileId: string, courseId: string, instructorUserId: string) {
+  const n = ++fixtures
+  const { classId, blockId } = await t.createClass(profileId, courseId, { instructorUserId })
+  const flagged = await t.enrolInClass(`class-flagged-${n}@example.com`, classId)
+  const absent = await t.enrolInClass(`class-absent-${n}@example.com`, classId)
+  const disputing = await t.enrolInClass(`class-disputing-${n}@example.com`, classId)
+  const of = (e: { id: string; userId: string }) => ({
+    classId,
+    blockId,
+    enrollmentId: e.id,
+    learnerUserId: e.userId,
+  })
+  await attendanceRow({
+    ...of(flagged),
+    type: 'check_in',
+    actorUserId: flagged.userId,
+    actorRole: 'learner',
+    method: 'typed_code',
+    locationStatus: 'out_of_range',
+    accuracyM: 20,
+    distanceM: 4000,
+  })
+  const mark = await attendanceRow({
+    ...of(disputing),
+    type: 'manual_mark',
+    actorUserId: instructorUserId,
+    actorRole: 'writer',
+    reasonCode: 'phone_not_working',
+    idDocumentType: 'nric',
+  })
+  const dispute = await attendanceRow({
+    ...of(disputing),
+    type: 'dispute',
+    actorUserId: disputing.userId,
+    actorRole: 'learner',
+    reason: 'This was not me.',
+    refersToEventId: mark.id,
+  })
+  return {
+    classId,
+    blockId,
+    flaggedEnrollmentId: flagged.id,
+    absentEnrollmentId: absent.id,
+    disputeEventId: dispute.id,
+  }
+}
 
 /** A course in the given status, a pending invitation and a writer, all on the profile. */
 async function fixture(profileId: string, status: Status = 'draft'): Promise<Fixture> {
   const n = ++fixtures
   const course = await t.createCourse(profileId, { status })
   const member = await t.addMember(profileId, `fixture-writer-${n}@example.com`, 'writer')
+  // The class is taught by writer@example.com where that user is a member, else by a writer
+  // added for it; never by `member`, whom a route removes.
+  const instructor =
+    profileId === approved
+      ? await t.ensureUser('writer@example.com')
+      : await t.addMember(profileId, `fixture-instructor-${n}@example.com`, 'writer')
+  const classes = await classFixture(profileId, course.courseId, instructor.id)
+  const deletable = await t.createClass(profileId, course.courseId, {
+    status: 'draft',
+    blocks: [],
+  })
   const [invitation] = await t.db
     .insert(s.profileInvitations)
     .values({
@@ -331,7 +531,14 @@ async function fixture(profileId: string, status: Status = 'draft'): Promise<Fix
     })
     .returning()
   if (!invitation) throw new Error('failed to create the invitation')
-  return { ...course, invitationId: invitation.id, memberId: member.id }
+  return {
+    ...course,
+    ...classes,
+    invitationId: invitation.id,
+    memberId: member.id,
+    instructorUserId: instructor.id,
+    deletableClassId: deletable.classId,
+  }
 }
 
 /**
@@ -409,6 +616,20 @@ const REVIEW_ROUTES = [
 const STRIPE_LINKS = ['POST stripe/onboarding-link', 'POST stripe/login-link']
 const PUBLISHING = ['PUT courses/:id/price', 'POST courses/:id/submit', 'DELETE courses/:id']
 const EARNINGS = ['GET earnings', 'GET earnings/reconcile', 'GET earnings/courses/:id']
+const INSTRUCTOR_ROUTES = [
+  'GET classes/:id/blocks/:blockId/code',
+  'PUT classes/:id/venue-location',
+  'POST classes/:id/blocks/:blockId/learners/:enrollmentId/overturn',
+  'POST classes/:id/blocks/:blockId/learners/:enrollmentId/manual-mark',
+]
+const CLASS_MANAGE_ROUTES = [
+  'POST classes',
+  'PATCH classes/:id',
+  'POST classes/:id/publish',
+  'PUT classes/:id/instructor',
+  'DELETE classes/:id',
+]
+const DISPUTE_ROUTES = ['GET classes/:id/disputes', 'POST classes/:id/disputes/:eventId/decision']
 
 beforeAll(async () => {
   t = await createTestApp()
@@ -437,7 +658,10 @@ describe('the role table, route by route', () => {
 
   for (const status of STATUSES) {
     it(`lets the owner of an approved profile use every route, on a ${status} course`, async () => {
-      expect(await checkAgainstTable(OWNER, 'owner@example.com', approved, status)).toEqual([])
+      // The fixture's class is taught by a writer, so the owner may not run it.
+      expect(await checkAgainstTable(OWNER, 'owner@example.com', approved, status)).toEqual(
+        [...INSTRUCTOR_ROUTES].sort(),
+      )
     })
 
     it(`gives a manager everything but Stripe links and managers, on a ${status} course`, async () => {
@@ -448,6 +672,7 @@ describe('the role table, route by route', () => {
           'PUT apply/corporate',
           'POST invitations/:id/confirm',
           'PATCH members/:userId',
+          ...INSTRUCTOR_ROUTES,
         ].sort(),
       )
     })
@@ -465,6 +690,8 @@ describe('the role table, route by route', () => {
           'GET members',
           ...MEMBER_ROUTES,
           ...REVIEW_ROUTES,
+          ...CLASS_MANAGE_ROUTES,
+          ...DISPUTE_ROUTES,
           // a live course's details are not a writer's to change, even as a proposal
           ...(status === 'live' ? ['PATCH courses/:id'] : []),
         ].sort(),
@@ -481,6 +708,9 @@ describe('the role table, route by route', () => {
           ...PUBLISHING,
           ...MEMBER_ROUTES,
           ...REVIEW_ROUTES,
+          ...CLASS_MANAGE_ROUTES,
+          ...INSTRUCTOR_ROUTES,
+          ...DISPUTE_ROUTES,
         ].sort(),
       )
     })
@@ -574,6 +804,50 @@ describe('the role table, route by route', () => {
         body: route.body?.(f),
       })
       expect(res.status, label(route)).toBe(401)
+    }
+  })
+
+  it('lets only the assigned instructor run a class, and hides it from a writer who is not', async () => {
+    const course = await t.createCourse(approved, { status: 'live' })
+    const owner = await t.ensureUser('owner@example.com')
+    const f = await classFixture(approved, course.courseId, owner.id)
+    const base = `/api/teach/profiles/${approved}/classes/${f.classId}`
+    const block = `${base}/blocks/${f.blockId}`
+    const instructorRoutes = [
+      { method: 'GET', path: `${block}/code` },
+      {
+        method: 'PUT',
+        path: `${base}/venue-location`,
+        body: { lat: 1.29, lng: 103.85, accuracyM: 10 },
+      },
+      {
+        method: 'POST',
+        path: `${block}/learners/${f.flaggedEnrollmentId}/overturn`,
+        body: { reasonCode: 'not_in_room' },
+      },
+      {
+        method: 'POST',
+        path: `${block}/learners/${f.absentEnrollmentId}/manual-mark`,
+        body: { reasonCode: 'no_phone', idDocumentType: 'nric' },
+      },
+    ]
+    // the owner instructs this class, so the four routes are theirs
+    for (const route of instructorRoutes) {
+      const res = await t.api(route.method, route.path, {
+        token: await signIn('owner@example.com'),
+        body: route.body,
+      })
+      expect(res.status, `${route.method} ${route.path}`).toBe(200)
+    }
+    // the writer does not, so the class is not found for them at all
+    const writer = await signIn('writer@example.com')
+    for (const route of [
+      { method: 'GET', path: base },
+      { method: 'GET', path: `${block}/roster` },
+      ...instructorRoutes,
+    ]) {
+      const res = await t.api(route.method, route.path, { token: writer, body: route.body })
+      expect(res.status, `${route.method} ${route.path}`).toBe(404)
     }
   })
 

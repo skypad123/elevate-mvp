@@ -4,7 +4,8 @@
 # The image runs the API (`node dist/server.js`, the default) and the one-off migration task
 # (`node dist/migrate.js`) that the deploy pipeline starts before rolling a new version.
 # It also carries three entry files a person runs as one-off tasks: `dist/seed.js`,
-# `dist/reset-schema.js` and `dist/previews.js`.
+# `dist/reset-schema.js` and `dist/previews.js`; and `dist/check-api-role.js`, which the deploy
+# pipeline runs after a deploy to confirm the API's database user cannot change attendance rows.
 
 FROM node:24-bookworm-slim AS base
 WORKDIR /app

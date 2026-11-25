@@ -138,8 +138,10 @@ export class PaymentsService {
     const { db, env, payments } = this.deps
     const course = await this.loadCourse(courseId)
     if (course.status !== 'live') throw errors.notFound('Course')
+    // The self-paced enrollment only: a class enrollment for the same course is neither
+    // "already enrolled" nor a row to reuse.
     const existing = await db.query.enrollments.findFirst({
-      where: { userId: user.id, courseId },
+      where: { userId: user.id, courseId, classId: { isNull: true } },
     })
     if (existing?.status === 'active')
       throw errors.conflict('already_enrolled', 'You are already enrolled in this course')

@@ -592,3 +592,11 @@ export const seedCourses: SeedCourse[] = [
     lessons: [],
   },
 ]
+
+/**
+ * The demo class (docs/designs/scheduled-classes-attendance.md, entry 2.19). The seed names each
+ * one `Demo class YYYY-MM-DD` and finds the newest by this prefix; it holds it at this venue.
+ */
+export const DEMO_CLASS_NAME_PREFIX = 'Demo class '
+export const DEMO_CLASS_VENUE_ADDRESS =
+  'Jalan Bahar Clay Studios, 97L Lorong Tawas, Singapore 639823'

@@ -188,6 +188,8 @@ export type ClassBlockView = {
   endsAt: string
   /** A check-in or manual mark exists, so the block's times can no longer change. */
   frozen: boolean
+  /** No attendance event of any kind exists, so the block can be removed. */
+  removable: boolean
   checkInOpensAt: string
   checkInClosesAt: string
 }
@@ -287,6 +289,8 @@ export type LearnerClass = {
 /** `GET /me/classes/blocks/:blockId`. */
 export type CheckInContext = {
   blockId: string
+  /** The learner's class enrollment, for the link back to their class screen. */
+  enrollmentId: string
   className: string
   startsAt: string
   endsAt: string
@@ -346,6 +350,8 @@ export type SupportClassBlock = {
       actorName: string
       reasonCode: string | null
       reason: string | null
+      /** For a `dispute_decision`: `upheld` or `voided`; otherwise null. */
+      decision: string | null
     }[]
   })[]
 }

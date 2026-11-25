@@ -1,9 +1,22 @@
-import { quizDefinitionSchema } from '@elevate/core'
+import { randomBytes } from 'node:crypto'
+import {
+  CLASS_TIME_ZONE,
+  instantToZoned,
+  quizDefinitionSchema,
+  zonedToInstant,
+} from '@elevate/core'
 import { eq } from 'drizzle-orm'
 import type { AnyDb } from '../index'
 
 import * as s from '../schema'
-import { type SeedCourse, type SeedTeacher, seedCourses, seedTeachers } from './content'
+import {
+  DEMO_CLASS_NAME_PREFIX,
+  DEMO_CLASS_VENUE_ADDRESS,
+  type SeedCourse,
+  type SeedTeacher,
+  seedCourses,
+  seedTeachers,
+} from './content'
 
 /** Where the seed writes course thumbnails. `put` has the signature of the API's storage provider. */
 export type SeedStorage = {
@@ -18,12 +31,23 @@ export type SeedOptions = {
    * `admin-only` creates the super admin and nothing else. `demo` also creates a support agent,
    * the demo teachers (as approved personal profiles with no payout account, so their courses
    * cannot be bought), a writer on the first of those profiles, an approved company profile with
-   * a manager, the demo courses, two promo codes and a learner.
+   * a manager, the demo courses, two promo codes and a learner. With `classes`, `demo` also
+   * creates a demo class with class learners.
    */
   mode: 'demo' | 'admin-only'
   /** Null skips the thumbnail files; the media rows are still created. */
   storage: SeedStorage | null
   log?: (message: string) => void
+  /**
+   * In demo mode, a published demo class on the first demo profile with 20 class enrollments, and
+   * a fresh class once the last has ended. Pass the API's `CLASSES` setting, so class data exists
+   * only where class routes are on. Default false.
+   */
+  classes?: boolean
+  /** Testers' addresses to add to the demo class; a user is created for an unknown one. */
+  classLearnerEmails?: readonly string[]
+  /** The time the demo class is dated from and checked against. Default: the current time. */
+  now?: Date
 }
 
 function thumbnailSvg(course: SeedCourse): string {
@@ -395,7 +419,7 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
   const sourdoughId = courseIds.get('sourdough-from-scratch')
   if (sourdoughId) {
     const existing = await db.query.enrollments.findFirst({
-      where: { userId: learner.id, courseId: sourdoughId },
+      where: { userId: learner.id, courseId: sourdoughId, classId: { isNull: true } },
     })
     if (!existing) {
       const [enrollment] = await db
@@ -426,5 +450,127 @@ export async function seedDatabase(db: AnyDb, options: SeedOptions) {
   }
   log('demo learner enrolled in Sourdough from Scratch')
 
+  if (options.classes && firstTeacher && firstOwner) {
+    await seedDemoClass(db, {
+      teacher: firstTeacher,
+      owner: firstOwner,
+      courseIds,
+      learnerEmails: options.classLearnerEmails ?? [],
+      now: options.now ?? new Date(),
+      log,
+    })
+  }
+
   return { adminId: admin.id, profileIds, courseIds }
+}
+
+const DEMO_CLASS_DAYS = 3
+const DEMO_CLASS_SEATS = 30
+const MADE_UP_CLASS_LEARNERS = 19
+
+/** `date` plus `days`, both `YYYY-MM-DD`. */
+function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number]
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
+/**
+ * The demo class on the first demo profile: the newest one, or a new one dated today in Singapore
+ * when there is none or the newest has ended. Then any missing class enrollment for the demo
+ * learner, the made-up class learners and the testers. No existing row is changed.
+ */
+async function seedDemoClass(
+  db: AnyDb,
+  input: {
+    teacher: SeedTeacher
+    owner: { userId: string; profileId: string }
+    courseIds: Map<string, string>
+    learnerEmails: readonly string[]
+    now: Date
+    log: (message: string) => void
+  },
+) {
+  const { owner, now, log } = input
+  const candidates = await db.query.classes.findMany({
+    where: { profileId: owner.profileId, name: { like: `${DEMO_CLASS_NAME_PREFIX}%` } },
+    orderBy: { createdAt: 'desc' },
+    limit: 1,
+    with: { blocks: { columns: { endsAt: true } } },
+  })
+  let demo: { id: string; name: string } | undefined = candidates[0]
+  if (!demo || !candidates[0]?.blocks.some((b) => b.endsAt.getTime() > now.getTime())) {
+    // The first course of the profile, in content order, that is on sale.
+    const course = seedCourses.find(
+      (c) => c.teacherEmail === input.teacher.email && c.status === 'live',
+    )
+    const courseId = course ? input.courseIds.get(course.slug) : undefined
+    const instructor = await db.query.users.findFirst({ where: { email: 'writer@example.com' } })
+    if (!courseId || !instructor) throw new Error('the demo class needs a live course and a writer')
+    const today = instantToZoned(now, CLASS_TIME_ZONE).date
+    const [created] = await db
+      .insert(s.classes)
+      .values({
+        profileId: owner.profileId,
+        courseId,
+        name: `${DEMO_CLASS_NAME_PREFIX}${today}`,
+        delivery: 'in_person',
+        venueAddress: DEMO_CLASS_VENUE_ADDRESS,
+        instructorUserId: instructor.id,
+        seats: DEMO_CLASS_SEATS,
+        timeZone: CLASS_TIME_ZONE,
+        status: 'published',
+        publishedAt: now,
+        createdBy: owner.userId,
+        createdAt: now,
+      })
+      .returning()
+    if (!created) throw new Error('failed to create the demo class')
+    await db.insert(s.classBlocks).values(
+      Array.from({ length: DEMO_CLASS_DAYS }, (_, position) => {
+        const date = addDays(today, position)
+        return {
+          classId: created.id,
+          position,
+          startsAt: zonedToInstant(date, '09:00', CLASS_TIME_ZONE),
+          endsAt: zonedToInstant(date, '17:00', CLASS_TIME_ZONE),
+          codeSecret: randomBytes(32).toString('base64url'),
+        }
+      }),
+    )
+    demo = created
+    log(
+      `${created.name}: a published class with ${DEMO_CLASS_DAYS} blocks, taught by writer@example.com`,
+    )
+  }
+  const classRow = await db.query.classes.findFirst({ where: { id: demo.id } })
+  if (!classRow) throw new Error('the demo class disappeared')
+
+  const learners = [await upsertUser(db, 'learner@example.com', 'Alex Learner')]
+  for (let n = 1; n <= MADE_UP_CLASS_LEARNERS; n++) {
+    const two = String(n).padStart(2, '0')
+    learners.push(await upsertUser(db, `class-learner-${two}@example.com`, `Class Learner ${two}`))
+  }
+  for (const email of input.learnerEmails) {
+    // A tester's own name is never overwritten: the user is created only if nobody has the address.
+    await db.insert(s.users).values({ email }).onConflictDoNothing()
+    const user = await db.query.users.findFirst({ where: { email } })
+    if (user) learners.push(user)
+  }
+  let added = 0
+  for (const learner of learners) {
+    const existing = await db.query.enrollments.findFirst({
+      where: { userId: learner.id, classId: classRow.id },
+      columns: { id: true },
+    })
+    if (existing) continue
+    await db.insert(s.enrollments).values({
+      userId: learner.id,
+      courseId: classRow.courseId,
+      classId: classRow.id,
+      status: 'active',
+      enrolledAt: now,
+    })
+    added++
+  }
+  log(`${classRow.name}: ${added} class enrollments added`)
 }

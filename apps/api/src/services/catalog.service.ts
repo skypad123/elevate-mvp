@@ -139,7 +139,7 @@ export class CatalogService {
   }
 
   async detail(slug: string, viewer: Viewer | null): Promise<CoursePublicView> {
-    const { db, learnerDb } = this.deps
+    const { learnerDb } = this.deps
     const course = await learnerDb.query.courses.findFirst({
       where: { slug },
       with: {
@@ -158,8 +158,10 @@ export class CatalogService {
       },
     })
     if (!course) throw errors.notFound('Course')
+    // Through the learner client, so only the self-paced enrollment is reported: a class
+    // enrollment for the same course is not this course page's to show.
     const enrollment = viewer
-      ? await db.query.enrollments.findFirst({
+      ? await learnerDb.query.enrollments.findFirst({
           where: { courseId: course.id, userId: viewer.id },
         })
       : null

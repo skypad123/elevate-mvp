@@ -54,8 +54,9 @@ export class EnrollmentsService {
     return out
   }
 
+  // Both read through the learner client, so neither can return a class enrollment.
   async activeCourseIds(userId: string): Promise<Set<string>> {
-    const rows = await this.deps.db.query.enrollments.findMany({
+    const rows = await this.deps.learnerDb.query.enrollments.findMany({
       where: { userId },
       columns: { courseId: true, status: true },
     })
@@ -63,7 +64,7 @@ export class EnrollmentsService {
   }
 
   async ensureActive(userId: string, enrollmentId: string) {
-    const enrollment = await this.deps.db.query.enrollments.findFirst({
+    const enrollment = await this.deps.learnerDb.query.enrollments.findFirst({
       where: { id: enrollmentId },
     })
     if (!enrollment || enrollment.userId !== userId) return null

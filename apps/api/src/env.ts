@@ -18,6 +18,8 @@ const envSchema = z.object({
   SESSION_SECRET: z.string().min(16, 'SESSION_SECRET must be at least 16 characters'),
   DEV_ENDPOINTS_ENABLED: bool.default(false),
   SEED_SUPER_ADMIN_EMAIL: z.string().email().optional(),
+  /** Comma-separated addresses the demo seed puts in the demo class, when `CLASSES` is on. */
+  SEED_CLASS_LEARNER_EMAILS: z.string().optional(),
 
   MAIL_DRIVER: z.enum(['console', 'smtp', 'resend']).default('console'),
   SMTP_HOST: z.string().default('localhost'),
@@ -48,6 +50,11 @@ const envSchema = z.object({
    * none is made, but stored files stay and are still served.
    */
   COURSE_PREVIEWS: bool.default(true),
+  /**
+   * Scheduled classes and attendance (ADR 012). Off: `GET /me/classes` answers an empty list and
+   * every other class route answers 404; the demo seed creates no class data.
+   */
+  CLASSES: bool.default(false),
 
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),

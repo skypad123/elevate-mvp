@@ -253,6 +253,8 @@ export type ProfileView = {
   owner: { id: string; email: string; name: string | null }
   /** True when the caller is platform staff acting on this profile, not its owner or a member. */
   actingAsStaff: boolean
+  /** The `CLASSES` server setting: the Teach portal shows Classes only when it is on. */
+  classesEnabled: boolean
   appliedAt: string
   reviewedAt: string | null
 }
