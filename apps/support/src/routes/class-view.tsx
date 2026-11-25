@@ -1,6 +1,8 @@
 import {
   type AttendanceEventType,
   type AttendanceState,
+  ELEVATE_CANCEL_REASONS,
+  type ElevateCancelReason,
   type FlagReason,
   type ManualMarkSubState,
   REFUSAL_REASONS,
@@ -14,6 +16,7 @@ import {
   Card,
   CardHeader,
   DescriptionList,
+  Dialog,
   EmptyState,
   formatDate,
   NativeSelect,
@@ -24,14 +27,25 @@ import {
   Table,
   TBody,
   TD,
+  Textarea,
   TH,
   THead,
   TR,
+  useToast,
 } from '@elevate/web-ui'
-import { errorMessage } from '@elevate/web-ui/portal'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { errorMessage, usePortalAuth } from '@elevate/web-ui/portal'
+import { useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, Ban, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router'
-import { useSupportBlock, useSupportClass } from '../lib/queries'
+import { groundLabel } from '../lib/class-sales'
+import {
+  cancelClassByElevate,
+  classKeys,
+  payoutKeys,
+  useSupportBlock,
+  useSupportClass,
+} from '../lib/queries'
 import { dateRange, deliveryLabel } from './classes'
 
 type Learner = SupportClassBlock['learners'][number]
@@ -163,6 +177,10 @@ function ClassBody({ c, refetchClass }: { c: SupportClass; refetchClass: () => u
   const blockId =
     asked && c.blocks.some((b) => b.id === asked) ? asked : defaultBlockId(c.blocks, Date.now())
   const block = useSupportBlock(c.id, blockId)
+  const { hasRole } = usePortalAuth()
+  const [cancelling, setCancelling] = useState(false)
+  // The API refuses a draft and a cancelled class; a released class Elevate can still cancel.
+  const canCancel = hasRole('super_admin') && c.status === 'published' && c.cancelledAt === null
   const time = (iso: string | null) =>
     formatDate(iso, {
       day: 'numeric',
@@ -181,20 +199,28 @@ function ClassBody({ c, refetchClass }: { c: SupportClass; refetchClass: () => u
         title={c.name}
         description={c.courseTitle}
         actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={RefreshCw}
-            loading={block.isFetching}
-            onClick={() => {
-              refetchClass()
-              if (blockId) block.refetch()
-            }}
-          >
-            Refresh
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={RefreshCw}
+              loading={block.isFetching}
+              onClick={() => {
+                refetchClass()
+                if (blockId) block.refetch()
+              }}
+            >
+              Refresh
+            </Button>
+            {canCancel ? (
+              <Button variant="danger" size="sm" icon={Ban} onClick={() => setCancelling(true)}>
+                Cancel class (Elevate)
+              </Button>
+            ) : null}
+          </div>
         }
       />
+      {cancelling ? <ElevateCancelDialog c={c} onClose={() => setCancelling(false)} /> : null}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card as="section">
           <CardHeader title="Class" />
@@ -210,6 +236,12 @@ function ClassBody({ c, refetchClass }: { c: SupportClass; refetchClass: () => u
               { label: 'Enrolled', value: `${c.enrolledCount} of ${c.seats} seats` },
               { label: 'Venue address', value: c.venueAddress ?? '—' },
               { label: 'Published', value: time(c.publishedAt) },
+              ...(c.cancelledAt
+                ? [
+                    { label: 'Cancelled', value: time(c.cancelledAt) },
+                    { label: 'Cancel reason', value: c.cancelReason ?? '—' },
+                  ]
+                : []),
             ]}
           />
         </Card>
@@ -279,6 +311,94 @@ function ClassBody({ c, refetchClass }: { c: SupportClass; refetchClass: () => u
         )}
       </section>
     </>
+  )
+}
+
+/**
+ * Cancellation by Elevate (docs/designs/scheduled-classes-selling.md, G17): one of five grounds
+ * and a note. Every active seat gets a full refund row, attended or not; the next run sends them.
+ * The profile's owner is emailed the ground and the note.
+ */
+function ElevateCancelDialog({ c, onClose }: { c: SupportClass; onClose: () => void }) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [ground, setGround] = useState<ElevateCancelReason | ''>('')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const seats = c.enrolledCount === 1 ? '1 learner' : `${c.enrolledCount} learners`
+
+  async function submit() {
+    if (!ground) return
+    setBusy(true)
+    try {
+      const updated = await cancelClassByElevate(c.id, { ground, note: note.trim() })
+      queryClient.setQueryData(classKeys.detail(c.id), updated)
+      await queryClient.invalidateQueries({ queryKey: payoutKeys.overview })
+      toast({
+        tone: 'success',
+        title: 'Class cancelled',
+        description: 'The refunds go out on the next run. The profile’s owner has been emailed.',
+      })
+      onClose()
+    } catch (error) {
+      toast({
+        tone: 'danger',
+        title: 'Could not cancel the class',
+        description: errorMessage(error),
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={`Cancel ${c.name}?`}
+      description={`Every seat is refunded in full: ${seats} get back what they paid, whether or not they attended, and Elevate bears Stripe’s fee. The class leaves sale at once and cannot be published again. ${c.profile.displayName}’s owner is emailed the ground and your note. When there is time, tell the owner before you cancel.`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Keep the class
+          </Button>
+          <Button
+            variant="danger"
+            loading={busy}
+            disabled={!ground || note.trim().length < 3}
+            onClick={submit}
+          >
+            Cancel class
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <NativeSelect
+          label="Ground"
+          value={ground}
+          onChange={(e) => setGround(e.target.value as ElevateCancelReason | '')}
+        >
+          <option value="" disabled>
+            Choose a ground
+          </option>
+          {ELEVATE_CANCEL_REASONS.map((g) => (
+            <option key={g} value={g}>
+              {groundLabel[g]}
+            </option>
+          ))}
+        </NativeSelect>
+        <Textarea
+          label="Note"
+          hint="Sent to the profile’s owner and kept in the audit log."
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={3}
+          maxLength={500}
+          placeholder="The venue closed on … after a fire inspection…"
+        />
+      </div>
+    </Dialog>
   )
 }
 

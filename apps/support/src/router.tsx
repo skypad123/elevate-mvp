@@ -6,6 +6,7 @@ import { ClassView } from './routes/class-view'
 import { Classes } from './routes/classes'
 import { InsightsPage } from './routes/insights'
 import { SupportLayout } from './routes/layout'
+import { PayoutsPage } from './routes/payouts'
 import { People } from './routes/people'
 import { Person } from './routes/person'
 import { Profile } from './routes/profile'
@@ -49,6 +50,7 @@ export const router = createBrowserRouter([
           { path: 'transactions/:id', element: <TransactionDetailPage /> },
           { path: 'classes', element: <Classes /> },
           { path: 'classes/:id', element: <ClassView /> },
+          { path: 'payouts', element: <PayoutsPage /> },
           { path: 'audit', element: <AuditLogPage /> },
           { path: 'insights', element: <InsightsPage /> },
           { path: 'settings', element: <SettingsPage /> },

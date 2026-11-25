@@ -1,16 +1,21 @@
 import type {
   AnalyticsSummary,
   AuditEntry,
+  Correction,
+  ElevateCancelClass,
   EraseCoordinatesResult,
   NameCheckView,
   Page,
   PayoutLedgerRow,
   PersonDetail,
   PersonSummary,
+  RefundRowAction,
+  SeatRefundView,
   SupportClass,
   SupportClassBlock,
   SupportClassSummary,
   SupportFeatures,
+  SupportPayoutsOverview,
   SupportProfileDetail,
   SupportProfileSummary,
   TransactionDetail,
@@ -194,6 +199,70 @@ export function usePayouts() {
     queryFn: async () =>
       (await unwrap(await api.support.payouts.$get())).items as PayoutLedgerRow[],
   })
+}
+
+// ── held class money and payouts (docs/designs/scheduled-classes-selling.md) ──
+export const payoutKeys = {
+  /** Under `transactionKeys.payouts`, so a refund that refreshes the ledger refreshes this too. */
+  overview: ['support', 'payouts', 'overview'] as const,
+}
+
+/**
+ * The release job's state and the cases that need a person: the last finished run, classes under
+ * review, refunds that wait or failed, unfinished cancellations, day-limit releases, failed
+ * payouts, unnamed money and the recent runs.
+ */
+export function usePayoutsOverview() {
+  return useQuery({
+    queryKey: payoutKeys.overview,
+    queryFn: async () =>
+      (await unwrap(await api.support.payouts.overview.$get())).overview as SupportPayoutsOverview,
+  })
+}
+
+/** Releases a class under review, with a note; the next run releases its money. Super admin. */
+export async function clearReview(classId: string, note: string) {
+  return (
+    await unwrap(
+      await api.support.classes[':id']['clear-review'].$post({
+        param: { id: classId },
+        json: { note },
+      }),
+    )
+  ).review
+}
+
+/**
+ * Elevate cancels a class on one of the grounds of G17, with a note. Every active seat gets a
+ * full refund row, sent by the next run, and the profile's owner is emailed. Super admin.
+ */
+export async function cancelClassByElevate(classId: string, input: ElevateCancelClass) {
+  return (
+    await unwrap(
+      await api.support.classes[':id'].cancel.$post({ param: { id: classId }, json: input }),
+    )
+  ).class as SupportClass
+}
+
+/** Retries or closes a failed seat refund row, with a reason. Super admin. */
+export async function refundRowAction(seatRefundId: string, input: RefundRowAction) {
+  return (
+    await unwrap(
+      await api.support['seat-refunds'][':id'].$post({ param: { id: seatRefundId }, json: input }),
+    )
+  ).seatRefund as SeatRefundView
+}
+
+/** Writes a signed `correction` adjustment, with a reason; the next payout pays or takes it. */
+export async function addCorrection(payoutAccountId: string, input: Correction) {
+  return (
+    await unwrap(
+      await api.support['payout-accounts'][':id'].corrections.$post({
+        param: { id: payoutAccountId },
+        json: input,
+      }),
+    )
+  ).adjustment
 }
 
 export function useAuditLog() {

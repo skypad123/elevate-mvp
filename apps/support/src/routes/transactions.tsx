@@ -1,4 +1,4 @@
-import { formatSgd, type TransactionDetail } from '@elevate/core'
+import { formatSgd, type TransactionDetail, UNFINISHED_SEAT_REFUND_STATUSES } from '@elevate/core'
 import {
   Badge,
   Button,
@@ -33,6 +33,14 @@ import { ArrowLeft, ExternalLink, Receipt, RotateCcw, Wallet } from 'lucide-reac
 import { useDeferredValue, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../lib/api'
+import {
+  bankDisputeLabel,
+  bankDisputeTone,
+  seatRefundDetail,
+  seatRefundKindLabel,
+  seatRefundStatusLabel,
+  seatRefundStatusTone,
+} from '../lib/class-sales'
 import {
   type TransactionsFilter,
   transactionKeys,
@@ -268,6 +276,139 @@ function PayoutLedger() {
   )
 }
 
+/**
+ * A class payment's seat: where its money stands and the seat refund rows the release job sends.
+ * Ledger rows for the refunds Stripe made are in the Refunds card below.
+ */
+function ClassSeat({
+  t,
+  classInfo,
+}: {
+  t: TransactionDetail
+  classInfo: NonNullable<TransactionDetail['class']>
+}) {
+  return (
+    <Card as="section" className="mt-6">
+      <CardHeader
+        title="Class seat"
+        description="Class money is held until the release job releases it, and paid out after that."
+      />
+      <DescriptionList
+        items={[
+          {
+            label: 'Class',
+            value: (
+              <Link
+                to={`/classes/${classInfo.id}`}
+                state={{ from: `/transactions/${t.id}` }}
+                className="font-semibold text-ink hover:text-brand-fg hover:underline"
+              >
+                {classInfo.name}
+              </Link>
+            ),
+          },
+          {
+            label: 'Seat',
+            value: t.seatStatus ? (
+              <Badge tone={statusTone[t.seatStatus]}>{statusLabel(t.seatStatus)}</Badge>
+            ) : (
+              '—'
+            ),
+          },
+          {
+            label: 'Released',
+            // A seat refunded before release has nothing left to hold, though it is not released.
+            value: t.released ? 'Yes' : t.paidOut ? 'No' : 'No, held',
+          },
+          {
+            label: 'Paid out',
+            value:
+              t.paidOut && t.paidOutCents !== null && t.paidOutCents < 0 ? (
+                <span>
+                  Taken as a debt: <Money cents={t.paidOutCents} />
+                  <span className="block text-caption text-ink-tertiary">
+                    A refund left the teacher Stripe’s fee to bear. A debt is not held, so a payout
+                    took it before the class was released.
+                  </span>
+                </span>
+              ) : t.paidOut ? (
+                'Yes'
+              ) : (
+                'No'
+              ),
+          },
+          {
+            label: 'Bank dispute',
+            value: t.bankDisputeStatus
+              ? (bankDisputeLabel[t.bankDisputeStatus] ?? statusLabel(t.bankDisputeStatus))
+              : 'None',
+          },
+        ]}
+      />
+      <h4 className="mb-2 mt-6 text-small-strong font-semibold text-ink">Seat refunds</h4>
+      {t.seatRefunds.length === 0 ? (
+        <p className="text-small text-ink-secondary">No seat refund for this payment.</p>
+      ) : (
+        <>
+          <Table>
+            <THead>
+              <TR>
+                <TH>Asked</TH>
+                <TH>Kind</TH>
+                <TH>Status</TH>
+                <TH className="text-right">To the learner</TH>
+                <TH>Reason</TH>
+                <TH>Finished</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {t.seatRefunds.map((r) => {
+                const detail = seatRefundDetail(r)
+                return (
+                  <TR key={r.id}>
+                    <TD className="whitespace-nowrap text-ink-secondary">
+                      {formatDate(r.createdAt, dateTime)}
+                    </TD>
+                    <TD>{seatRefundKindLabel[r.kind]}</TD>
+                    <TD>
+                      <Badge tone={seatRefundStatusTone[r.status]}>
+                        {seatRefundStatusLabel[r.status]}
+                      </Badge>
+                      {detail ? (
+                        <p className="mt-1 text-caption text-ink-tertiary">{detail}</p>
+                      ) : null}
+                    </TD>
+                    <TD className="text-right">
+                      {r.learnerRefundCents !== null ? (
+                        <Money cents={r.learnerRefundCents} />
+                      ) : (
+                        <span className="text-ink-tertiary">Not worked out yet</span>
+                      )}
+                    </TD>
+                    <TD>{r.reason ?? '—'}</TD>
+                    <TD className="whitespace-nowrap text-ink-secondary">
+                      {formatDate(r.completedAt, dateTime)}
+                    </TD>
+                  </TR>
+                )
+              })}
+            </TBody>
+          </Table>
+          {t.seatRefunds.some((r) => r.status === 'failed') ? (
+            <p className="mt-3 text-small text-ink-secondary">
+              A failed seat refund is retried or closed on the{' '}
+              <Link to="/payouts" className="text-brand-fg hover:underline">
+                Payouts page
+              </Link>
+              .
+            </p>
+          ) : null}
+        </>
+      )}
+    </Card>
+  )
+}
+
 export function TransactionDetailPage() {
   const { id = '' } = useParams()
   const query = useTransaction(id)
@@ -291,6 +432,10 @@ function TransactionView({ t }: { t: TransactionDetail }) {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const canRefund = hasRole('super_admin') && t.status !== 'refunded'
+  // The API refuses a refund here while a seat refund is under way (`refund_in_progress`).
+  const unfinished = t.seatRefunds.find((r) =>
+    (UNFINISHED_SEAT_REFUND_STATUSES as readonly string[]).includes(r.status),
+  )
   const stripeUrl = t.stripe.paymentIntentId
     ? `https://dashboard.stripe.com/test/payments/${t.stripe.paymentIntentId}`
     : null
@@ -320,6 +465,8 @@ function TransactionView({ t }: { t: TransactionDetail }) {
     }
   }
 
+  // Refunds change both nets; the page then shows the figures before and after them.
+  const refunded = t.refunds.length > 0
   const ids: Array<[string, string | null]> = [
     ['Payout account', t.payoutAccountId],
     ['Checkout session', t.stripe.checkoutSessionId],
@@ -346,8 +493,13 @@ function TransactionView({ t }: { t: TransactionDetail }) {
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <Badge tone={statusTone[t.status]}>{statusLabel(t.status)}</Badge>
         <Badge tone={statusTone[t.enrollmentStatus]}>
-          Enrolment {statusLabel(t.enrollmentStatus).toLowerCase()}
+          {t.seatStatus ? 'Seat' : 'Enrolment'} {statusLabel(t.enrollmentStatus).toLowerCase()}
         </Badge>
+        {t.bankDisputeStatus ? (
+          <Badge tone={bankDisputeTone[t.bankDisputeStatus] ?? 'warning'}>
+            {bankDisputeLabel[t.bankDisputeStatus] ?? statusLabel(t.bankDisputeStatus)}
+          </Badge>
+        ) : null}
         {stripeUrl ? (
           <Button asChild variant="secondary" size="sm" icon={ExternalLink}>
             <a href={stripeUrl} target="_blank" rel="noreferrer">
@@ -363,15 +515,39 @@ function TransactionView({ t }: { t: TransactionDetail }) {
           </Button>
         ) : null}
         {canRefund ? (
-          <Button
-            variant="danger"
-            size="sm"
-            icon={RotateCcw}
-            className="ml-auto"
-            onClick={() => setOpen(true)}
-          >
-            Refund in full
-          </Button>
+          <div className="ml-auto flex flex-col items-end gap-1">
+            <Button
+              variant="danger"
+              size="sm"
+              icon={RotateCcw}
+              disabled={!!unfinished}
+              aria-describedby={unfinished ? 'refund-blocked' : undefined}
+              onClick={() => setOpen(true)}
+            >
+              Refund in full
+            </Button>
+            {unfinished ? (
+              <p
+                id="refund-blocked"
+                className="max-w-xs text-right text-caption text-ink-secondary"
+              >
+                A seat refund for this payment is under way (
+                {seatRefundStatusLabel[unfinished.status].toLowerCase()}).
+                {unfinished.status === 'failed' ? (
+                  <>
+                    {' '}
+                    Retry or close it on the{' '}
+                    <Link to="/payouts" className="text-brand-fg hover:underline">
+                      Payouts page
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  ' The release job sends it.'
+                )}
+              </p>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -419,11 +595,16 @@ function TransactionView({ t }: { t: TransactionDetail }) {
               { label: 'Commission', value: <Money cents={t.commissionCents} /> },
               { label: 'Application fee', value: <Money cents={t.applicationFeeCents} /> },
               {
-                label: 'Teacher net',
-                value: <Money cents={t.teacherNetCents} className="font-semibold" />,
+                label: refunded ? 'Teacher net before refunds' : 'Teacher net',
+                value: (
+                  <Money
+                    cents={t.teacherNetCents}
+                    className={refunded ? undefined : 'font-semibold'}
+                  />
+                ),
               },
               {
-                label: 'Platform net',
+                label: refunded ? 'Platform net before refunds' : 'Platform net',
                 value:
                   t.platformNetCents !== null ? (
                     <Money cents={t.platformNetCents} />
@@ -440,6 +621,29 @@ function TransactionView({ t }: { t: TransactionDetail }) {
                   />
                 ),
               },
+              ...(refunded
+                ? [
+                    {
+                      label: 'Teacher net after refunds',
+                      value: (
+                        <Money cents={t.teacherNetAfterRefundsCents} className="font-semibold" />
+                      ),
+                    },
+                    {
+                      label: 'Platform net after refunds',
+                      value:
+                        t.platformNetAfterRefundsCents !== null ? (
+                          <Money cents={t.platformNetAfterRefundsCents} />
+                        ) : (
+                          <span className="text-ink-tertiary">
+                            {t.platformNetCents === null
+                              ? 'Known once Stripe reports the fee'
+                              : 'Not worked out after a lost bank dispute'}
+                          </span>
+                        ),
+                    },
+                  ]
+                : []),
             ]}
           />
         </Card>
@@ -460,6 +664,8 @@ function TransactionView({ t }: { t: TransactionDetail }) {
           />
         </Card>
       </div>
+
+      {t.class ? <ClassSeat t={t} classInfo={t.class} /> : null}
 
       <Card as="section" className="mt-6">
         <CardHeader
@@ -502,7 +708,7 @@ function TransactionView({ t }: { t: TransactionDetail }) {
         open={open}
         onOpenChange={(o) => !o && setOpen(false)}
         title="Refund this payment?"
-        description={`${formatSgd(t.amountCents)} goes back to ${t.learnerEmail}. The transfer to ${t.profileName} is reversed and the learner loses access to the course.`}
+        description={`${formatSgd(t.amountCents)} goes back to ${t.learnerEmail}. The transfer to ${t.profileName} is reversed and the learner loses ${t.class ? `their seat in ${t.class.name}` : 'access to the course'}.`}
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>

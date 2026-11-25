@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   GraduationCap,
+  Landmark,
   LogOut,
   Receipt,
   ScrollText,
@@ -50,7 +51,13 @@ export function SupportLayout() {
           { to: '/profiles', label: t('nav.profiles'), icon: GraduationCap },
           { to: '/people', label: t('nav.people'), icon: Users },
           { to: '/transactions', label: t('nav.transactions'), icon: Receipt },
-          ...(classesOn ? [{ to: '/classes', label: t('nav.classes'), icon: CalendarDays }] : []),
+          ...(classesOn
+            ? [
+                { to: '/classes', label: t('nav.classes'), icon: CalendarDays },
+                // Money is held and paid out by the release job only for class sales.
+                { to: '/payouts', label: t('nav.payouts'), icon: Landmark },
+              ]
+            : []),
           { to: '/insights', label: t('nav.insights'), icon: TrendingUp },
           { to: '/audit', label: t('nav.auditLog'), icon: ScrollText },
           { to: '/settings', label: t('nav.settings'), icon: Settings },
