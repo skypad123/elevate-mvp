@@ -89,6 +89,16 @@ export type PaymentDetails = {
 
 export type RefundResult = { refundId: string; amountCents: number; status: string }
 
+/** One refund of a charge, as Stripe has it now. */
+export type ChargeRefund = {
+  refundId: string
+  amountCents: number
+  /** Stripe's refund status: `pending`, `requires_action`, `succeeded`, `failed` or `canceled`. */
+  status: string
+  /** What `createRefund` wrote: `paymentId`, `actorId` or `enrollmentId`, and `elevateReason`. */
+  metadata: Record<string, string>
+}
+
 export type PaymentsWebhookEvent = {
   id: string
   type: string
@@ -124,6 +134,8 @@ export interface PaymentsProvider {
     /** A retry with the same key returns the first refund instead of making another. */
     idempotencyKey?: string
   }): Promise<RefundResult>
+  /** Every refund of a charge, whoever made it (Elevate or the Stripe dashboard). */
+  listRefunds(chargeId: string): Promise<ChargeRefund[]>
   listTransferAmountCents(destinationAccountId: string): Promise<number>
   /** Verifies the signature with one of the configured secrets and parses the event. */
   constructEvent(rawBody: string, signature: string | undefined): PaymentsWebhookEvent
@@ -170,6 +182,9 @@ export class UnconfiguredPaymentsProvider implements PaymentsProvider {
     return this.fail()
   }
   async createRefund(): Promise<never> {
+    return this.fail()
+  }
+  async listRefunds(): Promise<never> {
     return this.fail()
   }
   async listTransferAmountCents(): Promise<never> {

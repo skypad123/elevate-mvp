@@ -1,5 +1,6 @@
 import Stripe from 'stripe'
 import {
+  type ChargeRefund,
   type CheckoutSessionInput,
   type CheckoutSessionResult,
   type ConnectedAccountInput,
@@ -204,6 +205,19 @@ export class StripePaymentsProvider implements PaymentsProvider {
       input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
     )
     return { refundId: refund.id, amountCents: refund.amount, status: refund.status ?? 'pending' }
+  }
+
+  async listRefunds(chargeId: string): Promise<ChargeRefund[]> {
+    const out: ChargeRefund[] = []
+    for await (const refund of this.stripe.refunds.list({ charge: chargeId, limit: 100 })) {
+      out.push({
+        refundId: refund.id,
+        amountCents: refund.amount,
+        status: refund.status ?? 'pending',
+        metadata: (refund.metadata ?? {}) as Record<string, string>,
+      })
+    }
+    return out
   }
 
   async listTransferAmountCents(destinationAccountId: string): Promise<number> {

@@ -52,3 +52,33 @@ describe('Stripe checkout sessions', () => {
     expect(calls).toBe(1)
   })
 })
+
+describe('Stripe refunds', () => {
+  it('lists every refund of a charge with its id, amount, status and metadata', async () => {
+    const provider = new StripePaymentsProvider({ secretKey: 'sk_test_fake', country: 'SG' })
+    const asked: unknown[] = []
+    const list = (params: unknown) => {
+      asked.push(params)
+      return (async function* () {
+        yield { id: 're_2', amount: 2000, status: 'succeeded', metadata: {} }
+        yield {
+          id: 're_1',
+          amount: 3000,
+          status: 'pending',
+          metadata: { paymentId: 'pay_1', elevateReason: 'Bought by mistake' },
+        }
+      })()
+    }
+    ;(provider.stripe.refunds as unknown as { list: typeof list }).list = list
+    expect(await provider.listRefunds('ch_1')).toEqual([
+      { refundId: 're_2', amountCents: 2000, status: 'succeeded', metadata: {} },
+      {
+        refundId: 're_1',
+        amountCents: 3000,
+        status: 'pending',
+        metadata: { paymentId: 'pay_1', elevateReason: 'Bought by mistake' },
+      },
+    ])
+    expect(asked).toEqual([{ charge: 'ch_1', limit: 100 }])
+  })
+})

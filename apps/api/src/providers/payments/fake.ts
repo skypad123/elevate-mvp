@@ -1,5 +1,6 @@
 import {
   type BusinessType,
+  type ChargeRefund,
   type CheckoutSessionInput,
   type CheckoutSessionResult,
   type ConnectedAccountInput,
@@ -37,7 +38,13 @@ export class FakePaymentsProvider implements PaymentsProvider {
   readonly driver = 'fake'
   readonly accounts = new Map<string, FakeAccount>()
   readonly sessions = new Map<string, FakeSession>()
-  readonly refunds: Array<{ refundId: string; paymentIntentId: string; amountCents: number }> = []
+  readonly refunds: Array<{
+    refundId: string
+    paymentIntentId: string
+    amountCents: number
+    status: string
+    metadata: Record<string, string>
+  }> = []
   private readonly refundsByKey = new Map<string, RefundResult>()
   /** Actual Stripe fee the fake reports, in basis points + fixed, so tests can check estimate vs actual. */
   feeBps = 340
@@ -213,37 +220,81 @@ export class FakePaymentsProvider implements PaymentsProvider {
       amountCents: s.amountCents,
     }
   }
+  /**
+   * Refunds what is left of the payment, as Elevate always does. `amountCents`, which the real
+   * provider does not take, refunds part of it, as a refund in the Stripe dashboard can.
+   */
   async createRefund(input: {
     paymentIntentId: string
+    reason?: string
+    metadata?: Record<string, string>
     idempotencyKey?: string
+    amountCents?: number
   }): Promise<RefundResult> {
     const earlier = input.idempotencyKey ? this.refundsByKey.get(input.idempotencyKey) : undefined
     if (earlier) return earlier
     const s = [...this.sessions.values()].find((x) => x.paymentIntentId === input.paymentIntentId)
     if (!s) throw new Error(`no such payment intent ${input.paymentIntentId}`)
-    const amountCents = s.amountCents - s.refundedCents
-    s.refundedCents = s.amountCents
+    const left = s.amountCents - s.refundedCents
+    const amountCents = Math.min(input.amountCents ?? left, left)
+    s.refundedCents += amountCents
     const refundId = `re_fake_${++this.counter}`
-    this.refunds.push({ refundId, paymentIntentId: input.paymentIntentId, amountCents })
+    // The metadata Stripe stores, as the real provider writes it.
+    const metadata = {
+      ...(input.metadata ?? {}),
+      ...(input.reason ? { elevateReason: input.reason.slice(0, 500) } : {}),
+    }
+    this.refunds.push({
+      refundId,
+      paymentIntentId: input.paymentIntentId,
+      amountCents,
+      status: 'succeeded',
+      metadata,
+    })
     const result = { refundId, amountCents, status: 'succeeded' }
     if (input.idempotencyKey) this.refundsByKey.set(input.idempotencyKey, result)
     return result
   }
-  /** The charge.refunded event Stripe would send after createRefund. */
+  async listRefunds(chargeId: string): Promise<ChargeRefund[]> {
+    // Newest first, as Stripe lists them.
+    return this.refunds
+      .filter((r) => `ch_${r.paymentIntentId}` === chargeId)
+      .reverse()
+      .map(({ refundId, amountCents, status, metadata }) => ({
+        refundId,
+        amountCents,
+        status,
+        metadata,
+      }))
+  }
+  /** The charge.refunded event Stripe would send after createRefund, with the charge's refunds. */
   refundedEvent(paymentIntentId: string): PaymentsWebhookEvent {
     const s = [...this.sessions.values()].find((x) => x.paymentIntentId === paymentIntentId)
     if (!s) throw new Error(`no such payment intent ${paymentIntentId}`)
+    const chargeId = `ch_${paymentIntentId}`
+    const refunds = this.refunds
+      .filter((r) => r.paymentIntentId === paymentIntentId)
+      .reverse()
+      .map((r) => ({
+        id: r.refundId,
+        object: 'refund',
+        amount: r.amountCents,
+        charge: chargeId,
+        status: r.status,
+        metadata: r.metadata,
+      }))
     return {
       id: `evt_ref_${paymentIntentId}_${++this.counter}`,
       type: 'charge.refunded',
       data: {
         object: {
-          id: `ch_${paymentIntentId}`,
+          id: chargeId,
           object: 'charge',
           payment_intent: paymentIntentId,
           amount: s.amountCents,
           amount_refunded: s.refundedCents,
           refunded: s.refundedCents >= s.amountCents,
+          refunds: { object: 'list', data: refunds },
         },
       },
     }
