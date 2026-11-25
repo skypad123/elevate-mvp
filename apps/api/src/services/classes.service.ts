@@ -12,8 +12,10 @@ import {
   checkInMix,
   checkInWindow,
   type DisputeDecision,
+  type Locale,
   type LocationStatus,
   type RefusalReason,
+  SEAT_HORIZON_MS,
   type SetVenueLocation,
   type UpdateClass,
   VENUE_ACCURACY_CONFIRM_M,
@@ -23,10 +25,14 @@ import {
 import { schema as s } from '@elevate/db'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { Deps } from '../deps'
+import { classTimesChangedEmail } from '../emails/class-sales'
 import { newBlockSecret } from '../lib/class-code'
 import { errors, HttpError } from '../lib/errors'
 import type { ProfileActor } from '../middleware/auth'
+import { AttendanceService } from './attendance.service'
 import { recordAudit } from './audit.service'
+import { onSale, seatsTaken } from './class-checkout.service'
+import type { Tx } from './seat-refunds.service'
 
 export type ClassRow = typeof s.classes.$inferSelect
 export type ClassBlockRow = typeof s.classBlocks.$inferSelect
@@ -68,6 +74,11 @@ export function blockView(
     checkInClosesAt: closesAt.toISOString(),
   }
 }
+
+const spanIso = (span: Span) => ({
+  startsAt: span.startsAt.toISOString(),
+  endsAt: span.endsAt.toISOString(),
+})
 
 /** A block whose learner has a check-in or a manual mark: its times can no longer change. */
 const FREEZING: readonly string[] = ['check_in', 'manual_mark']
@@ -132,10 +143,50 @@ function summaryOf(row: SummaryRow): ClassSummary {
   }
 }
 
+type Span = { startsAt: Date; endsAt: Date }
+
 type BlockPlan = {
+  /** The blocks as they are now. */
+  before: (Span & { id: string })[]
   removed: string[]
   kept: { id: string; startsAt: Date; endsAt: Date; position: number }[]
   added: { startsAt: Date; endsAt: Date; position: number }[]
+}
+
+/** A seat holder told of a time change; `canWithdraw` when the edit gave them the right. */
+type TimesChangedSeat = {
+  enrollmentId: string
+  email: string
+  locale: Locale | null
+  canWithdraw: boolean
+}
+
+/** The old and the new times, when an edit moves, adds or removes a block; else null. */
+function timesChange(plan: BlockPlan): { before: Span[]; after: Span[] } | null {
+  const was = new Map(plan.before.map((b) => [b.id, b]))
+  const moved = plan.kept.some((block) => {
+    const old = was.get(block.id)
+    return (
+      !old ||
+      old.startsAt.getTime() !== block.startsAt.getTime() ||
+      old.endsAt.getTime() !== block.endsAt.getTime()
+    )
+  })
+  if (!moved && plan.removed.length === 0 && plan.added.length === 0) return null
+  const byStart = (a: Span, b: Span) => a.startsAt.getTime() - b.startsAt.getTime()
+  return {
+    before: plan.before.map(({ startsAt, endsAt }) => ({ startsAt, endsAt })).sort(byStart),
+    after: [...plan.kept, ...plan.added]
+      .map(({ startsAt, endsAt }) => ({ startsAt, endsAt }))
+      .sort(byStart),
+  }
+}
+
+/** A class that was cancelled is closed: nothing about it can change any more. */
+function assertNotCancelled(row: ClassRow): void {
+  if (row.status === 'cancelled' || row.cancelledAt !== null) {
+    throw errors.conflict('class_cancelled', 'This class was cancelled')
+  }
 }
 
 /**
@@ -202,11 +253,21 @@ export class ClassesService {
       where: { id },
       with: {
         ...SUMMARY_RELATIONS,
+        course: { columns: { title: true, status: true } },
+        profile: { columns: { classSalesAcceptedAt: true }, with: { payoutAccount: true } },
         blocks: { orderBy: { position: 'asc' } },
       },
     })
     if (!row) throw errors.notFound('Class')
     const events = await db.query.attendanceEvents.findMany({ where: { classId: id } })
+    const onSaleNow = onSale(this.deps.env, row, now)
+    const started = row.blocks.some((b) => b.startsAt.getTime() <= now.getTime())
+    const attendance = started
+      ? null
+      : await new AttendanceService(this.deps).moneyAttendanceByEnrollment(db, id)
+    const seatsWithChangeRight = attendance
+      ? row.enrollments.filter((e) => !attendance.get(e.id)?.counted).length
+      : 0
     const enrollmentIds = row.enrollments.map((e) => e.id)
     const blocks = row.blocks.map((block) => {
       const ofBlock = events.filter((e) => e.blockId === block.id)
@@ -242,6 +303,12 @@ export class ClassesService {
       viewerIsInstructor,
       blocks,
       mix,
+      notOnSaleReason: onSaleNow === true ? null : onSaleNow,
+      cancelReason: row.cancelReason,
+      cancelledAt: row.cancelledAt?.toISOString() ?? null,
+      releasedAt: row.releasedAt?.toISOString() ?? null,
+      seatsTaken: await seatsTaken(db, id, now),
+      seatsWithChangeRight,
     }
   }
 
@@ -301,6 +368,7 @@ export class ClassesService {
   async update(actor: ProfileActor, id: string, input: UpdateClass): Promise<ClassDetail> {
     const { db } = this.deps
     const row = await this.load(actor, id)
+    assertNotCancelled(row)
     const published = row.status === 'published'
     const courseChanges = input.courseId !== undefined && input.courseId !== row.courseId
     const deliveryChanges = input.delivery !== undefined && input.delivery !== row.delivery
@@ -317,6 +385,7 @@ export class ClassesService {
       await this.assertInstructor(actor.profileId, input.instructorUserId)
     }
     const plan = input.blocks ? await this.planBlocks(row, input.blocks) : null
+    const change = plan ? timesChange(plan) : null
 
     const fields = {
       ...(input.name !== undefined ? { name: input.name } : {}),
@@ -327,12 +396,32 @@ export class ClassesService {
       ...(input.instructorUserId !== undefined ? { instructorUserId: input.instructorUserId } : {}),
     }
     const now = this.deps.now()
-    await db.transaction(async (tx) => {
+    const told = await db.transaction(async (tx) => {
+      // The class row is locked first, as checkout and fulfilment lock it, so the seats counted
+      // here cannot change before this edit commits.
+      await tx
+        .select({ id: s.classes.id })
+        .from(s.classes)
+        .where(eq(s.classes.id, row.id))
+        .for('update')
+      if (input.seats !== undefined) {
+        const taken = await seatsTaken(tx as unknown as Tx, row.id, now)
+        if (input.seats < taken) {
+          throw errors.unprocessable(
+            'capacity_below_taken',
+            'More seats are taken than that capacity allows',
+            { taken },
+          )
+        }
+      }
+      const seats = change
+        ? await this.timesChangedSeats(tx as unknown as Tx, row, change, now)
+        : []
       await tx
         .update(s.classes)
         .set({ ...fields, updatedAt: now })
         .where(eq(s.classes.id, row.id))
-      if (!plan) return
+      if (!plan) return seats
       if (plan.removed.length) {
         await tx.delete(s.classBlocks).where(inArray(s.classBlocks.id, plan.removed))
       }
@@ -365,7 +454,39 @@ export class ClassesService {
           })),
         )
       }
+      return seats
     })
+    if (change && told.length > 0) {
+      await recordAudit(this.deps, {
+        actorId: actor.userId,
+        action: 'class.times_changed',
+        entityType: 'class',
+        entityId: row.id,
+        profileId: actor.profileId,
+        metadata: {
+          before: change.before.map(spanIso),
+          after: change.after.map(spanIso),
+          seats: told.length,
+          withdrawRight: told.filter((seat) => seat.canWithdraw).length,
+        },
+      })
+      const className = input.name ?? row.name
+      for (const seat of told) {
+        await this.deps.mailer.send(
+          classTimesChangedEmail({
+            to: seat.email,
+            locale: seat.locale ?? 'en',
+            learnerUrl: this.deps.env.LEARNER_URL,
+            enrollmentId: seat.enrollmentId,
+            className,
+            timeZone: row.timeZone,
+            before: change.before,
+            after: change.after,
+            canWithdraw: seat.canWithdraw,
+          }),
+        )
+      }
+    }
     if (published) {
       await recordAudit(this.deps, {
         actorId: actor.userId,
@@ -390,6 +511,7 @@ export class ClassesService {
   async publish(actor: ProfileActor, id: string): Promise<ClassDetail> {
     const { db } = this.deps
     const row = await this.load(actor, id)
+    assertNotCancelled(row)
     if (row.status === 'published') return this.detail(row.id, isAssignedInstructor(actor, row))
     const now = this.deps.now()
     const [course, blocks, instructorOk] = await Promise.all([
@@ -430,6 +552,7 @@ export class ClassesService {
   /** Reassigns the instructor. Choosing the current one changes nothing and is not audited. */
   async setInstructor(actor: ProfileActor, id: string, userId: string): Promise<ClassDetail> {
     const row = await this.load(actor, id)
+    assertNotCancelled(row)
     if (userId !== row.instructorUserId) {
       await this.assertInstructor(actor.profileId, userId)
       await this.deps.db
@@ -444,6 +567,7 @@ export class ClassesService {
   /** Deletes a draft class; its blocks go with it. A published class cannot be deleted. */
   async remove(actor: ProfileActor, id: string): Promise<void> {
     const row = await this.load(actor, id)
+    assertNotCancelled(row)
     if (row.status !== 'draft') {
       throw errors.conflict('class_published', 'A published class cannot be deleted')
     }
@@ -497,6 +621,65 @@ export class ClassesService {
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────
+
+  /**
+   * A block-time edit in a class with seats (R3), inside the edit's transaction. It is refused
+   * when the class would end more than `SEAT_HORIZON_MS` after any seat's payment. Before the
+   * class starts, each seat whose learner is not counted as attended gets `classChangedAt`, the
+   * right to withdraw in full. Returns every seat holder, to be emailed after the commit.
+   */
+  private async timesChangedSeats(
+    tx: Tx,
+    row: ClassRow,
+    change: { before: Span[]; after: Span[] },
+    now: Date,
+  ): Promise<TimesChangedSeat[]> {
+    const seats = await tx.query.enrollments.findMany({
+      where: { classId: row.id, status: 'active' },
+      columns: { id: true, stripeCheckoutSessionId: true },
+      with: {
+        user: { columns: { email: true, locale: true } },
+        payments: { columns: { stripeCheckoutSessionId: true, paidAt: true } },
+      },
+    })
+    if (seats.length === 0) return []
+    // The seat's payment is the one its enrollment points at; a seeded seat has none.
+    const paidAt = seats.flatMap((seat) =>
+      seat.payments
+        .filter((p) => p.stripeCheckoutSessionId === seat.stripeCheckoutSessionId)
+        .map((p) => p.paidAt.getTime()),
+    )
+    const newEnd = Math.max(...change.after.map((b) => b.endsAt.getTime()))
+    if (paidAt.length > 0) {
+      const earliest = Math.min(...paidAt)
+      if (newEnd - earliest > SEAT_HORIZON_MS) {
+        throw errors.unprocessable(
+          'class_too_late_for_seat',
+          'The class would end too long after a seat in it was paid for',
+          { latestEndsAt: new Date(earliest + SEAT_HORIZON_MS).toISOString() },
+        )
+      }
+    }
+    const started = change.before.some((b) => b.startsAt.getTime() <= now.getTime())
+    const attendance = started
+      ? null
+      : await new AttendanceService(this.deps).moneyAttendanceByEnrollment(tx, row.id)
+    const withRight = attendance
+      ? seats.filter((seat) => !attendance.get(seat.id)?.counted).map((seat) => seat.id)
+      : []
+    if (withRight.length > 0) {
+      await tx
+        .update(s.enrollments)
+        .set({ classChangedAt: now })
+        .where(inArray(s.enrollments.id, withRight))
+    }
+    return seats.map((seat) => ({
+      enrollmentId: seat.id,
+      email: seat.user.email,
+      locale: seat.user.locale,
+      canWithdraw: withRight.includes(seat.id),
+    }))
+  }
 
   /** The course, which must belong to the actor's profile. */
   private async courseOf(actor: ProfileActor, courseId: string) {
@@ -621,6 +804,7 @@ export class ClassesService {
     }
     const ordered = this.ordered(spans)
     return {
+      before: existing.map(({ id, startsAt, endsAt }) => ({ id, startsAt, endsAt })),
       removed: removed.map((b) => b.id),
       kept: ordered.flatMap((span) => (span.id ? [{ ...span, id: span.id }] : [])),
       added: ordered.filter((span) => !span.id),

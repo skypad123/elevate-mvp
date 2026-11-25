@@ -421,11 +421,16 @@ describe('who may read', () => {
     expect((await t.api('GET', `/api/support/classes/${classId}`)).status).toBe(401)
   })
 
-  it('has no write route under /support/classes', async () => {
+  it('has no write route under /support/classes but Elevate’s cancellation and review', async () => {
     const writes = t.app.routes.filter(
       (r) => r.path.startsWith('/api/support/classes') && !['GET', 'ALL'].includes(r.method),
     )
-    expect(writes).toEqual([])
+    // docs/designs/scheduled-classes-selling.md, "Cancellation by Elevate" and "What Support sees
+    // and can do", for a Support admin
+    expect([...new Set(writes.map((r) => `${r.method} ${r.path}`))]).toEqual([
+      'POST /api/support/classes/:id/cancel',
+      'POST /api/support/classes/:id/clear-review',
+    ])
     for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
       const res = await t.api(method, `/api/support/classes/${classId}`, {
         token: agent,

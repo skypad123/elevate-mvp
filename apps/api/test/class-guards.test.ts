@@ -14,11 +14,18 @@ import { describe, expect, it } from 'vitest'
  * - calls `update` or `delete` on `attendanceEvents` (rule "change");
  * - deletes from `attendanceEventLocations`, other than the writer, whose Support erasure of one
  *   learner's coordinates is the only delete (rule "erase");
- * - sets `classId` in an insert into, or an update of, `enrollments`: no route creates a class
- *   enrollment (rule "class enrollment").
+ * - sets `classId` in an insert into, or an update of, `enrollments`, other than
+ *   `services/class-checkout.service.ts` and `services/seats.service.ts`: buying a seat is the
+ *   only way into a class (docs/designs/scheduled-classes-selling.md), so class checkout is the
+ *   one file that makes a class enrollment, and a move by the profile ("Move") is the one change
+ *   of an enrollment's class (rule "class enrollment").
  */
 const SRC = fileURLToPath(new URL('../src', import.meta.url))
 const WRITER = 'services/attendance.service.ts'
+const CLASS_CHECKOUT = 'services/class-checkout.service.ts'
+const SEATS = 'services/seats.service.ts'
+/** The files that may set an enrollment's class. */
+const CLASS_WRITERS: readonly string[] = [CLASS_CHECKOUT, SEATS]
 
 type Rule = 'insert' | 'change' | 'erase' | 'class enrollment'
 
@@ -53,7 +60,7 @@ function violations(source: string, file = ''): Rule[] {
   if (file !== WRITER && INSERT.test(code)) found.push('insert')
   if (CHANGE.test(code)) found.push('change')
   if (file !== WRITER && ERASE.test(code)) found.push('erase')
-  for (const match of code.matchAll(ENROLLMENT_WRITE)) {
+  for (const match of CLASS_WRITERS.includes(file) ? [] : code.matchAll(ENROLLMENT_WRITE)) {
     if (/\bclassId\b/.test(payloadAfter(code, (match.index ?? 0) + match[0].length))) {
       found.push('class enrollment')
       break
@@ -71,7 +78,7 @@ function sourceFiles(dir: string): string[] {
 }
 
 describe('attendance-record guard', () => {
-  it('finds no other writer of attendance rows, no change to one, no other erasure, and no class enrollment made', () => {
+  it('finds no other writer of attendance rows, no change to one, no other erasure, and no other setter of an enrollment’s class', () => {
     const files = sourceFiles(SRC)
     expect(files.length).toBeGreaterThan(40)
     const offenders = files
@@ -85,6 +92,14 @@ describe('attendance-record guard', () => {
     const writer = readFileSync(join(SRC, WRITER), 'utf8')
     expect(INSERT.test(writer)).toBe(true)
     expect(ERASE.test(writer)).toBe(true)
+    // class checkout does make class enrollments, which the rule would refuse anywhere else
+    const checkout = readFileSync(join(SRC, CLASS_CHECKOUT), 'utf8')
+    expect(violations(checkout, 'services/other.ts')).toContain('class enrollment')
+    expect(violations(checkout, CLASS_CHECKOUT)).toEqual([])
+    // and a move re-points one, which the rule allows in the seats service alone
+    const seats = readFileSync(join(SRC, SEATS), 'utf8')
+    expect(violations(seats, 'services/other.ts')).toContain('class enrollment')
+    expect(violations(seats, SEATS)).toEqual([])
   })
 
   it('fires on each rule, and not on reads or on words in comments', () => {
@@ -108,6 +123,15 @@ describe('attendance-record guard', () => {
     expect(violations('tx.update(s.enrollments).set({ classId }).where(eq(a, b))', 'x.ts')).toEqual(
       ['class enrollment'],
     )
+    expect(
+      violations('tx.insert(s.enrollments).values({ userId, classId: id })', CLASS_CHECKOUT),
+    ).toEqual([])
+    expect(violations('tx.update(s.enrollments).set({ classId: to.id })', SEATS)).toEqual([])
+    expect(violations('tx.insert(s.attendanceEvents).values(v)', SEATS)).toEqual(['insert'])
+    // the exception is for class enrollments only, not for attendance rows
+    expect(violations('tx.insert(s.attendanceEvents).values(v)', CLASS_CHECKOUT)).toEqual([
+      'insert',
+    ])
 
     const fine = `
       // db.insert(s.attendanceEvents) is only mentioned here

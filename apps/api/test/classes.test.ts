@@ -1,4 +1,5 @@
 import { schema as s } from '@elevate/db'
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -352,6 +353,36 @@ describe('deleting', () => {
     expect(await t.db.query.classes.findFirst({ where: { id: c.id } })).toBeUndefined()
     expect(await t.db.query.classBlocks.findMany({ where: { classId: c.id } })).toEqual([])
     expect((await t.api('GET', `${base}/${c.id}`, { token: owner })).status).toBe(404)
+  })
+})
+
+describe('a cancelled class', () => {
+  // docs/designs/scheduled-classes-selling.md, entry 4.5: a cancelled class is closed.
+  it('refuses publishing, editing, re-assigning and deleting', async () => {
+    const c = (await create()).body.class
+    const cancelledAt = t.now()
+    await t.db
+      .update(s.classes)
+      .set({ status: 'cancelled', cancelledAt, cancelReason: 'The teacher is unwell.' })
+      .where(eq(s.classes.id, c.id))
+    const calls = [
+      t.api('POST', `${base}/${c.id}/publish`, { token: owner }),
+      t.api('PATCH', `${base}/${c.id}`, { token: owner, body: { name: 'A new name' } }),
+      t.api('PUT', `${base}/${c.id}/instructor`, { token: owner, body: { userId: ownerId } }),
+      t.api('DELETE', `${base}/${c.id}`, { token: owner }),
+    ]
+    for (const res of await Promise.all(calls)) {
+      expect(res.status).toBe(409)
+      expect(res.body.error.code).toBe('class_cancelled')
+    }
+    const read = await t.api('GET', `${base}/${c.id}`, { token: owner })
+    expect(read.body.class).toMatchObject({
+      status: 'cancelled',
+      name: 'March weekend class',
+      cancelReason: 'The teacher is unwell.',
+      cancelledAt: cancelledAt.toISOString(),
+      releasedAt: null,
+    })
   })
 })
 

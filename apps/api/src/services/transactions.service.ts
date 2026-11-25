@@ -1,10 +1,13 @@
 import {
   ANALYTICS_EVENTS,
   type AuditEntry,
+  type BankDisputeStatus,
+  type EnrollmentRefundOutcome,
   type Page,
   type PayoutLedgerRow,
   type TransactionDetail,
   type TransactionSummary,
+  UNFINISHED_SEAT_REFUND_STATUSES,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { translate } from '@elevate/i18n'
@@ -12,8 +15,10 @@ import { and, EmptyFilter, eq, exists, ilike, ne, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { simpleEmail } from '../emails/templates'
 import { errors } from '../lib/errors'
+import { elevateShare, paymentShare } from '../lib/share'
 import type { SessionUser } from '../middleware/auth'
 import { recordAudit, trackEvent } from './audit.service'
+import { SEAT_REFUND_LABEL, seatRefundView, type Tx } from './seat-refunds.service'
 
 /**
  * The reason recorded for a refund made in the Stripe dashboard. The learner's email shows its
@@ -118,6 +123,8 @@ export class TransactionsService {
         enrollment: { columns: { id: true, status: true } },
         promoCode: { columns: { code: true } },
         refunds: true,
+        class: { columns: { id: true, name: true } },
+        seatRefunds: { orderBy: { createdAt: 'asc' } },
       },
     })
     if (!p) throw errors.notFound('Payment')
@@ -159,6 +166,16 @@ export class TransactionsService {
         requestedBy: r.requestedBy ? (requesters.get(r.requestedBy) ?? null) : null,
         createdAt: r.createdAt.toISOString(),
       })),
+      // A class payment's seat, so Support sees its refund state before acting on the payment.
+      class: p.class ? { id: p.class.id, name: p.class.name } : null,
+      seatStatus: p.classId !== null ? p.enrollment.status : null,
+      bankDisputeStatus: (p.bankDisputeStatus as BankDisputeStatus | null) ?? null,
+      released: p.releasedAt !== null,
+      paidOut: p.payoutId !== null,
+      paidOutCents: p.payoutId !== null ? p.paidOutCents : null,
+      teacherNetAfterRefundsCents: paymentShare(p, p.refunds),
+      platformNetAfterRefundsCents: elevateShare(p, p.refunds),
+      seatRefunds: p.seatRefunds.map(seatRefundView),
     }
   }
 
@@ -171,6 +188,14 @@ export class TransactionsService {
       throw errors.conflict('already_refunded', 'This payment was already refunded')
     if (!p.stripePaymentIntentId)
       throw errors.conflict('no_payment_intent', 'This payment has no Stripe payment intent')
+    // A seat refund under way would be counted twice; the seat refund row is retried or closed
+    // from Support's payouts page instead.
+    const unfinished = await db.query.seatRefunds.findFirst({
+      where: { paymentId, status: { in: [...UNFINISHED_SEAT_REFUND_STATUSES] } },
+      columns: { id: true },
+    })
+    if (unfinished)
+      throw errors.conflict('refund_in_progress', 'A refund for this seat is already on its way')
     // A second click, or a retry after a lost answer, gets back the refund the first one made.
     const result = await payments.createRefund({
       paymentIntentId: p.stripePaymentIntentId,
@@ -255,9 +280,22 @@ export class TransactionsService {
   }
 
   /**
-   * Shared by the Support action and the charge.refunded webhook. Idempotent per Stripe refund
-   * id; returns whether this call recorded the refund (false when it was already on record). The
-   * payment's refunded total is the sum of its ledger rows, so each Stripe refund counts once.
+   * The one ledger writer, shared by Support's action, the charge.refunded webhook and the seat
+   * refund sender. Idempotent per Stripe refund id; returns whether this call recorded the refund
+   * (false when it was already on record). The payment's refunded total is the sum of its ledger
+   * rows, so each Stripe refund counts once.
+   *
+   * - `tx` joins the caller's open transaction; without it the call opens its own.
+   * - `enrollment` is what happens to a class payment's enrollment: `refunded`, `cancelled` or
+   *   `unchanged`, whether the refund is full or part. Without it a class payment gets `refunded`
+   *   for a full refund and `unchanged` for a part one. Only the payment that the enrollment's
+   *   session points at changes the enrollment, and a class payment never changes the course's
+   *   enrol count. A self-paced payment behaves as it always has.
+   * - `applicationFeeRefundedCents` is X, the part of Elevate's fee returned with this refund. A
+   *   refund from outside stores null: Stripe returned the fee in proportion.
+   * - For an account on manual payouts, a refund of a payment that a payout has already counted
+   *   (it has a `payoutId`, or was paid before `manualSince`, inside the opening amounts) writes a
+   *   `refund_after_payout` adjustment of what the refund changed the profile's share by.
    */
   async applyRefund(input: {
     paymentId: string
@@ -265,18 +303,31 @@ export class TransactionsService {
     amountCents: number
     reason: string | null
     requestedBy: string | null
+    applicationFeeRefundedCents?: number | null
+    seatRefundId?: string | null
+    enrollment?: EnrollmentRefundOutcome
+    tx?: Tx
   }): Promise<boolean> {
     const { db } = this.deps
-    const payment = await db.query.payments.findFirst({ where: { id: input.paymentId } })
+    const payment = await (input.tx ?? db).query.payments.findFirst({
+      where: { id: input.paymentId },
+    })
     if (!payment) return false
     // One transaction that locks the enrolment first, in the order fulfilment uses: refunds of
     // two payments of one enrolment are then recorded one after the other.
-    return db.transaction(async (tx) => {
+    const run = async (tx: Tx): Promise<boolean> => {
       const [enrollment] = await tx
         .select()
         .from(s.enrollments)
         .where(eq(s.enrollments.id, payment.enrollmentId))
         .for('update')
+      const before = await tx
+        .select({
+          amountCents: s.refunds.amountCents,
+          applicationFeeRefundedCents: s.refunds.applicationFeeRefundedCents,
+        })
+        .from(s.refunds)
+        .where(eq(s.refunds.paymentId, payment.id))
       const inserted = await tx
         .insert(s.refunds)
         .values({
@@ -285,19 +336,41 @@ export class TransactionsService {
           amountCents: input.amountCents,
           reason: input.reason,
           requestedBy: input.requestedBy,
+          applicationFeeRefundedCents: input.applicationFeeRefundedCents ?? null,
+          seatRefundId: input.seatRefundId ?? null,
         })
         .onConflictDoNothing()
         .returning()
-      if (inserted.length === 0) return false
+      const ledgerRow = inserted[0]
+      if (!ledgerRow) return false
       const [p] = await tx.select().from(s.payments).where(eq(s.payments.id, input.paymentId))
       if (!p) return true
-      const [ledger] = await tx
-        .select({ total: sql<number>`coalesce(sum(${s.refunds.amountCents}), 0)::int` })
-        .from(s.refunds)
-        .where(eq(s.refunds.paymentId, p.id))
-      const refundedCents = ledger?.total ?? 0
+      const rows = [
+        ...before,
+        {
+          amountCents: ledgerRow.amountCents,
+          applicationFeeRefundedCents: ledgerRow.applicationFeeRefundedCents,
+        },
+      ]
+      const refundedCents = rows.reduce((sum, r) => sum + r.amountCents, 0)
       const status = refundedCents >= p.amountCents ? 'refunded' : 'partially_refunded'
       await tx.update(s.payments).set({ refundedCents, status }).where(eq(s.payments.id, p.id))
+      await this.adjustAfterPayout(tx, p, ledgerRow.id, before, rows)
+
+      if (p.classId !== null) {
+        const outcome = input.enrollment ?? (status === 'refunded' ? 'refunded' : 'unchanged')
+        if (
+          outcome !== 'unchanged' &&
+          enrollment?.stripeCheckoutSessionId === p.stripeCheckoutSessionId
+        ) {
+          await tx
+            .update(s.enrollments)
+            .set({ status: outcome })
+            .where(eq(s.enrollments.id, p.enrollmentId))
+        }
+        return true
+      }
+
       // Only the payment that gave access takes it away: the enrolment points at that payment's
       // session. Refunding a second, duplicate payment leaves the enrolment and the count alone.
       if (
@@ -333,7 +406,46 @@ export class TransactionsService {
         .set({ enrolCount: sql`greatest(${s.courses.enrolCount} - 1, 0)` })
         .where(eq(s.courses.id, p.courseId))
       return true
-    })
+    }
+    if (input.tx) return run(input.tx)
+    return db.transaction((tx) => run(tx as unknown as Tx))
+  }
+
+  /**
+   * The `refund_after_payout` adjustment of a refund on a payment a payout has already counted,
+   * for an account on manual payouts. Its amount is what the refund changed the profile's share
+   * by, worked out by `profileShareAfterRefunds` (through `paymentShare`): X − R for a seat refund.
+   */
+  private async adjustAfterPayout(
+    tx: Tx,
+    p: typeof s.payments.$inferSelect,
+    refundId: string,
+    before: { amountCents: number; applicationFeeRefundedCents: number | null }[],
+    after: { amountCents: number; applicationFeeRefundedCents: number | null }[],
+  ): Promise<void> {
+    const [account] = await tx
+      .select({
+        payoutMode: s.payoutAccounts.payoutMode,
+        manualSince: s.payoutAccounts.manualSince,
+      })
+      .from(s.payoutAccounts)
+      .where(eq(s.payoutAccounts.id, p.payoutAccountId))
+    if (account?.payoutMode !== 'manual') return
+    const counted =
+      p.payoutId !== null ||
+      (account.manualSince !== null && p.paidAt.getTime() < account.manualSince.getTime())
+    if (!counted) return
+    const share = (refunds: typeof before) => paymentShare(p, refunds)
+    await tx
+      .insert(s.payoutAdjustments)
+      .values({
+        payoutAccountId: p.payoutAccountId,
+        kind: 'refund_after_payout',
+        amountCents: share(after) - share(before),
+        paymentId: p.id,
+        refundId,
+      })
+      .onConflictDoNothing()
   }
 
   /** Webhook: charge.refunded (covers refunds made from the Stripe dashboard). */
@@ -367,9 +479,18 @@ export class TransactionsService {
         })
       ).map((r) => r.stripeRefundId),
     )
+    // The release job's own seat refunds are left to it: it records each, and sends its emails,
+    // once Stripe reports that the refund succeeded. They carry the row's label, and the job
+    // stores their ids on the row.
+    for (const row of await this.deps.db
+      .select({ refundId: s.seatRefunds.stripeRefundId })
+      .from(s.seatRefunds)
+      .where(eq(s.seatRefunds.paymentId, p.id))) {
+      if (row.refundId) known.add(row.refundId)
+    }
     const recorded: Array<{ refundId: string; amountCents: number; reason: string }> = []
     for (const r of refunds) {
-      if (known.has(r.refundId)) continue
+      if (known.has(r.refundId) || r.metadata[SEAT_REFUND_LABEL]) continue
       const reason = r.metadata.elevateReason || STRIPE_REFUND_REASON
       const added = await this.applyRefund({
         paymentId: p.id,

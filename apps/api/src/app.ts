@@ -12,6 +12,7 @@ import { catalogRoutes } from './routes/catalog'
 import { certificateRoutes } from './routes/certificates'
 import { checkoutRoutes } from './routes/checkout'
 import { classRoutes } from './routes/classes'
+import { devRoutes } from './routes/dev'
 import { filesRoutes } from './routes/files'
 import { healthRoutes } from './routes/health'
 import { learningRoutes } from './routes/learning'
@@ -68,6 +69,10 @@ export function createApp(deps: Deps) {
     .route('/catalog', catalogRoutes(deps))
     .route('/checkout', checkoutRoutes(deps))
     .route('/certificates', certificateRoutes(deps))
+
+  // Development only, and left out of the typed client: present only with the dev endpoints
+  // setting on, outside production, as the other dev answers are.
+  if (env.DEV_ENDPOINTS_ENABLED && !env.isProd) app.route('/dev', devRoutes(deps))
 
   return routes
 }

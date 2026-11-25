@@ -34,6 +34,8 @@ import {
   type ManualMark,
   type ManualMarkReasonCode,
   type ManualMarkView,
+  type MoneyAttendance,
+  moneyAttendance,
   type Overturn,
   type OverturnReasonCode,
   REFUSAL_REASONS,
@@ -48,6 +50,7 @@ import {
 import { schema as s } from '@elevate/db'
 import { and, desc, eq, exists, ilike, inArray, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
+import { manualMarkEmail } from '../emails/class-sales'
 import { codesFor, matchCode, periodStartMs, qrSvg } from '../lib/class-code'
 import { errors, HttpError } from '../lib/errors'
 import type { ProfileActor, SessionUser } from '../middleware/auth'
@@ -62,6 +65,7 @@ import {
   nameOf,
   toFacts,
 } from './classes.service'
+import { SeatsService } from './seats.service'
 
 type EventInsert = typeof s.attendanceEvents.$inferInsert
 type Reading = { lat: number; lng: number; accuracyM: number }
@@ -69,6 +73,12 @@ type EnrollmentRow = typeof s.enrollments.$inferSelect
 type UserRef = { id: string; name: string | null; email: string }
 
 const FROZEN_BY: readonly string[] = ['check_in', 'manual_mark']
+
+/** A learner with no attendance events: not counted, and no mark open. */
+export const NO_ATTENDANCE: MoneyAttendance = { counted: false, openMarkUntil: null }
+
+/** How long a refunded or withdrawn seat stays on the learner's list, to show its refund. */
+const RECENT_REFUND_MS = 30 * 24 * 60 * 60 * 1000
 
 const iso = (date: Date | null | undefined) => date?.toISOString() ?? null
 
@@ -136,6 +146,10 @@ export class AttendanceService {
       where: { userId: user.id, classId: block.classId, status: 'active' },
     })
     if (!enrollment) throw errors.notFound('Class')
+    // A cancelled class takes no check-in: the cancellation has already settled each seat's money.
+    if (block.class.status === 'cancelled' || block.class.cancelledAt !== null) {
+      throw errors.conflict('class_cancelled', 'This class was cancelled')
+    }
     return { block, classRow: block.class, enrollment }
   }
 
@@ -365,11 +379,20 @@ export class AttendanceService {
     return { state: state.state, flagReason: state.flagReason, checkedInAt: iso(at) }
   }
 
-  /** The learner's class enrollments, each with its class, blocks and the learner's own state. */
+  /**
+   * The learner's class enrollments, each with its class, blocks, the learner's own state and the
+   * seat: every active seat, and a seat that was refunded or withdrawn with a seat refund row
+   * created in the last 30 days, so the learner can see where the refund is.
+   */
   async listForLearner(user: SessionUser): Promise<LearnerClass[]> {
     const { db } = this.deps
+    const now = this.deps.now()
     const enrollments = await db.query.enrollments.findMany({
-      where: { userId: user.id, classId: { isNotNull: true }, status: 'active' },
+      where: {
+        userId: user.id,
+        classId: { isNotNull: true },
+        status: { in: ['active', 'refunded', 'cancelled'] },
+      },
       orderBy: { createdAt: 'desc' },
       with: {
         class: {
@@ -381,49 +404,111 @@ export class AttendanceService {
         attendanceEvents: { orderBy: { createdAt: 'asc' } },
       },
     })
-    const now = this.deps.now()
-    return enrollments.flatMap((enrollment) => {
+    const ended = enrollments.filter((e) => e.status !== 'active').map((e) => e.id)
+    const recent = new Set(
+      ended.length
+        ? (
+            await db.query.seatRefunds.findMany({
+              where: {
+                enrollmentId: { in: ended },
+                createdAt: { gte: new Date(now.getTime() - RECENT_REFUND_MS) },
+              },
+              columns: { enrollmentId: true },
+            })
+          ).map((r) => r.enrollmentId)
+        : [],
+    )
+    const seats = new SeatsService(this.deps)
+    const out: LearnerClass[] = []
+    for (const enrollment of enrollments) {
       const c = enrollment.class
-      if (!c) return []
-      return [
-        {
-          enrollmentId: enrollment.id,
-          class: {
-            id: c.id,
-            name: c.name,
-            courseTitle: c.course.title,
-            delivery: c.delivery,
-            venueAddress: c.venueAddress,
-            timeZone: c.timeZone,
-          },
-          blocks: c.blocks.map((block) => {
-            const events = enrollment.attendanceEvents
-              .filter((e) => e.blockId === block.id)
-              .sort(byTime)
-            const state = attendanceState(events.map(toFacts), now)
-            const checkIn = latest(events, 'check_in')
-            const overturn = checkIn
-              ? events.find((e) => e.type === 'overturn' && e.refersToEventId === checkIn.id)
-              : undefined
-            return {
-              id: block.id,
-              startsAt: block.startsAt.toISOString(),
-              endsAt: block.endsAt.toISOString(),
-              checkInOpen: checkInWindowStatus(block, now) === 'open',
-              state: state.state,
-              flagReason: state.flagReason,
-              manualMark: manualMarkView(events, state),
-              overturn: overturn
-                ? {
-                    reasonCode: overturn.reasonCode as OverturnReasonCode,
-                    at: overturn.createdAt.toISOString(),
-                  }
-                : null,
-            }
-          }),
+      if (!c) continue
+      if (enrollment.status !== 'active' && !recent.has(enrollment.id)) continue
+      out.push({
+        enrollmentId: enrollment.id,
+        class: {
+          id: c.id,
+          name: c.name,
+          courseTitle: c.course.title,
+          delivery: c.delivery,
+          venueAddress: c.venueAddress,
+          timeZone: c.timeZone,
         },
-      ]
+        blocks: c.blocks.map((block) => {
+          const events = enrollment.attendanceEvents
+            .filter((e) => e.blockId === block.id)
+            .sort(byTime)
+          const state = attendanceState(events.map(toFacts), now)
+          const checkIn = latest(events, 'check_in')
+          const overturn = checkIn
+            ? events.find((e) => e.type === 'overturn' && e.refersToEventId === checkIn.id)
+            : undefined
+          return {
+            id: block.id,
+            startsAt: block.startsAt.toISOString(),
+            endsAt: block.endsAt.toISOString(),
+            checkInOpen: checkInWindowStatus(block, now) === 'open',
+            state: state.state,
+            flagReason: state.flagReason,
+            manualMark: manualMarkView(events, state),
+            overturn: overturn
+              ? {
+                  reasonCode: overturn.reasonCode as OverturnReasonCode,
+                  at: overturn.createdAt.toISOString(),
+                }
+              : null,
+          }
+        }),
+        seat: await seats.learnerSeat({
+          enrollment,
+          classRow: c,
+          blocks: c.blocks,
+          events: enrollment.attendanceEvents,
+        }),
+      })
+    }
+    return out
+  }
+
+  // ── attendance for money ─────────────────────────────────────────────────
+
+  /**
+   * Each learner's attendance in a class, for money (decision 3), by enrollment: counted as
+   * attended, and the latest open manual mark's deadline. A learner with no events is not in the
+   * map; read them as `NO_ATTENDANCE`.
+   */
+  async moneyAttendanceByEnrollment(
+    tx: Deps['db'],
+    classId: string,
+  ): Promise<Map<string, MoneyAttendance>> {
+    const now = this.deps.now()
+    const events = await tx.query.attendanceEvents.findMany({
+      where: { classId },
+      orderBy: { createdAt: 'asc' },
     })
+    const byEnrollment = new Map<string, Map<string, ReturnType<typeof toFacts>[]>>()
+    for (const event of events) {
+      const blocks = byEnrollment.get(event.enrollmentId) ?? new Map()
+      blocks.set(event.blockId, [...(blocks.get(event.blockId) ?? []), toFacts(event)])
+      byEnrollment.set(event.enrollmentId, blocks)
+    }
+    return new Map(
+      [...byEnrollment].map(([enrollmentId, blocks]) => [
+        enrollmentId,
+        moneyAttendance(blocks, now),
+      ]),
+    )
+  }
+
+  /** The latest open manual mark's deadline in the class, or null when no mark is open. */
+  async classOpenMarkUntil(tx: Deps['db'], classId: string): Promise<Date | null> {
+    let latestUntil: Date | null = null
+    for (const a of (await this.moneyAttendanceByEnrollment(tx, classId)).values()) {
+      if (a.openMarkUntil && (!latestUntil || a.openMarkUntil > latestUntil)) {
+        latestUntil = a.openMarkUntil
+      }
+    }
+    return latestUntil
   }
 
   /** Disputes the learner's own standing manual mark, within 7 days of it. */
@@ -606,6 +691,9 @@ export class AttendanceService {
   /** The current period's code and the next two, each with its QR image and timing. */
   async codes(actor: ProfileActor, classId: string, blockId: string): Promise<CodeView> {
     const { classRow, block } = await this.instructorTarget(actor, classId, blockId)
+    if (classRow.status === 'cancelled' || classRow.cancelledAt !== null) {
+      throw errors.conflict('class_cancelled', 'This class was cancelled')
+    }
     if (classRow.delivery === 'in_person' && classRow.venueSetAt === null) {
       throw errors.conflict(
         'venue_not_set',
@@ -722,6 +810,26 @@ export class AttendanceService {
       profileId: actor.profileId,
       metadata: { classId: classRow.id, blockId: block.id, enrollmentId: enrollment.id },
     })
+    // A mark that settles can cost the learner a refund, so they hear of it while they can still
+    // dispute it, in their account's language.
+    const learner = await this.deps.db.query.users.findFirst({
+      where: { id: enrollment.userId },
+      columns: { email: true, locale: true },
+    })
+    if (learner && event) {
+      await this.deps.mailer.send(
+        manualMarkEmail({
+          to: learner.email,
+          locale: learner.locale ?? 'en',
+          learnerUrl: this.deps.env.LEARNER_URL,
+          enrollmentId: enrollment.id,
+          className: classRow.name,
+          timeZone: classRow.timeZone,
+          block,
+          disputeUntil: new Date(event.createdAt.getTime() + DISPUTE_WINDOW_MS),
+        }),
+      )
+    }
     return this.rosterView(classRow, block)
   }
 

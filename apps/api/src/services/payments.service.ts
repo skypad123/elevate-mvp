@@ -4,23 +4,28 @@ import {
   type CheckoutSyncResponse,
   DEFAULT_MINIMUM_CHARGE_CENTS,
   formatSgd,
+  fulfilmentDecision,
   type Locale,
   localeSchema,
   type PromoDiscount,
+  type Quote,
   type QuoteResponse,
   quote,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { translate } from '@elevate/i18n'
-import { and, eq, ne, sql } from 'drizzle-orm'
+import { and, eq, min, ne, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
+import { classReceiptEmail } from '../emails/class-sales'
 import { simpleEmail } from '../emails/templates'
-import { errors } from '../lib/errors'
+import { errors, HttpError } from '../lib/errors'
 import { isPayable } from '../lib/payout'
 import type { SessionUser } from '../middleware/auth'
 import type { CheckoutSessionResult } from '../providers/payments/types'
 import { recordAudit, trackEvent } from './audit.service'
+import { seatsTaken } from './class-checkout.service'
 import { MediaService } from './media.service'
+import { SeatRefundsService, type Tx } from './seat-refunds.service'
 import { TransactionsService } from './transactions.service'
 
 type PromoRow = typeof s.promoCodes.$inferSelect
@@ -38,6 +43,8 @@ export type FulfilmentInput = {
  * that does not exist. No payment is written; the caller reports it so Support can act.
  * `duplicate`: the enrolment was already active, so this payment was recorded and refunded.
  * `duplicate_unrefunded`: the same, but the refund failed; the payment stays for Support to refund.
+ * `seat_lost`: a class payment that arrived when its seat was gone. It is recorded with a
+ * `seat_lost` seat refund row, which the release job sends; the learner gets no seat.
  */
 export type FulfilmentOutcome =
   | 'applied'
@@ -46,6 +53,21 @@ export type FulfilmentOutcome =
   | 'unattributed'
   | 'duplicate'
   | 'duplicate_unrefunded'
+  | 'seat_lost'
+
+/**
+ * A class payment whose seat was lost, for an enrollment that already has an unfinished seat
+ * refund: the one-unfinished-row rule cannot take its `seat_lost` row yet. Nothing is recorded;
+ * the webhook stores the error and Stripe's redelivery is handled again once that row finishes.
+ */
+export class SeatLostBlockedError extends Error {
+  constructor(sessionId: string) {
+    super(
+      `seat_lost_blocked: session ${sessionId} lost its seat and its enrollment has a refund under way`,
+    )
+    this.name = 'SeatLostBlockedError'
+  }
+}
 
 /** What makes two checkout attempts the same: a session is reused only when all of these match. */
 const ATTEMPT_KEYS = [
@@ -58,7 +80,7 @@ const ATTEMPT_KEYS = [
 const sameAttempt = (a: Record<string, string>, b: Record<string, string>) =>
   ATTEMPT_KEYS.every((key) => (a[key] ?? '') === (b[key] ?? ''))
 
-const fulfilmentInput = (session: CheckoutSessionResult): FulfilmentInput => ({
+export const fulfilmentInput = (session: CheckoutSessionResult): FulfilmentInput => ({
   sessionId: session.id,
   paymentIntentId: session.paymentIntentId,
   amountTotal: session.amountTotal,
@@ -67,6 +89,49 @@ const fulfilmentInput = (session: CheckoutSessionResult): FulfilmentInput => ({
 })
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * The payment page's metadata, which fulfilment reads: the payee is fixed when checkout starts and
+ * travels here, never read from the course as it is later. Class checkout adds its own keys.
+ */
+export function checkoutMetadata(input: {
+  enrollmentId: string
+  courseId: string
+  userId: string
+  payoutAccountId: string
+  profileId: string
+  promoCodeId: string | null
+  quote: Quote
+  locale?: Locale
+}): Record<string, string> {
+  const q = input.quote
+  return {
+    enrollmentId: input.enrollmentId,
+    courseId: input.courseId,
+    userId: input.userId,
+    elevatePayoutAccountId: input.payoutAccountId,
+    elevateProfileId: input.profileId,
+    promoCodeId: input.promoCodeId ?? '',
+    listPriceCents: String(q.listPriceCents),
+    discountCents: String(q.discountCents),
+    amountCents: String(q.amountCents),
+    stripeFeeEstimateCents: String(q.stripeFeeEstimateCents),
+    commissionCents: String(q.commissionCents),
+    applicationFeeCents: String(q.applicationFeeCents),
+    teacherNetCents: String(q.teacherNetCents),
+    ...(input.locale ? { locale: input.locale } : {}),
+  }
+}
+
+/** Refuses a price above zero that is under the minimum Stripe charge. */
+export function assertChargeable(q: Quote): void {
+  if (q.belowMinimum)
+    throw errors.unprocessable(
+      'below_minimum',
+      `The discounted price is below the minimum chargeable amount (${formatSgd(DEFAULT_MINIMUM_CHARGE_CENTS)})`,
+      { minimumCents: DEFAULT_MINIMUM_CHARGE_CENTS },
+    )
+}
 
 export class PaymentsService {
   private readonly media: MediaService
@@ -214,12 +279,7 @@ export class PaymentsService {
       return { kind: 'enrolled', enrollmentId }
     }
 
-    if (q.belowMinimum)
-      throw errors.unprocessable(
-        'below_minimum',
-        `The discounted price is below the minimum chargeable amount (${formatSgd(DEFAULT_MINIMUM_CHARGE_CENTS)})`,
-        { minimumCents: DEFAULT_MINIMUM_CHARGE_CENTS },
-      )
+    assertChargeable(q)
     // The error code keeps its old name so clients do not change.
     const account = course.profile.payoutAccount
     if (!isPayable(account)) {
@@ -258,22 +318,16 @@ export class PaymentsService {
     // Fulfilment reads it from there, never from the course as it is later.
     // The return pages open in the language checkout started in.
     const lang = locale ? `&lang=${locale}` : ''
-    const metadata: Record<string, string> = {
+    const metadata = checkoutMetadata({
       enrollmentId,
       courseId,
       userId: user.id,
-      elevatePayoutAccountId: account.id,
-      elevateProfileId: course.profileId,
-      promoCodeId: promoRow?.id ?? '',
-      listPriceCents: String(q.listPriceCents),
-      discountCents: String(q.discountCents),
-      amountCents: String(q.amountCents),
-      stripeFeeEstimateCents: String(q.stripeFeeEstimateCents),
-      commissionCents: String(q.commissionCents),
-      applicationFeeCents: String(q.applicationFeeCents),
-      teacherNetCents: String(q.teacherNetCents),
-      ...(locale ? { locale } : {}),
-    }
+      payoutAccountId: account.id,
+      profileId: course.profileId,
+      promoCodeId: promoRow?.id ?? null,
+      quote: q,
+      locale,
+    })
     const started = () =>
       trackEvent(this.deps, {
         userId: user.id,
@@ -394,6 +448,7 @@ export class PaymentsService {
       if (session) enrollment = await this.enrollmentForSession(sessionId, session.metadata)
     }
     if (!enrollment || enrollment.userId !== user.id) throw errors.notFound('Checkout session')
+    if (enrollment.classId) return this.syncClassSession(sessionId, enrollment, session)
     const paid = { status: 'paid', enrollmentId: enrollment.id, courseSlug: enrollment.course.slug }
     if (enrollment.status === 'active' && pointsHere) return paid as CheckoutSyncResponse
     // Another session of an active enrolment is still read: if it was paid too, fulfilment
@@ -411,6 +466,95 @@ export class PaymentsService {
     }
     if (enrollment.status === 'active') return paid as CheckoutSyncResponse
     return { status: session.status === 'expired' ? 'expired' : 'pending' }
+  }
+
+  /**
+   * The success page of a class checkout. A recorded payment answers `paid` with its class, or
+   * `seat_lost` when it got a `seat_lost` row; an unrecorded paid session is fulfilled first.
+   */
+  private async syncClassSession(
+    sessionId: string,
+    enrollment: { id: string; classId: string | null; course: { slug: string } },
+    session: CheckoutSessionResult | null,
+  ): Promise<CheckoutSyncResponse> {
+    const { db, payments, log } = this.deps
+    const courseSlug = enrollment.course.slug
+    const recorded = async (): Promise<CheckoutSyncResponse | null> => {
+      const payment = await db.query.payments.findFirst({
+        where: { stripeCheckoutSessionId: sessionId },
+        with: { seatRefunds: { columns: { kind: true } } },
+      })
+      if (!payment) return null
+      const classId = payment.classId ?? enrollment.classId ?? ''
+      if (payment.seatRefunds.some((row) => row.kind === 'seat_lost'))
+        return { status: 'seat_lost', classId, courseSlug }
+      return { status: 'paid', enrollmentId: enrollment.id, courseSlug, classId }
+    }
+    const known = await recorded()
+    if (known) return known
+    const current = session ?? (await payments.retrieveCheckoutSession(sessionId))
+    if (current.paymentStatus !== 'paid')
+      return { status: current.status === 'expired' ? 'expired' : 'pending' }
+    try {
+      const outcome = await this.fulfilCheckout(fulfilmentInput(current))
+      if (outcome === 'unattributed') {
+        log.error('paid checkout session has no payout account', { sessionId })
+        return { status: 'pending' }
+      }
+    } catch (error) {
+      if (!(error instanceof SeatLostBlockedError)) throw error
+      log.error('a lost seat could not be recorded yet', { sessionId, error: error.message })
+      return { status: 'pending' }
+    }
+    return (await recorded()) ?? { status: 'pending' }
+  }
+
+  /**
+   * Step 3 of a release run: Stripe's fee, and the balance transaction, transfer and application
+   * fee ids, are empty for a few seconds after a payment on the pinned API version. For each
+   * payment with a charge and no fee recorded, reads them from Stripe and stores the fee, the
+   * platform's net and any id that is still empty. A payment Stripe has not filled yet is left for
+   * the next run; a failure on one does not stop the others. Returns how many it filled.
+   */
+  async fillStripeFees(): Promise<number> {
+    const { db, log, payments } = this.deps
+    const rows = await db.query.payments.findMany({
+      where: { stripeChargeId: { isNotNull: true }, stripeFeeActualCents: { isNull: true } },
+      columns: {
+        id: true,
+        stripeChargeId: true,
+        applicationFeeCents: true,
+        stripeBalanceTransactionId: true,
+        stripeTransferId: true,
+        stripeApplicationFeeId: true,
+      },
+    })
+    let filled = 0
+    for (const p of rows) {
+      if (!p.stripeChargeId) continue
+      try {
+        const fee = await payments.retrieveChargeFee(p.stripeChargeId)
+        if (!fee) continue
+        const [updated] = await db
+          .update(s.payments)
+          .set({
+            stripeFeeActualCents: fee.stripeFeeCents,
+            platformNetCents: p.applicationFeeCents - fee.stripeFeeCents,
+            stripeBalanceTransactionId: p.stripeBalanceTransactionId ?? fee.balanceTransactionId,
+            stripeTransferId: p.stripeTransferId ?? fee.transferId,
+            stripeApplicationFeeId: p.stripeApplicationFeeId ?? fee.applicationFeeId,
+          })
+          .where(and(eq(s.payments.id, p.id), sql`${s.payments.stripeFeeActualCents} is null`))
+          .returning({ id: s.payments.id })
+        if (updated) filled++
+      } catch (error) {
+        log.warn('could not read the Stripe fee of a payment', {
+          paymentId: p.id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+    return filled
   }
 
   /**
@@ -460,6 +604,49 @@ export class PaymentsService {
     const parsedLocale = localeSchema.safeParse(m.locale)
     const locale = parsedLocale.success ? parsedLocale.data : null
     const now = this.deps.now()
+    const paymentValues = {
+      enrollmentId: enrollment.id,
+      userId: enrollment.userId,
+      courseId: enrollment.courseId,
+      profileId,
+      payoutAccountId,
+      stripeCheckoutSessionId: input.sessionId,
+      stripePaymentIntentId: input.paymentIntentId,
+      stripeChargeId: details.chargeId,
+      stripeTransferId: details.transferId,
+      stripeApplicationFeeId: details.applicationFeeId,
+      stripeBalanceTransactionId: details.balanceTransactionId,
+      currency: env.PLATFORM_CURRENCY,
+      listPriceCents,
+      discountCents,
+      amountCents,
+      stripeFeeEstimateCents,
+      stripeFeeActualCents: details.stripeFeeCents,
+      commissionCents,
+      applicationFeeCents,
+      teacherNetCents,
+      platformNetCents:
+        details.stripeFeeCents === null ? null : applicationFeeCents - details.stripeFeeCents,
+      promoCodeId,
+      status: 'succeeded' as const,
+      receiptUrl: details.receiptUrl,
+      paidAt: now,
+    }
+
+    // A class sale: the seat steps differ, and a class payment never reaches the duplicate paths.
+    if (m.classId !== undefined) {
+      if (!UUID.test(m.classId)) return 'unmatched'
+      return this.fulfilClass({
+        sessionId: input.sessionId,
+        to: input.customerEmail ?? enrollment.user.email,
+        classId: m.classId,
+        enrollment,
+        paymentValues,
+        profile,
+        stripePaidAt: details.paidAt ?? null,
+        locale,
+      })
+    }
 
     const result = await db.transaction(async (tx) => {
       // The enrolment is locked first, so fulfilments of one enrolment run one after the other:
@@ -472,34 +659,7 @@ export class PaymentsService {
       // The same session fulfilled meanwhile: its payment is there, so nothing is inserted.
       const [payment] = await tx
         .insert(s.payments)
-        .values({
-          enrollmentId: enrollment.id,
-          userId: enrollment.userId,
-          courseId: enrollment.courseId,
-          profileId,
-          payoutAccountId,
-          stripeCheckoutSessionId: input.sessionId,
-          stripePaymentIntentId: input.paymentIntentId,
-          stripeChargeId: details.chargeId,
-          stripeTransferId: details.transferId,
-          stripeApplicationFeeId: details.applicationFeeId,
-          stripeBalanceTransactionId: details.balanceTransactionId,
-          currency: env.PLATFORM_CURRENCY,
-          listPriceCents,
-          discountCents,
-          amountCents,
-          stripeFeeEstimateCents,
-          stripeFeeActualCents: details.stripeFeeCents,
-          commissionCents,
-          applicationFeeCents,
-          teacherNetCents,
-          platformNetCents:
-            details.stripeFeeCents === null ? null : applicationFeeCents - details.stripeFeeCents,
-          promoCodeId,
-          status: 'succeeded',
-          receiptUrl: details.receiptUrl,
-          paidAt: now,
-        })
+        .values(paymentValues)
         .onConflictDoNothing()
         .returning()
       if (!payment) return null
@@ -539,6 +699,7 @@ export class PaymentsService {
         enrollmentId: enrollment.id,
         userId: enrollment.userId,
         locale: enrollment.user.locale,
+        classId: null,
       })
 
     await trackEvent(this.deps, {
@@ -605,6 +766,177 @@ export class PaymentsService {
   }
 
   /**
+   * The class branch of `fulfilCheckout`, by the fulfilment table. One transaction locks the class
+   * row and then the enrollment row, always in that order, records the payment with its class,
+   * and either gives it the seat or writes a `seat_lost` seat refund row. The seat is refused when
+   * the enrollment is already active on another payment. Neither branch touches
+   * `courses.enrol_count`: a class seat is not counted as an enrolment in the course.
+   */
+  private async fulfilClass(input: {
+    sessionId: string
+    to: string
+    classId: string
+    enrollment: {
+      id: string
+      userId: string
+      courseId: string
+      user: { locale: Locale | null }
+      course: { title: string }
+    }
+    paymentValues: typeof s.payments.$inferInsert & { amountCents: number }
+    profile: { ownerUserId: string; displayName: string; reviewedAt: Date | null }
+    /** Stripe's time for the payment, when the provider reports it. */
+    stripePaidAt: Date | null
+    locale: Locale | null
+  }): Promise<FulfilmentOutcome> {
+    const { db, env, mailer } = this.deps
+    const { enrollment, classId, paymentValues } = input
+    const now = this.deps.now()
+    const promoCodeId = paymentValues.promoCodeId ?? null
+    let result: { paymentId: string; seat: boolean } | null
+    try {
+      result = await db.transaction(async (tx) => {
+        const [cls] = await tx
+          .select({
+            seats: s.classes.seats,
+            status: s.classes.status,
+            cancelledAt: s.classes.cancelledAt,
+          })
+          .from(s.classes)
+          .where(eq(s.classes.id, classId))
+          .for('update')
+        const [locked] = await tx
+          .select({
+            status: s.enrollments.status,
+            classId: s.enrollments.classId,
+            seatReservedUntil: s.enrollments.seatReservedUntil,
+          })
+          .from(s.enrollments)
+          .where(eq(s.enrollments.id, enrollment.id))
+          .for('update')
+        if (!cls || !locked) throw new Error(`class checkout ${input.sessionId} has no class`)
+        // The same session fulfilled meanwhile: its payment is there, so nothing is inserted.
+        const [payment] = await tx
+          .insert(s.payments)
+          .values({ ...paymentValues, classId })
+          .onConflictDoNothing()
+          .returning()
+        if (!payment) return null
+        const [first] = await tx
+          .select({ startsAt: min(s.classBlocks.startsAt) })
+          .from(s.classBlocks)
+          .where(eq(s.classBlocks.classId, classId))
+        const taken = await seatsTaken(tx as unknown as Tx, classId, now, enrollment.id)
+        const decision =
+          locked.status === 'active' || locked.classId !== classId
+            ? 'seat_lost'
+            : fulfilmentDecision({
+                classCancelled: cls.status === 'cancelled' || cls.cancelledAt !== null,
+                reservedUntil: locked.seatReservedUntil,
+                seatFree: taken < cls.seats,
+                firstBlockStartsAt: first?.startsAt ?? now,
+                paidAt: input.stripePaidAt ?? now,
+                now,
+              })
+        if (decision === 'seat_lost') {
+          await new SeatRefundsService(this.deps).request(tx as unknown as Tx, {
+            enrollmentId: enrollment.id,
+            paymentId: payment.id,
+            classId,
+            kind: 'seat_lost',
+          })
+          return { paymentId: payment.id, seat: false }
+        }
+        // The enrolment points at the session that paid for its seat, as for a self-paced one.
+        await tx
+          .update(s.enrollments)
+          .set({
+            status: 'active',
+            enrolledAt: now,
+            promoCodeId,
+            stripeCheckoutSessionId: input.sessionId,
+            seatReservedUntil: null,
+          })
+          .where(eq(s.enrollments.id, enrollment.id))
+        if (promoCodeId)
+          await tx
+            .update(s.promoCodes)
+            .set({ redeemedCount: sql`${s.promoCodes.redeemedCount} + 1` })
+            .where(eq(s.promoCodes.id, promoCodeId))
+        return { paymentId: payment.id, seat: true }
+      })
+    } catch (error) {
+      if (error instanceof HttpError && error.code === 'refund_in_progress')
+        throw new SeatLostBlockedError(input.sessionId)
+      throw error
+    }
+    if (!result) return 'ignored'
+    const { amountCents, profileId, payoutAccountId } = paymentValues
+    await recordAudit(this.deps, {
+      actorId: null,
+      action: 'payment.succeeded',
+      entityType: 'enrollment',
+      entityId: enrollment.id,
+      profileId,
+      metadata: {
+        sessionId: input.sessionId,
+        amountCents,
+        payoutAccountId,
+        classId,
+        seatLost: !result.seat,
+      },
+    })
+    if (!result.seat) return 'seat_lost'
+    await trackEvent(this.deps, {
+      userId: enrollment.userId,
+      name: ANALYTICS_EVENTS.checkoutCompleted,
+      properties: { courseId: enrollment.courseId, classId, amountCents, locale: input.locale },
+    })
+    const paidToAccount = await db.$count(
+      s.payments,
+      eq(s.payments.payoutAccountId, payoutAccountId),
+    )
+    if (paidToAccount === 1) {
+      const approvedAt = input.profile.reviewedAt ?? null
+      await trackEvent(this.deps, {
+        userId: input.profile.ownerUserId,
+        name: ANALYTICS_EVENTS.firstPayout,
+        properties: {
+          profileId,
+          payoutAccountId,
+          courseId: enrollment.courseId,
+          classId,
+          amountCents,
+          teacherNetCents: paymentValues.teacherNetCents,
+          secondsSinceApproval: approvedAt
+            ? Math.round((now.getTime() - approvedAt.getTime()) / 1000)
+            : null,
+        },
+      })
+    }
+    const cls = await db.query.classes.findFirst({
+      where: { id: classId },
+      with: { blocks: { columns: { startsAt: true, endsAt: true } } },
+    })
+    if (cls) {
+      await mailer.send(
+        classReceiptEmail({
+          to: input.to,
+          locale: enrollment.user.locale ?? 'en',
+          learnerUrl: env.LEARNER_URL,
+          enrollmentId: enrollment.id,
+          class: cls,
+          courseTitle: enrollment.course.title,
+          teacher: input.profile.displayName,
+          amountCents,
+          receiptUrl: paymentValues.receiptUrl ?? null,
+        }),
+      )
+    }
+    return 'applied'
+  }
+
+  /**
    * A payment already on record for this session. If it is a duplicate whose refund did not
    * happen (the refund failed, or the process stopped after the payment was written), the refund
    * is tried again; anything else is done.
@@ -612,6 +944,8 @@ export class PaymentsService {
   private async retryDuplicateRefund(
     payment: typeof s.payments.$inferSelect,
   ): Promise<FulfilmentOutcome> {
+    // A class payment that got no seat has a `seat_lost` row instead; it never comes here.
+    if (payment.classId) return 'ignored'
     if (payment.status !== 'succeeded' || !payment.stripePaymentIntentId) return 'ignored'
     const enrollment = await this.deps.db.query.enrollments.findFirst({
       where: { id: payment.enrollmentId },
@@ -633,6 +967,7 @@ export class PaymentsService {
       enrollmentId: enrollment.id,
       userId: enrollment.userId,
       locale: enrollment.user.locale,
+      classId: payment.classId,
     })
   }
 
@@ -654,7 +989,10 @@ export class PaymentsService {
     userId: string
     /** The learner's account language, for the email. */
     locale: Locale | null
+    /** Set for a class payment, which is never refunded here. */
+    classId: string | null
   }): Promise<FulfilmentOutcome> {
+    if (input.classId) return 'ignored'
     const { env, payments, mailer, log } = this.deps
     const reason = 'Duplicate payment: already enrolled through another checkout'
     const audit = (metadata: Record<string, unknown>) =>

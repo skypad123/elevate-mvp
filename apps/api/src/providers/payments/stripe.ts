@@ -1,15 +1,25 @@
 import Stripe from 'stripe'
 import {
+  type AccountBalance,
+  type ApplicationFeeRefund,
+  type ChargeFee,
   type ChargeRefund,
   type CheckoutSessionInput,
   type CheckoutSessionResult,
   type ConnectedAccountInput,
   type ConnectedAccountStatus,
+  type CreateRefundInput,
   checkoutIdempotencyKey,
+  PAYOUT_LABEL,
   type PaymentDetails,
   type PaymentsProvider,
   type PaymentsWebhookEvent,
+  type PayoutResult,
+  type PayoutStatus,
   type RefundResult,
+  type RefundStatus,
+  type TransferReversal,
+  type TransferReversalResult,
 } from './types'
 
 export type StripeConfig = {
@@ -98,7 +108,7 @@ export class StripePaymentsProvider implements PaymentsProvider {
             currency: input.currency,
             unit_amount: input.amountCents,
             product_data: {
-              name: input.courseTitle,
+              name: input.productName ?? input.courseTitle,
               ...(input.courseImageUrl ? { images: [input.courseImageUrl] } : {}),
             },
           },
@@ -115,6 +125,10 @@ export class StripePaymentsProvider implements PaymentsProvider {
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
       ...(input.locale ? { locale: input.locale } : {}),
+      ...(input.allowedPaymentMethods
+        ? { allowed_payment_method_types: [...input.allowedPaymentMethods] }
+        : {}),
+      ...(input.hideLink ? { wallet_options: { link: { display: 'never' } } } : {}),
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
     }
     const key = checkoutIdempotencyKey(input)
@@ -182,20 +196,17 @@ export class StripePaymentsProvider implements PaymentsProvider {
         appFee?.id ?? (typeof charge?.application_fee === 'string' ? charge.application_fee : null),
       receiptUrl: charge?.receipt_url ?? null,
       amountCents: pi.amount_received || pi.amount,
+      paidAt: charge?.created ? new Date(charge.created * 1000) : null,
     }
   }
 
-  async createRefund(input: {
-    paymentIntentId: string
-    reason?: string
-    metadata?: Record<string, string>
-    idempotencyKey?: string
-  }): Promise<RefundResult> {
+  async createRefund(input: CreateRefundInput): Promise<RefundResult> {
     const refund = await this.stripe.refunds.create(
       {
         payment_intent: input.paymentIntentId,
+        ...(input.amountCents === undefined ? {} : { amount: input.amountCents }),
         reverse_transfer: true,
-        refund_application_fee: true,
+        refund_application_fee: input.refundApplicationFee ?? true,
         reason: 'requested_by_customer',
         metadata: {
           ...(input.metadata ?? {}),
@@ -204,7 +215,12 @@ export class StripePaymentsProvider implements PaymentsProvider {
       },
       input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
     )
-    return { refundId: refund.id, amountCents: refund.amount, status: refund.status ?? 'pending' }
+    return { refundId: refund.id, amountCents: refund.amount, status: refundStatus(refund.status) }
+  }
+
+  async retrieveRefund(refundId: string): Promise<RefundStatus> {
+    const refund = await this.stripe.refunds.retrieve(refundId)
+    return refundStatus(refund.status)
   }
 
   async listRefunds(chargeId: string): Promise<ChargeRefund[]> {
@@ -218,6 +234,145 @@ export class StripePaymentsProvider implements PaymentsProvider {
       })
     }
     return out
+  }
+
+  async refundApplicationFee(input: {
+    applicationFeeId: string
+    amountCents: number
+    metadata: Record<string, string>
+    idempotencyKey: string
+  }): Promise<{ feeRefundId: string }> {
+    const feeRefund = await this.stripe.applicationFees.createRefund(
+      input.applicationFeeId,
+      { amount: input.amountCents, metadata: input.metadata },
+      { idempotencyKey: input.idempotencyKey },
+    )
+    return { feeRefundId: feeRefund.id }
+  }
+
+  async listApplicationFeeRefunds(applicationFeeId: string): Promise<ApplicationFeeRefund[]> {
+    const out: ApplicationFeeRefund[] = []
+    for await (const feeRefund of this.stripe.applicationFees.listRefunds(applicationFeeId, {
+      limit: 100,
+    })) {
+      out.push({
+        feeRefundId: feeRefund.id,
+        amountCents: feeRefund.amount,
+        metadata: (feeRefund.metadata ?? {}) as Record<string, string>,
+      })
+    }
+    return out
+  }
+
+  /**
+   * The answer carries the transfer's charge and its application fee, so the fee returned in all
+   * is read from the same response that an idempotent retry replays.
+   */
+  async reverseTransfer(input: {
+    transferId: string
+    amountCents: number
+    refundApplicationFee: boolean
+    metadata: Record<string, string>
+    idempotencyKey: string
+  }): Promise<TransferReversalResult> {
+    const reversal = await this.stripe.transfers.createReversal(
+      input.transferId,
+      {
+        amount: input.amountCents,
+        refund_application_fee: input.refundApplicationFee,
+        metadata: input.metadata,
+        expand: ['transfer.source_transaction.application_fee'],
+      },
+      { idempotencyKey: input.idempotencyKey },
+    )
+    const transfer = typeof reversal.transfer === 'string' ? null : reversal.transfer
+    const charge =
+      transfer?.source_transaction && typeof transfer.source_transaction !== 'string'
+        ? transfer.source_transaction
+        : null
+    const fee =
+      charge?.application_fee && typeof charge.application_fee !== 'string'
+        ? charge.application_fee
+        : null
+    return { reversalId: reversal.id, applicationFeeRefundedCents: fee?.amount_refunded ?? null }
+  }
+
+  async listTransferReversals(transferId: string): Promise<TransferReversal[]> {
+    const out: TransferReversal[] = []
+    for await (const reversal of this.stripe.transfers.listReversals(transferId, { limit: 100 })) {
+      out.push({
+        reversalId: reversal.id,
+        amountCents: reversal.amount,
+        metadata: (reversal.metadata ?? {}) as Record<string, string>,
+      })
+    }
+    return out
+  }
+
+  /** The call the test session ran on the pinned API version. */
+  async setManualPayouts(accountId: string): Promise<void> {
+    await this.stripe.accounts.update(accountId, {
+      settings: { payouts: { schedule: { interval: 'manual' } } },
+    })
+  }
+
+  async setAutomaticPayouts(accountId: string): Promise<void> {
+    await this.stripe.accounts.update(accountId, {
+      settings: { payouts: { schedule: { interval: 'daily' } } },
+    })
+  }
+
+  async retrieveBalance(accountId: string): Promise<AccountBalance> {
+    const balance = await this.stripe.balance.retrieve({}, { stripeAccount: accountId })
+    const sgd = (rows: Array<{ amount: number; currency: string }>) =>
+      rows.filter((r) => r.currency === 'sgd').reduce((sum, r) => sum + r.amount, 0)
+    return { availableCents: sgd(balance.available), pendingCents: sgd(balance.pending) }
+  }
+
+  async createPayout(input: {
+    accountId: string
+    amountCents: number
+    metadata: Record<string, string>
+    idempotencyKey: string
+  }): Promise<{ payoutId: string }> {
+    const payout = await this.stripe.payouts.create(
+      { amount: input.amountCents, currency: 'sgd', metadata: input.metadata },
+      { stripeAccount: input.accountId, idempotencyKey: input.idempotencyKey },
+    )
+    return { payoutId: payout.id }
+  }
+
+  /** Reads the account's payouts, newest first, until one carries the label or the list ends. */
+  async findPayout(accountId: string, label: string): Promise<PayoutResult | null> {
+    for await (const payout of this.stripe.payouts.list(
+      { limit: 100 },
+      { stripeAccount: accountId },
+    )) {
+      if (payout.metadata?.[PAYOUT_LABEL] === label)
+        return {
+          payoutId: payout.id,
+          amountCents: payout.amount,
+          status: payout.status as PayoutStatus,
+          metadata: (payout.metadata ?? {}) as Record<string, string>,
+        }
+    }
+    return null
+  }
+
+  async retrieveChargeFee(chargeId: string): Promise<ChargeFee | null> {
+    const charge = await this.stripe.charges.retrieve(chargeId, {
+      expand: ['balance_transaction'],
+    })
+    const balance = charge.balance_transaction
+    if (!balance || typeof balance === 'string') return null
+    const id = (field: string | { id: string } | null | undefined) =>
+      field ? (typeof field === 'string' ? field : field.id) : null
+    return {
+      stripeFeeCents: balance.fee,
+      balanceTransactionId: balance.id,
+      transferId: id(charge.transfer),
+      applicationFeeId: id(charge.application_fee),
+    }
   }
 
   async listTransferAmountCents(destinationAccountId: string): Promise<number> {
@@ -268,4 +423,8 @@ export function accountStatus(
     payoutsEnabled: !!account.payouts_enabled,
     legalName: account.company?.name ?? null,
   }
+}
+
+function refundStatus(status: string | null): RefundStatus {
+  return status === 'succeeded' || status === 'failed' || status === 'canceled' ? status : 'pending'
 }

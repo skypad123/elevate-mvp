@@ -1,4 +1,4 @@
-import { type Actor, type Capability, can } from '@elevate/core'
+import { type Actor, type Capability, CLASS_SALES_TERMS_VERSION, can } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
@@ -41,6 +41,8 @@ type Fixture = Awaited<ReturnType<TestApp['createCourse']>> & {
   disputeEventId: string
   /** A draft class with no blocks. */
   deletableClassId: string
+  /** A second published class of the course, for a move. */
+  moveTargetClassId: string
 }
 type Route = {
   method: string
@@ -110,6 +112,28 @@ const ROUTES: Route[] = [
     pattern: 'stripe/login-link',
     capability: 'stripe.links',
     path: () => '/stripe/login-link',
+  },
+  // ── class sales ──
+  {
+    method: 'GET',
+    pattern: 'class-sales',
+    capability: 'profile.read',
+    path: () => '/class-sales',
+  },
+  {
+    // The owner opts in on the first call; later calls answer 409 already_opted_in.
+    method: 'POST',
+    pattern: 'class-sales/accept',
+    capability: 'stripe.links',
+    path: () => '/class-sales/accept',
+    body: () => ({ termsVersion: CLASS_SALES_TERMS_VERSION }),
+  },
+  {
+    // The owner gives notice on the first call; later calls answer 409 not_opted_in.
+    method: 'POST',
+    pattern: 'class-sales/leave',
+    capability: 'stripe.links',
+    path: () => '/class-sales/leave',
   },
   { method: 'GET', pattern: 'earnings', capability: 'earnings.read', path: () => '/earnings' },
   {
@@ -363,6 +387,43 @@ const ROUTES: Route[] = [
     path: (f) => `/classes/${f.classId}/disputes/${f.disputeEventId}/decision`,
     body: () => ({ decision: 'upheld', reason: 'Checked with the instructor.' }),
   },
+  // ── seats (scheduled-classes-selling.md, 4.7) ──
+  {
+    method: 'GET',
+    pattern: 'classes/:id/seats',
+    capability: 'earnings.read',
+    path: (f) => `/classes/${f.classId}/seats`,
+  },
+  {
+    method: 'GET',
+    pattern: 'classes/:id/learners/:enrollmentId/move-targets',
+    capability: 'class.manage',
+    path: (f) => `/classes/${f.classId}/learners/${f.absentEnrollmentId}/move-targets`,
+  },
+  {
+    // The fixture's seats were given without a payment: 409 seat_has_no_payment.
+    method: 'POST',
+    pattern: 'classes/:id/learners/:enrollmentId/move',
+    capability: 'class.manage',
+    path: (f) => `/classes/${f.classId}/learners/${f.absentEnrollmentId}/move`,
+    body: (f) => ({ toClassId: f.moveTargetClassId }),
+  },
+  {
+    // As for the move: 409 seat_has_no_payment.
+    method: 'POST',
+    pattern: 'classes/:id/learners/:enrollmentId/refund',
+    capability: 'class.refund',
+    path: (f) => `/classes/${f.classId}/learners/${f.absentEnrollmentId}/refund`,
+    body: () => ({ amountCents: 100, reason: 'A goodwill refund.' }),
+  },
+  {
+    // Last of the class routes: the fixture's class is closed once it is cancelled.
+    method: 'POST',
+    pattern: 'classes/:id/cancel',
+    capability: 'class.manage',
+    path: (f) => `/classes/${f.classId}/cancel`,
+    body: () => ({ reason: 'The teacher is unwell.' }),
+  },
   {
     method: 'DELETE',
     pattern: 'invitations/:id',
@@ -518,6 +579,10 @@ async function fixture(profileId: string, status: Status = 'draft'): Promise<Fix
     status: 'draft',
     blocks: [],
   })
+  const moveTarget = await t.createClass(profileId, course.courseId, {
+    instructorUserId: instructor.id,
+    blocks: [{ startMs: 10 * 24 * 60 * 60_000, endMs: 10 * 24 * 60 * 60_000 + 60 * 60_000 }],
+  })
   const [invitation] = await t.db
     .insert(s.profileInvitations)
     .values({
@@ -538,6 +603,7 @@ async function fixture(profileId: string, status: Status = 'draft'): Promise<Fix
     memberId: member.id,
     instructorUserId: instructor.id,
     deletableClassId: deletable.classId,
+    moveTargetClassId: moveTarget.classId,
   }
 }
 
@@ -613,9 +679,19 @@ const REVIEW_ROUTES = [
   'POST courses/:id/change-set/approve',
   'POST courses/:id/change-set/discard',
 ]
-const STRIPE_LINKS = ['POST stripe/onboarding-link', 'POST stripe/login-link']
+const STRIPE_LINKS = [
+  'POST stripe/onboarding-link',
+  'POST stripe/login-link',
+  'POST class-sales/accept',
+  'POST class-sales/leave',
+]
 const PUBLISHING = ['PUT courses/:id/price', 'POST courses/:id/submit', 'DELETE courses/:id']
-const EARNINGS = ['GET earnings', 'GET earnings/reconcile', 'GET earnings/courses/:id']
+const EARNINGS = [
+  'GET earnings',
+  'GET earnings/reconcile',
+  'GET earnings/courses/:id',
+  'GET classes/:id/seats',
+]
 const INSTRUCTOR_ROUTES = [
   'GET classes/:id/blocks/:blockId/code',
   'PUT classes/:id/venue-location',
@@ -628,7 +704,12 @@ const CLASS_MANAGE_ROUTES = [
   'POST classes/:id/publish',
   'PUT classes/:id/instructor',
   'DELETE classes/:id',
+  'GET classes/:id/learners/:enrollmentId/move-targets',
+  'POST classes/:id/learners/:enrollmentId/move',
+  'POST classes/:id/cancel',
 ]
+/** `class.refund`: the owner and managers only. */
+const CLASS_REFUND = ['POST classes/:id/learners/:enrollmentId/refund']
 const DISPUTE_ROUTES = ['GET classes/:id/disputes', 'POST classes/:id/disputes/:eventId/decision']
 
 beforeAll(async () => {
@@ -691,6 +772,7 @@ describe('the role table, route by route', () => {
           ...MEMBER_ROUTES,
           ...REVIEW_ROUTES,
           ...CLASS_MANAGE_ROUTES,
+          ...CLASS_REFUND,
           ...DISPUTE_ROUTES,
           // a live course's details are not a writer's to change, even as a proposal
           ...(status === 'live' ? ['PATCH courses/:id'] : []),
@@ -709,6 +791,7 @@ describe('the role table, route by route', () => {
           ...MEMBER_ROUTES,
           ...REVIEW_ROUTES,
           ...CLASS_MANAGE_ROUTES,
+          ...CLASS_REFUND,
           ...INSTRUCTOR_ROUTES,
           ...DISPUTE_ROUTES,
         ].sort(),
@@ -729,6 +812,7 @@ describe('the role table, route by route', () => {
         'PATCH profile',
         'PUT apply/corporate',
         'GET stripe/status',
+        'GET class-sales',
         'GET courses',
         'GET courses/:id',
         'GET courses/:id/change-set',
@@ -747,6 +831,7 @@ describe('the role table, route by route', () => {
       [
         'GET profile',
         'GET stripe/status',
+        'GET class-sales',
         'GET courses',
         'GET courses/:id',
         'GET courses/:id/change-set',

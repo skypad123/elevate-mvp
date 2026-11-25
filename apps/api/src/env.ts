@@ -55,6 +55,12 @@ const envSchema = z.object({
    * every other class route answers 404; the demo seed creates no class data.
    */
   CLASSES: bool.default(false),
+  /**
+   * Selling class seats (docs/designs/scheduled-classes-selling.md). Off: no class is on sale and
+   * class checkout answers `class_not_on_sale`. Seats already sold, withdrawals, refunds, the
+   * release job and check-in keep working.
+   */
+  CLASS_SALES: bool.default(false),
 
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),

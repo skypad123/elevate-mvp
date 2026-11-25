@@ -1,5 +1,5 @@
 import type { Locale } from '@elevate/core'
-import { codePeriod } from '@elevate/core'
+import { CLASS_SALES_TERMS_VERSION, codePeriod, REFUND_TERMS_VERSION } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { createPgliteDb } from '@elevate/db/pglite'
 import { eq } from 'drizzle-orm'
@@ -12,6 +12,7 @@ import { FakeMailer } from '../../src/providers/mailer'
 import { FakePaymentsProvider, type PaymentsWebhookEvent } from '../../src/providers/payments'
 import { FakeStorage } from '../../src/providers/storage'
 import { FakeVideoProvider } from '../../src/providers/video'
+import { ClassSalesService } from '../../src/services/class-sales.service'
 
 export type ApiResponse<T = unknown> = { status: number; body: T; res: Response }
 
@@ -26,6 +27,7 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     TEACH_URL: 'http://teach.test',
     SUPPORT_URL: 'http://support.test',
     CLASSES: 'true',
+    CLASS_SALES: 'true',
     ...overrides,
   })
   // The whole suite runs as the API's restricted database user, so a missing grant fails a test.
@@ -446,6 +448,90 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     return enrollment
   }
 
+  /**
+   * Opts a profile in to class sales as its owner would, through the service: the account is
+   * switched to manual payouts on the fake Stripe and the opening amounts are written. A profile
+   * with no payout account is first made payable.
+   */
+  async function optIn(profileId: string) {
+    const profile = await db.query.profiles.findFirst({
+      where: { id: profileId },
+      with: { payoutAccount: true },
+    })
+    if (!profile) throw new Error(`no profile ${profileId}`)
+    if (!profile.payoutAccount) await makePayable(profileId)
+    const status = await new ClassSalesService(deps).accept(
+      {
+        role: 'owner',
+        profileId,
+        userId: profile.ownerUserId,
+        profileType: profile.type,
+        profileStatus: profile.status,
+      },
+      { termsVersion: CLASS_SALES_TERMS_VERSION },
+    )
+    if (status.payoutMode !== 'manual') throw new Error(`opting in left ${status.payoutMode}`)
+    return status
+  }
+
+  /** One session per learner for `buySeat`: sign-in codes are limited per address. */
+  const seatTokens = new Map<string, string>()
+  async function learnerToken(email: string) {
+    const known = seatTokens.get(email)
+    if (known) return known
+    const { token } = await signIn(email)
+    if (!token) throw new Error(`could not sign in ${email}`)
+    seatTokens.set(email, token)
+    return token
+  }
+
+  /**
+   * Starts a class checkout for `email` and pays it through the fake provider, delivering Stripe's
+   * webhook. `pay: false` stops after the reservation. Returns the session, the enrollment and,
+   * once paid, the payment.
+   */
+  async function buySeat(
+    email: string,
+    classId: string,
+    options: {
+      promoCode?: string
+      locale?: Locale
+      method?: 'card' | 'paynow'
+      pay?: boolean
+      /** Stripe's time for the payment. */
+      paidAt?: Date
+      /** Stripe's fee on the charge, as fulfilment reads it; null leaves it to be filled later. */
+      stripeFeeCents?: number | null
+    } = {},
+  ) {
+    const token = await learnerToken(email)
+    const started = await api('POST', `/api/checkout/classes/${classId}`, {
+      token,
+      body: {
+        termsVersion: REFUND_TERMS_VERSION,
+        ...(options.promoCode ? { promoCode: options.promoCode } : {}),
+        ...(options.locale ? { locale: options.locale } : {}),
+      },
+    })
+    if (started.status !== 200 || started.body.kind !== 'redirect')
+      throw new Error(`class checkout failed: ${started.status} ${JSON.stringify(started.body)}`)
+    const sessionId = started.body.sessionId as string
+    const user = await ensureUser(email)
+    const enrollment = await db.query.enrollments.findFirst({ where: { userId: user.id, classId } })
+    if (!enrollment) throw new Error('class checkout left no enrollment')
+    if (options.pay === false)
+      return { token, sessionId, enrollmentId: enrollment.id, payment: null }
+    if (options.stripeFeeCents !== undefined)
+      payments.setStripeFee(sessionId, options.stripeFeeCents)
+    const event = payments.completeCheckout(sessionId, options.method ?? 'card', options.paidAt)
+    const hook = await stripeWebhook(event)
+    if (hook.status !== 200) throw new Error(`webhook failed: ${JSON.stringify(hook.body)}`)
+    const payment = await db.query.payments.findFirst({
+      where: { stripeCheckoutSessionId: sessionId },
+    })
+    return { token, sessionId, enrollmentId: enrollment.id, payment: payment ?? null }
+  }
+
   /** The code a block shows at `at` (default: the test clock): the typed one, or the link's. */
   async function validCodeFor(blockId: string, at?: Date, kind: 'typed' | 'link' = 'typed') {
     const block = await db.query.classBlocks.findFirst({ where: { id: blockId } })
@@ -493,6 +579,9 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     enrolInClass,
     validCodeFor,
     makePayable,
+    optIn,
+    buySeat,
+    learnerToken,
     stripeWebhook,
     now: () => clock,
     setClock: (date: Date) => {

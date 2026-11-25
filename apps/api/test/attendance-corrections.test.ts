@@ -1,6 +1,7 @@
 import { DISPUTE_WINDOW_MS } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { inArray } from 'drizzle-orm'
+import { intlLocale, translate } from '@elevate/i18n'
+import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
@@ -147,6 +148,28 @@ describe('overturning a check-in', () => {
 })
 
 describe('marking by hand', () => {
+  it('emails the learner in their language with the date the dispute window ends', async () => {
+    const absent = await learnerIn()
+    await t.db.update(s.users).set({ locale: 'zh' }).where(eq(s.users.email, absent.email))
+    t.mailer.sent.length = 0
+    expect((await mark(writer, absent.enrollment.id)).status).toBe(200)
+    const sent = t.mailer.sent.filter((m) => m.to === absent.email)
+    const theClass = await t.db.query.classes.findFirst({ where: { id: classId } })
+    expect(sent.map((m) => m.subject)).toEqual([
+      translate('zh', 'email.manualMark.title', { className: theClass?.name ?? '' }),
+    ])
+    const until = new Date(t.now().getTime() + DISPUTE_WINDOW_MS)
+    const date = new Intl.DateTimeFormat(intlLocale('zh'), {
+      timeZone: theClass?.timeZone,
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(until)
+    expect(sent[0]?.text).toContain(translate('zh', 'email.manualMark.dispute', { date }))
+    expect(sent[0]?.text).toContain(`http://learner.test/class/${absent.enrollment.id}`)
+  })
+
   it('marks a learner who has not arrived, and refuses one who is present', async () => {
     const absent = await learnerIn()
     const res = await mark(writer, absent.enrollment.id)
