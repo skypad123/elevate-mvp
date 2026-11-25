@@ -6,8 +6,8 @@
 - **Who sees it:** the owner of a teaching profile, on the class-sales card
   in Teach Settings, above "Accept and start selling classes". Accepting is
   what the design calls opting in.
-- **Where the shown text lives:** the `teachSettings` area of `packages/i18n`,
-  once the build reaches it. Nothing is built yet.
+- **Where the shown text lives:** the `teachSettings` area of `packages/i18n`:
+  `packages/i18n/src/messages/areas/teachSettings.en.ts` and `.zh.ts`.
 - **Rules it states:** those of
   [Scheduled Classes, Part 2](../designs/scheduled-classes-selling.md). The
   table under "What each term rests on" names the decision or best guess

@@ -26,7 +26,7 @@ Install the CLI and forward both the account scope and the Connect scope to the 
 ```bash
 brew install stripe/stripe-cli/stripe
 stripe login
-stripe listen --events account.updated,charge.refunded,checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed --forward-to localhost:4400/api/webhooks/stripe --forward-connect-to localhost:4400/api/webhooks/stripe
+stripe listen --events account.updated,charge.refunded,charge.dispute.created,charge.dispute.closed,checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,payout.paid,payout.failed --forward-to localhost:4400/api/webhooks/stripe --forward-connect-to localhost:4400/api/webhooks/stripe
 ```
 
 Recent versions of the CLI refuse to start without `--events`. Paste the `whsec_…` the CLI prints
@@ -43,8 +43,11 @@ Create two endpoints in Dashboard → Developers → Webhooks, both pointing at
 `https://<api>/api/webhooks/stripe`:
 
 - **Your account**: `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-  `checkout.session.async_payment_failed`, `charge.refunded` → `STRIPE_WEBHOOK_SECRET`
-- **Connected accounts**: `account.updated` → `STRIPE_CONNECT_WEBHOOK_SECRET`
+  `checkout.session.async_payment_failed`, `charge.refunded`, `charge.dispute.created`,
+  `charge.dispute.closed` → `STRIPE_WEBHOOK_SECRET`
+- **Connected accounts**: `account.updated`, `payout.paid`, `payout.failed` →
+  `STRIPE_CONNECT_WEBHOOK_SECRET`. A payout is made on the profile's own account, so its events
+  arrive here.
 
 ## 4. Test data
 
@@ -81,6 +84,7 @@ Create two endpoints in Dashboard → Developers → Webhooks, both pointing at
   `/api/checkout/sessions/:id/sync`.
 - Partial refunds are not exposed in the UI; if one is made in the dashboard the ledger pro-rates
   the teacher net and marks the payment `partially_refunded`.
+- Class seats refund differently: see section 8.
 
 ## 6. Payout accounts
 
@@ -139,3 +143,28 @@ lists no director for a made-up company, so the authority check fails with every
 the first real company's onboarding, its dashboard link and Support's "Open in Stripe" link (built
 as `https://dashboard.stripe.com/[test/]connect/accounts/<id>`; in a Stripe sandbox, Stripe's own
 links also carry the platform account) by hand.
+
+## 8. Class sales and held payouts
+
+The rules are in [ADR 013](../adr/013-class-sales-and-held-payouts.md); running the release job is
+in [`infra/README.md`](../../infra/README.md), "The release job".
+
+- **Before any profile opts in**, in the sandbox and again in live mode: Connect → Settings →
+  in the platform's Connect settings for the Express dashboard, turn off **Edit payout schedule**
+  and **Manual payouts**. The setting is one
+  list for the whole platform, so every profile loses both. In live mode, email every teacher 30
+  days before.
+- **Opting in** switches the profile's Stripe account to manual payouts, and leaving switches it
+  back to daily automatic payouts. The account's payout schedule in the dashboard shows which.
+- **A class payment page** offers Card and PayNow and no other method (Apple Pay and the card form
+  are both "card"), and no Link button.
+- **Seat refunds are sent by the release job only**, never by a request. Each Stripe refund, fee
+  refund and reversal it makes carries the label `seat_refund_id` in its metadata, and each payout
+  carries `payout_id`. The webhook records nothing for a refund with the label; the job records it
+  once Stripe reports it succeeded. A PayNow refund stays pending for up to 5 minutes.
+- **Paying out** has not been tested on a real connected account. Singapore requires a liveness
+  check done by a person, and no test value for it is known; test a payout for part of a
+  balance, and a failed payout, on an account a person has taken through the check.
+- **A bank dispute** in test mode: pay with `4000 0000 0000 0259`. To decide it, submit evidence
+  with the text `winning_evidence` or `losing_evidence` in the dashboard. A PayNow payment cannot be
+  disputed.

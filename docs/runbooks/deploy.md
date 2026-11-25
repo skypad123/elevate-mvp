@@ -23,8 +23,9 @@ Branches: `main` is development (local only); `staging` and `production` deploy 
 1. Image: `docker build -f apps/api/Dockerfile -t elevate-api .` from the repo root. It contains
    `dist/server.js` (the default command), `dist/migrate.js`, and three commands run by hand as
    one-off tasks, `dist/seed.js`, `dist/reset-schema.js` and `dist/previews.js` (hover-preview
-   clips: `backfill`, `count`, `check`; see `infra/README.md`, "Hover previews"), with the
-   workspace packages bundled in. Outside Docker: `npm run build -w @elevate/api`, then `npm run start:prod`.
+   clips: `backfill`, `count`, `check`; see `infra/README.md`, "Hover previews"), and
+   `dist/release.js`, the release job, which a schedule runs every 15 minutes (`infra/README.md`,
+   "The release job"), with the workspace packages bundled in. Outside Docker: `npm run build -w @elevate/api`, then `npm run start:prod`.
 2. Required env: `DATABASE_URL`, `SESSION_SECRET` (32+ random chars), `API_URL`, `LEARNER_URL`,
    `TEACH_URL`, `SUPPORT_URL` (these three are also the CORS allow-list in production),
    `NODE_ENV=production`, and `STORAGE_DRIVER=s3` + `S3_BUCKET` + `S3_REGION`. On AWS leave the S3
@@ -32,7 +33,8 @@ Branches: `main` is development (local only); `staging` and `production` deploy 
    Optional integrations: `MAIL_DRIVER=resend` + `RESEND_API_KEY` + `MAIL_FROM`,
    `VIDEO_DRIVER=mux` + `MUX_*`, `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` +
    `STRIPE_CONNECT_WEBHOOK_SECRET`. `COURSE_PREVIEWS` (default `true`) pauses hover-preview clips
-   on course cards when `false`; they need `VIDEO_DRIVER=mux`.
+   on course cards when `false`; they need `VIDEO_DRIVER=mux`. `CLASS_SALES` (default `false`)
+   puts classes on sale; off, no class is on sale and everything already sold keeps working.
 3. Migrations: `node dist/migrate.js` (in the image) against the target `DATABASE_URL` before the
    new API version takes traffic; the Deploy workflow does this. `MIGRATIONS_DIR` points the
    bundle at the migration folders. Migrations are additive, with one exception: the teacher
@@ -42,8 +44,11 @@ Branches: `main` is development (local only); `staging` and `production` deploy 
    a learner) or `node dist/seed.js --admin-only` (production: the super admin and nothing else).
    Both need `SEED_SUPER_ADMIN_EMAIL` and write thumbnails through the configured storage.
 4. Webhooks: a Stripe endpoint for `checkout.session.completed`, `checkout.session.async_payment_*`,
-   `charge.refunded` on the account, and a **Connect** endpoint for `account.updated`, both pointing
-   at `https://<api>/api/webhooks/stripe`; a Mux endpoint for `video.*` at `/api/webhooks/mux`.
+   `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed` on the account, and a
+   **Connect** endpoint for `account.updated`, `payout.paid` and `payout.failed`, both pointing at
+   `https://<api>/api/webhooks/stripe`; a Mux endpoint for `video.*` at `/api/webhooks/mux`. Payout
+   events belong to the profile's connected account, so they arrive on the Connect endpoint. A
+   handler for an event an endpoint is not subscribed to is never called.
 5. Certificates: copy Noto Sans SC / Noto Sans Tamil into `apps/api/assets/fonts/fallback/` before
    building the image (or set `CERTIFICATE_FALLBACK_FONTS`) so non-Latin names render.
 6. The rate limiter is per instance and in memory; run one instance, or put a shared limiter at the
@@ -84,3 +89,19 @@ Branches: `main` is development (local only); `staging` and `production` deploy 
 - [ ] The hover-preview server PR was deployed before any teacher applied:
   `select count(*) from profiles where applied_at < '<time of that deploy>'` returns 0
   (ADR 011).
+
+## Checklist before the first class is sold
+
+Do each Stripe step in the sandbox first, then again in live mode
+([ADR 013](../adr/013-class-sales-and-held-payouts.md); the order of the deploy steps is in
+`infra/README.md`, "The first deploy with the release job").
+
+- [ ] In live mode, every teacher was emailed 30 days before the next step.
+- [ ] In the platform's Connect settings for the Express dashboard, **Edit payout schedule** and
+  **Manual payouts** are turned off. Without this a profile can pay its held money out itself.
+- [ ] The account endpoint is subscribed to `charge.dispute.created` and `charge.dispute.closed`,
+  and the Connect endpoint to `payout.paid` and `payout.failed` (step 4 above).
+- [ ] With `CLASS_SALES` on and one profile opted in, a class payment page offers Card and PayNow
+  and no other method. Apple Pay may show above them; Link does not.
+- [ ] Stripe's support has answered how the 90 days of a manual payout are counted, a lawyer has
+  read both sets of terms in `docs/terms/`, and the author has signed off the Chinese text.

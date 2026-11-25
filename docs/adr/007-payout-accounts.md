@@ -57,3 +57,9 @@ Builds on [ADR 003](003-payments-destination-charges.md) (destination charges) a
 - A later change that lets a personal profile become a company can give a profile a second
   account for a while. That needs a `retired` status and "at most one active account" in place of
   the unique `profile_id`; both are additive.
+
+## Update · 2026-11-25
+
+A payout account now has a `payout_mode`. A profile that opts in to class sales has its Stripe
+account on manual payouts, and the release job pays it; see
+[ADR 013](013-class-sales-and-held-payouts.md).

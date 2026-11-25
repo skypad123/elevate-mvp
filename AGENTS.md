@@ -90,6 +90,19 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
   cannot update or delete `attendance_events`; the API tests run as it too. Anything that needs
   the owner, such as a migration or `reset-schema.js`, runs from the migration task
   (`infra/README.md`).
+- A refund of a class seat is a `seat_refunds` row written by `SeatRefundsService.request`. Its
+  amounts come only from `seatRefund()`, and a profile's share of a payment after refunds only from
+  `profileShareAfterRefunds()`, both in `money.ts` (ADR 013).
+- No request handler calls Stripe to refund, reverse or pay out for a class seat: only the release
+  job does, through `SeatRefundsService.send` and `PayoutsService`. Support's "Refund in full"
+  (`TransactionsService.refund`) is the one exception and is refused while a seat refund is
+  unfinished. Only `PayoutsService` creates a payout or sets `released_run_id` or `payout_id`.
+- `seatsTaken` in `class-checkout.service.ts` is the only count of a class's seats. Only
+  `class-checkout.service.ts` and `seats.service.ts` set an enrollment's `class_id`
+  (`class-guards.test.ts`). A transaction that locks a class and an enrollment locks the class
+  first.
+- "Attended", in a money rule, means counted as attended by `moneyAttendance` in `packages/core`,
+  not any check-in or mark.
 - Run `npm run lint` (Biome) and `npx turbo run typecheck test` before committing.
 
 ## Expo conventions (apps/learner)

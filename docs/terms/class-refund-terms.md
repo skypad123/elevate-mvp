@@ -6,7 +6,10 @@
 - **Who sees it:** a learner, above the pay button on the class checkout
   page. One sentence of it is in the receipt email.
 - **Where the shown text lives:** the `learnerCheckout` and `email` areas of
-  `packages/i18n`, once the build reaches them. Nothing is built yet.
+  `packages/i18n`:
+  `packages/i18n/src/messages/areas/learnerCheckout.en.ts` and `.zh.ts` for the
+  checkout page, and `packages/i18n/src/messages/areas/email.en.ts` and
+  `.zh.ts` for the receipt email.
 - **Rules it states:** those of
   [Scheduled Classes, Part 2](../designs/scheduled-classes-selling.md). The
   table under "What each term rests on" names the decision or best guess

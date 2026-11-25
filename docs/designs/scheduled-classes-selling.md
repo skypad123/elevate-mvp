@@ -1601,8 +1601,10 @@ and where the decision is recorded:
   `CLASS_SALES` has been off for 35 minutes, so that no reservation is open.
   The job stays on a version that has the release program. No version older
   than Part 1's may be deployed.
-- **An opted-in profile cannot be taken off manual payouts** through the
-  product. If the job cannot run for more than a day, an engineer starts the
+- **An opted-in profile leaves manual payouts only by giving notice** (G16),
+  and the job finishes the leave once nothing of the profile is held; so the
+  job must keep running while any profile is opted in or leaving. If the job
+  cannot run for more than a day, an engineer starts the
   release task by hand, the way the migrate task is started. Paying a profile
   from the Stripe dashboard is the last resort, and a Support admin then
   records it as a correction. `infra/README.md` gets both procedures.
@@ -1937,6 +1939,60 @@ API key is available here; equivalent tests run against the fake provider.
 - **Why:** Who looked at a learner's location must be known.
 
 ### Phase 1: Database and shared logic
+
+**Built on 2026-11-25**, in the working tree. Across the repository, lint,
+typecheck, every build and 799 tests pass, with the API's tests running
+against the new migration as `elevate_api`. On a throwaway Postgres the
+migration applied, the grants were re-applied, `elevate_api` could read
+`self_paced_enrollments` and the new tables, and an update to
+`attendance_events` was still refused.
+
+**As built.** Where the build found an entry wrong or silent:
+
+- **Made optional for Phase 1; the phase that fills it makes it required:**
+  `ClassDetail.notOnSaleReason`, `cancelReason`, `cancelledAt`,
+  `seatsTaken`, `seatsWithChangeRight`; `LearnerClass.seat`;
+  `CoursePublicView.classes`, `viewerClassSeats`; `EarningsView.heldCents`,
+  `heldClasses`, `payouts`, `debtCents`. The API builds these types today, so
+  a required field would fail its build until a later phase fills it.
+- **1.1, 1.5:** `elevateCancelReasonEnum` is added as a Postgres enum, which
+  1.1 did not list. The value lists live in core, and each database enum is
+  checked against its list with `satisfies`.
+- **1.7:** The migration is generated and not edited. It is additive except
+  that Drizzle drops and recreates the `self_paced_enrollments` view, because
+  `enrollments` gains columns; no data is involved, and the migration task
+  re-applies the grants. `ALTER TYPE class_status ADD VALUE 'cancelled'` is
+  in the same migration and nothing there uses the value.
+- **1.9:** For refund rows with no recorded fee refund,
+  `profileShareAfterRefunds` returns the fee as `R − round(R × N ÷ A)`,
+  taken over the rows together, which matches today's `netAfterRefunds` to
+  the cent; the plan's form differs by a cent on half-cent ties. For
+  `dispute_lost`, `seatRefund` returns R and X as 0 with `reversalCents` as
+  what is left. It throws on a discretionary refund with no amount, and on a
+  part refund with bad block counts.
+- **1.10:** `moneyAttendance` takes events by block. A mark that was
+  disputed and then upheld does not count, as the word list says.
+- **1.11:** `classOnSale` answers `not_published` for a draft or a class with
+  no blocks, and `cancelled` for a cancelled class; a payout account that is
+  `switching` or missing counts as `profile_not_opted_in`; "course on sale"
+  means its status is `live`. `withdrawal` can also answer
+  `seat_has_no_payment`, and a helper, `withdrawalClosesAt`, is added.
+  `canMove` treats a cancelled target as `target_not_published`. The release
+  waits for an open mark until one millisecond after its deadline.
+- **1.14:** `ClassStatus` gains `cancelled`, so the Teach class list's status
+  map gains a "Cancelled" entry, the one change outside `packages/`.
+  `netAfterRefunds` is in `apps/api/src/services/earnings.service.ts`, not in
+  core, so the test compares against a copy of it.
+- **1.16:** `class_cancelled` and `refund_in_progress` serve as both learner
+  and Teach codes.
+- **1.17:** The Chinese text of the new messages needs the author's
+  sign-off.
+- **For later phases:** `payments.classId` is a new column beside
+  `enrollments.classId`, and `class-guards.test.ts` must change on purpose
+  when checkout writes it. Text status columns such as `waitingFor`,
+  `releaseReason` and `bankDisputeStatus` must be narrowed to core's unions.
+  `CheckoutSyncResponse` gains `seat_lost`, which the learner's success page
+  reads as still pending until Phase 6.
 
 **Ends with:** `npx turbo run typecheck test` passing, with the existing suites
 unchanged.
@@ -2310,6 +2366,35 @@ unchanged.
 
 ### Phase 2: The payments provider
 
+**Built on 2026-11-25**, in the working tree, with Phase 1.
+
+**As built.** Where the build found an entry wrong or silent:
+
+- **SDK check:** `allowed_payment_method_types`, with `card` and `paynow`, and
+  `wallet_options.link.display` set to `never` both exist on
+  `Checkout.SessionCreateParams` in `stripe` 23.1.0.
+- **Reused from P.1:** `listRefunds` and its type, and the fake's stored
+  refund metadata; `expireCheckoutSession` already existed.
+- **2.1, 2.2, `reverseTransfer`:** A reversal carries no fee amount, so the
+  call expands the transfer's charge and its application fee and returns
+  `applicationFeeRefundedCents`, the fee returned on the payment in all, or
+  null. Phase 5's `dispute_lost` step must subtract the fee already
+  returned. Whether Stripe fills that expansion was not tested in the
+  sandbox.
+- **2.1:** `findPayout` matches the payouts row id against
+  `metadata.payout_id`. A refund's status is `pending`, `succeeded`, `failed`
+  or `canceled`, with Stripe's `requires_action` read as `pending`.
+  `retrieveChargeFee` answers null until the balance transaction is filled.
+  `setAutomaticPayouts` sets a daily interval.
+- **2.3, the fake:** Stripe's fee is filled at once by default, because
+  existing tests need it at fulfilment; `stripeFeeLate` makes a new session's
+  first read empty, as the sandbox saw. A payment's money is pending until
+  `settle(accountId)`, and a payout above the available balance is refused
+  with `balance_insufficient`. The fake throws Stripe's own error classes,
+  so later phases sort fake and real errors the same way. A session can be
+  paid by PayNow only if it allows it; a failed PayNow refund is not counted
+  as refunded and its reversal stands, as G6 assumes.
+
 **Ends with:** `npx turbo run typecheck test` passing.
 
 #### 2.1 `apps/api/src/providers/payments/types.ts` (Modify)
@@ -2408,6 +2493,54 @@ unchanged.
 - **Why:** Every later test trusts the fake's arithmetic.
 
 ### Phase 3: Selling a seat
+
+**Built on 2026-11-25**, in the working tree. Across the repository, lint,
+typecheck, every build and 829 tests pass (API: 45 files, 468 tests).
+
+**As built.** Where the build found an entry wrong or silent:
+
+- **Made required:** `ClassDetail.notOnSaleReason`, `cancelReason`,
+  `cancelledAt`, `seatsTaken`, `seatsWithChangeRight`;
+  `CoursePublicView.classes`, `viewerClassSeats`. `LearnerClass.seat` and the
+  four `EarningsView` fields stay optional for Phases 4 and 5.
+- **Added:** a `ClassSalesStatus` contract for the Teach settings card; the
+  routes answer `{ classSales }`. The audit actions
+  `class_sales.leave_requested` and `class_sales.left` join core's list.
+- **Built early, from 4.5:** the time-edit rule (the 75-day refusal,
+  `classChangedAt`, the audit entry and the emails), since the brief asked
+  for it; it reads attendance through a local `moneyByEnrollment`. The
+  capacity check and the seat count run in a transaction that locks the
+  class row. Phase 4 does not rebuild these.
+- **3.2:** When Stripe fails after the opt-in is recorded, the route answers
+  200 with `switching` and the job finishes it. A second opt-in is refused
+  whenever the mode is not `automatic`. `finishStale` measures from
+  `classSalesAcceptedAt`. `finishLeaving` keeps the acceptance columns as a
+  record.
+- **3.3:** Fulfilment needs Stripe's time for the payment, so the provider's
+  payment details gain `paidAt`, the charge's creation time; without it,
+  fulfilment uses now. A seat is also refused when the enrollment's class
+  differs from the payment page's. A second lost payment for a seat that
+  already has an unfinished refund row records nothing and throws, so the
+  webhook stores the error and the retry of P.2 records it later; the
+  confirmation page answers `pending` meanwhile. A lost seat sends no
+  receipt and no `checkout_completed` event.
+- **3.4:** A staff learner is not refused `own_class`. The product name is
+  "Course: Class". The cancel address is
+  `/course/<slug>?class=<id>&checkout=cancelled`. A restart also expires the
+  row's own earlier page; if the page cannot be made, the reservation ends;
+  if a current reservation's page has gone, a new one is made without
+  extending the reservation. Restarting reuses a `refunded` or `cancelled`
+  enrollment row.
+- **3.5:** `request` writes the `seat.refund_requested` audit entry itself.
+- **3.6:** The course page lists classes on sale by first block, full ones
+  included with no seats left. `viewerClassSeats` lists active seats only.
+- **3.11:** `class-guards.test.ts` lets only `class-checkout.service.ts` set
+  `classId` on an enrollment; Phase 4 widens that to `seats.service.ts` for
+  a move. No rule was added for `payments.classId`; the plan asks for none.
+- The Chinese text of the new email keys needs the author's sign-off.
+- **For Phase 5:** `finishLeaving` waits while any class payment of the
+  account is unreleased, lost seats included, so the job must release
+  those. The job must call `finishStale` and `finishLeaving`.
 
 **Ends with:** `npx turbo run typecheck test` passing.
 
@@ -2602,6 +2735,57 @@ and test environments have it on from this phase, with the fake provider.
   this phase must not get wrong.
 
 ### Phase 4: Seat refunds, withdrawing, moving, changing a block and cancelling
+
+**Built on 2026-11-25**, in the working tree. The API has 47 test files and
+503 tests. Each refund kind is checked against the amounts table on S$500
+with Stripe's fee at S$20.00: a part refund after one block of five returns
+S$400.00 to the learner and S$55.90 of Elevate's fee to the profile.
+
+**As built.** Where the build found an entry wrong or silent:
+
+- **4.2:** The `refund_after_payout` adjustment is the profile's share after
+  the refund less the share before it, from `profileShareAfterRefunds`. It
+  equals X − R for a seat refund and keeps the fee arithmetic in `money.ts`.
+- **4.3, attempts:** An attempt is counted only when Stripe is to be called,
+  so a row that waits a week for a manual mark does not reach 96.
+- **4.3, keys:** The idempotency keys are `seat-refund:<id>:<first attempt>`
+  and `seat-fee-refund:<id>:<first attempt>`, the time in milliseconds. They
+  are the same for every retry of one row, so nothing is sent twice. A
+  Support retry starts a new first attempt and so a new key, because Stripe
+  replays a refused request under an old key for a day.
+- **4.3, retry:** When only the fee refund failed, Support's retry returns
+  the row to `refund_sent`. A row whose refund Stripe accepted and then
+  failed (`refund_failed`) cannot be retried (`refund_failed_at_stripe`):
+  the profile's share was already taken back, so a second refund would take
+  it twice. Support refunds the learner another way and closes the row
+  (G6). Such a refund has no ledger row, so the profile's Stripe balance and
+  its share after refunds differ by R until Support writes a correction;
+  the payout shows it as unnamed money.
+- **4.3, Stripe's fee:** The sender reads the fee from Stripe when its
+  payment has none, so a row never waits for ever; Phase 5's
+  `fillStripeFees` also does this, before the sender runs. A payment with an
+  open or lost bank dispute makes its row wait before sending, not only
+  after `charge_disputed`. `dispute_lost` rows wait for Phase 5.
+- **4.4:** Cancelling is refused, with `refund_in_progress` and the
+  enrollment ids, while any seat has a refund under way, to keep one
+  unfinished row per seat. A discretionary refund "too large counting an
+  unfinished row" cannot occur, since the unfinished row already refuses
+  it. Withdraw answers `{ class }`, a move and a refund `{ seat }`, a cancel
+  `{ class }`. A cancelled class refuses publishing, editing, deleting and a
+  new instructor.
+- **4.8:** Support's one write route under `/support/classes` is
+  `POST /classes/:id/cancel`; the test that found none now allows exactly
+  that one.
+- **4.10:** `GET /me/classes` also lists a refunded or withdrawn seat for 30
+  days, so the learner sees "refunded".
+- **Changes under `packages/`:** `LearnerClass.seat` is required.
+  `seat_has_no_payment` joins `USER_ERROR_CODES`. New email keys; their
+  Chinese text needs the author's sign-off.
+- **For Phase 5:** call `fillStripeFees` before the sender; remove the
+  sender's skip of `dispute_lost` rows, and keep those rows out of the
+  bank-dispute wait, which would close them as `bank_returned`; set both
+  `classes.releasedAt` and `payments.releasedAt`, because the profile's
+  cancel, move and refund check them.
 
 **Ends with:** `npx turbo run typecheck test` passing. Needs P.1 and P.2
 deployed.
@@ -2841,6 +3025,46 @@ deployed.
 
 ### Phase 5: The release job, bank disputes and payouts
 
+**Built on 2026-11-25**, in the working tree. The API has 50 test files and
+547 tests, and its build emits `dist/release.js`. Not run: the payout test
+on a real connected account, which waits for the liveness check (G3).
+
+**As built.** Where the build found an entry wrong or silent:
+
+- **5.1:** `markReleased` and `payDue` take the run's id, which
+  `releasedRunId` and `payouts.runId` need. A cancelled class never goes
+  under review, since every learner not counted as attended was refunded in
+  full; only classes with payments are considered, or every unsold class
+  would be flagged. A chosen total of 0 or less records `nothing_payable`,
+  1 to 99 cents `below_minimum`. A refused or failed payout writes a
+  `payout.failed` audit entry, which the run counts for 24 hours, because
+  `payouts` has no failure time. A payout event is matched by Stripe's id,
+  or by its label if it arrives before the id is stored. In
+  `ProfilePayoutView`, `debtCents` is a positive amount owed; the last 10
+  payouts are listed.
+- **5.2:** The run's lock is held on one pooled connection for the whole
+  run. A step that fails is counted in `needingAttention`, so the alarm on
+  that count also fires for a step that fails on every run; this was added
+  after the build.
+- **5.3:** The program exits 0 when the lock is held elsewhere or a step
+  failed, since the run's row and log line record it, and 1 when it fails
+  before its log line. It loads the API's whole environment, so the release
+  task needs the API's secrets too. Besides `release_run_finished` it logs
+  `release_run_locked` and `release_run_failed`.
+- **5.5:** A lost bank dispute zeroes the share of a class payment only. A
+  dispute closed with any status but `lost` counts as won.
+- **5.6:** The 23-hour lookup of a reversal needed a provider call 5.6 does
+  not name, `listTransferReversals`. The key is
+  `seat-reversal:<id>:<first attempt>`. The fee returned is Stripe's total
+  for the payment less what was returned before. The debt adjustment is
+  written only when the payment was paid out. Only the owner is emailed.
+- **5.8:** `GET /support/payouts` is already the payout ledger, so the
+  overview is `GET /support/payouts/overview`, answering `{ overview }`.
+- **5.9:** The dev route exists only when dev endpoints are on and the
+  environment is not production, and is left out of the typed client.
+- **Changes under `packages/`:** the four `EarningsView` fields are required;
+  the audit action `payout.failed` is added.
+
 **Ends with:** `npx turbo run typecheck test` passing. Before it is merged, the
 payout test on a real connected account is done and recorded.
 
@@ -3034,6 +3258,24 @@ payout test on a real connected account is done and recorded.
 
 ### Phase 6: Learner app
 
+**Built on 2026-11-25**, in the working tree; the learner app has 120 tests.
+
+**As built.** Where the build found an entry wrong or silent:
+
+- The checkout page shows refund terms 1 to 13 of
+  `docs/terms/class-refund-terms.md` with their version, term 13's list
+  rewritten as whole sentences. Stripe's rates are fixed text, since the API
+  carries the card estimate only. A line gives the class's own withdrawal
+  date. The receipt's terms sentence follows terms 2 to 4.
+- The app works out why withdrawal is not offered, and whether a seat was
+  withdrawn or refunded after a cancellation, from the session states and
+  the seat's refund rows, because `LearnerSeat` carries neither a reason nor
+  the enrollment's status. The success page reads the class's dates and
+  place from `GET /me/classes`.
+- `GET /checkout/classes/:classId` reads `promoCode` without a validator, so
+  the typed client has no query for it and the app casts its arguments.
+- The Chinese text of the new keys needs the author's sign-off.
+
 **Ends with:** `npx turbo run typecheck test` passing, including
 `npm -w @elevate/learner test`.
 
@@ -3127,6 +3369,29 @@ iOS or Android build.
 
 ### Phase 7: Teach portal
 
+**Built on 2026-11-25**, in the working tree.
+
+**As built.** Where the build found an entry wrong or silent:
+
+- The card shows all 32 held-payout terms, since every term binds the
+  profile, taken from `docs/terms/held-payout-terms.md`; the opening drops
+  the note that the design says "block", and term 23 is split into two
+  sentences. The terms say "session" where the Teach class pages say
+  "Block"; one word should be chosen. The Chinese needs the author's
+  sign-off.
+- The edit page is `form.tsx`, as Part 1 built it. The sign-in prompt for a
+  recent sign-in is shared through a new `useSignInAgain()`.
+- Cancelling is disabled, with a warning, while a seat has a refund under
+  way. The cancel dialog counts the part refunds for learners counted as
+  attended (G12).
+- **Added after the build:** `ClassDetail.releasedAt`, so "Cancel class"
+  is hidden once the class's money is released; and a sentence on the
+  Payments card for an opted-in profile, that Elevate pays out once a day
+  and holds class money until 7 days after each class.
+- The earnings page treats a profile as opted in when its payout mode is
+  `manual`; `EarningsView` has no such flag. A failed payout does not say
+  why.
+
 **Ends with:** `npx turbo run typecheck build` passing.
 
 #### 7.1 `packages/i18n/src/messages/areas/teachSettings.en.ts` and `teachSettings.zh.ts` (Modify)
@@ -3205,6 +3470,22 @@ iOS or Android build.
 
 ### Phase 8: Support portal
 
+**Built on 2026-11-25**, in the working tree.
+
+**As built.** Where the build found an entry wrong or silent:
+
+- The Payouts item shows only when classes are on, next to Classes. Retry
+  and Close appear only on `failed` rows and only for a super admin; Retry is
+  hidden for a refund Stripe failed, which says the learner is refunded
+  another way (G6). "Add correction" is offered on the unnamed-money rows. A
+  released class can still be cancelled by Elevate.
+- `TransactionDetail` gains `class`, `seatStatus`, `bankDisputeStatus`,
+  `released`, `paidOut` and `seatRefunds`; `seat-refunds.test.ts` covers
+  them, added after the build. "Refund in full" is disabled while a seat
+  refund is unfinished.
+- `nav.payouts` is 提现 in Chinese, as Support's profile area already says;
+  it needs the author's sign-off.
+
 **Ends with:** `npx turbo run typecheck build` passing, and then the local
 walkthrough below.
 
@@ -3246,6 +3527,39 @@ walkthrough below.
   name, the entry applies to the file that declares that type.
 
 ### Phase 9: Infrastructure and deploy
+
+**Built on 2026-11-25**, in the working tree. `terraform fmt`, `validate` in
+both environments and actionlint pass through Docker. Nothing was planned
+or applied in AWS.
+
+**As built.** Where the build found an entry wrong or silent:
+
+- **9.8:** The deploy points the schedule at the new release task version
+  after "Roll the service", not straight after registering it, so a
+  scheduled run never starts new code before the migrations have run, and a
+  failed migration or roll leaves the job on the old version. The step
+  copies back what `get-schedule` returns except the task, leaving out empty
+  values the CLI refuses. The register step stops when
+  `ECS_RELEASE_TASK_FAMILY` or `RELEASE_SCHEDULE_NAME` is missing.
+- **9.2:** A start is retried for up to 900 seconds and then goes to the
+  dead-letter queue, which keeps messages 14 days. The scheduler's role
+  trusts this account only.
+- **9.3:** A fourth alarm fires on `release_run_failed`, sooner than the
+  30-minute alarm. The topic is not encrypted, because CloudWatch alarms
+  cannot publish to a topic under the AWS-managed SNS key; the emails hold
+  only alarm and metric names. Nothing is sent when an alarm clears. The
+  release task logs to the API's log group.
+- **9.4:** The release task joins the existing `EcsRunMigration` statement.
+- **9.5, 9.7:** `alarm_email` is required, so each environment's untracked
+  `terraform.tfvars` needs the line before its next apply.
+- **Before the first deploy that carries this:** add `alarm_email` to the
+  environment's `terraform.tfvars`; plan and apply from a clean checkout;
+  copy `github_environment_variables` into the GitHub environment again;
+  confirm the subscription email; deploy, which points the still-disabled
+  schedule at the release task; then set `release_schedule_enabled = true`
+  and apply, and expect a `release_run_finished` line within 15 minutes. Do
+  not enable the schedule before that deploy, when it still points at the
+  placeholder image.
 
 **Ends with:** Terraform validated and the workflow linted, through Docker.
 Nothing is applied to AWS in this phase.
@@ -3426,6 +3740,33 @@ Nothing is applied to AWS in this phase.
 
 ### Verification Plan
 
+**Local walkthrough, run on 2026-11-25.** Steps 1 to 11 passed in a browser
+against a throwaway database with the fake payments provider, on a S$189
+class: withdrawal refunded S$182.07, the cancellation S$189.00 with the
+profile down Stripe's fee, and the payout S$147.83, the self-paced share less
+that debt. Every amount matched. It found no wrong amount, and these display
+faults, fixed before the commit:
+
+- The Teach earnings cards did not add up, because the part of Elevate's fee
+  returned after a refund was not shown. They now show "Elevate's fee
+  returned", and "Stripe fees" is the fee estimate inside Elevate's fee,
+  since the profile's share is fixed from it (R7). A test checks that the
+  parts add up to the net on a withdrawal, a part refund and a
+  cancellation. `money.ts` gains `elevateFeeReturned()` and
+  `elevateNetAfterRefunds()`.
+- A payout listed items of S$0.00 and labelled a debt as a payment; a
+  withdrawn seat showed "Cancelled"; a seat showed "Refunded" before its
+  refund was sent; a cancelled class still offered "Run block".
+- Support's payment page read "Released: No, held" beside "Paid out: Yes"
+  for a debt taken from a payout, and showed nets before refunds only.
+- The receipt's withdrawal deadline had no time, and Support's run times no
+  time zone.
+- A cancelled class still served check-in codes and took check-ins. It now
+  answers `class_cancelled` to both; a learner can still dispute a mark.
+
+Not fixed: Support cannot see which profile a payout went to, which the
+design does not ask for.
+
 - **Compilation/Build**: `npx turbo run typecheck build`.
 - **Unit Tests**: `npx turbo run test`.
 - **Static Analysis & Linting**: `npm run lint` and `npm run check:dupes` at
@@ -3473,9 +3814,9 @@ Sign-in codes and emails come from the API log. "Run the job" means `curl -X
 POST localhost:4400/api/dev/release-run`.
 
 1. As the demo owner, open Settings in Teach and accept the class-sales
-   terms. Expect the accepted state and no stop action. Create and publish a
-   class with a capacity of 2 and two blocks, three weeks ahead. Expect it to
-   show as on sale.
+   terms. Expect the accepted state and a "Stop selling classes" action (G16).
+   Create and publish a class with a capacity of 2 and two blocks, three weeks
+   ahead. Expect it to show as on sale.
 2. As learner A on the web, open the course page. Expect the class under "Take
    it as a class" with "2 seats left". Choose it. Expect the refund terms above
    the pay button. Pay. Expect "Your seat is booked" with the dates, and a
@@ -3532,9 +3873,11 @@ an apply and then a deploy to reach the running task.
     released at the next run and a payout in Stripe's dashboard after 10:00.
     Open a test bank dispute on one payment with Stripe's dispute test card
     and expect the lost case to take the share back.
-14. Rehearse the alarm: stop one run's task by hand and expect no alarm; set
-    `release_schedule_enabled = false`, apply, and expect the email within 45
-    minutes; turn it on again.
+14. Rehearse the alarm: stop one run's task by hand and expect no alarm;
+    disable the schedule outside Terraform, in the console or with the CLI,
+    and expect the email within 45 minutes; enable it again. Setting
+    `release_schedule_enabled = false` would also delete the 30-minute alarm
+    being rehearsed (Phase 9's notes; `infra/README.md`).
 15. Rehearse the ways back: set `class_sales = false`, apply and deploy, and
     expect no class on sale while an existing seat can still check in and
     withdraw and its refund is sent; point the schedule at the previous
