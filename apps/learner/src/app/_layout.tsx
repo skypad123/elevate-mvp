@@ -122,6 +122,7 @@ function RootNavigator() {
           {/* Keep lib/sign-in-redirect.ts's list of signed-in routes in step with this group. */}
           <Stack.Protected guard={isSignedIn}>
             <Stack.Screen name="checkout/[courseId]" />
+            <Stack.Screen name="checkout/class/[classId]" />
             <Stack.Screen name="checkout/success" />
             <Stack.Screen name="learn/[enrollmentId]/index" />
             <Stack.Screen name="learn/[enrollmentId]/lesson/[lessonId]" />

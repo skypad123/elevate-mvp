@@ -5,6 +5,7 @@ import * as WebBrowser from 'expo-web-browser'
 import { ArrowLeft, ArrowRight, Clock, Layers, Users } from 'lucide-react-native'
 import { useState } from 'react'
 import { Platform, Pressable, View } from 'react-native'
+import { ClassChoice } from '@/components/ClassChoice'
 import { TAB_BAR_HEIGHT } from '@/components/PillTabBar'
 import { RichText } from '@/components/RichText'
 import { Trail } from '@/components/Trail'
@@ -20,7 +21,11 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { Avatar, Badge, Button, Card, EmptyState, Screen, Skeleton, Text } from '@/ui'
 
 export default function CourseDetail() {
-  const { slug = '', checkout } = useLocalSearchParams<{ slug: string; checkout?: string }>()
+  const {
+    slug = '',
+    checkout,
+    class: chosenClassId,
+  } = useLocalSearchParams<{ slug: string; checkout?: string; class?: string }>()
   const theme = useTheme()
   const router = useRouter()
   const { isWideWeb, isLg } = useBreakpoint()
@@ -107,6 +112,10 @@ export default function CourseDetail() {
   const itemsText = (count: number) =>
     t(count === 1 ? 'learnerCourse.items.one' : 'learnerCourse.items.other', { count })
 
+  const classes = (
+    <ClassChoice course={c} chosenClassId={chosenClassId} cancelled={checkout === 'cancelled'} />
+  )
+
   const cta = (
     <Card style={{ gap: theme.space[4] }} elevated>
       <View style={{ gap: 4 }}>
@@ -131,7 +140,8 @@ export default function CourseDetail() {
         loading={busy}
         onPress={enrol}
       />
-      {checkout === 'cancelled' && !enrolled ? (
+      {/* A class's own checkout comes back with `class` set; its row says so instead. */}
+      {checkout === 'cancelled' && !enrolled && !chosenClassId ? (
         <Text variant="small" tone="warning">
           {t('learnerCourse.cta.cancelled')}
         </Text>
@@ -237,6 +247,7 @@ export default function CourseDetail() {
             </View>
 
             {!isLg ? cta : null}
+            {!isLg ? classes : null}
 
             <View style={{ gap: theme.space[4] }}>
               <Text variant="h2">{t('learnerCourse.learn.title')}</Text>
@@ -283,7 +294,12 @@ export default function CourseDetail() {
               {c.teacher.bio ? <Text tone="secondary">{c.teacher.bio}</Text> : null}
             </Card>
           </View>
-          {isLg ? <View style={{ width: 340 }}>{cta}</View> : null}
+          {isLg ? (
+            <View style={{ width: 340, gap: theme.space[6] }}>
+              {cta}
+              {classes}
+            </View>
+          ) : null}
         </View>
       </View>
     </Screen>

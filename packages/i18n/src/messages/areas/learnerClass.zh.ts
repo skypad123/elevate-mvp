@@ -86,6 +86,52 @@ export const learnerClassZh = {
   'learnerClass.checkIn.notOpenUntil': '这节课的签到将于 {time} 开放。',
   'learnerClass.checkIn.closedAt': '这节课的签到已于 {time} 结束。',
 
+  'learnerClass.seat.title': '您的名额',
+  'learnerClass.seat.moved': '教师已将您调到这个班级。我们已通过电子邮件将新的上课时间发送给您。',
+  'learnerClass.seat.timesChanged':
+    '您付款后，这个班级的上课时间有所更改。我们已通过电子邮件将原时间和新时间发送给您。',
+  'learnerClass.seat.withdrawAmount':
+    '您可以在 {date} 之前退出。我们将退还 {amount}，即您支付的价格扣除 Stripe 就您的付款收取的支付手续费。',
+  'learnerClass.seat.withdrawRate':
+    '您可以在 {date} 之前退出。我们将退还您支付的价格，扣除 Stripe 就您的付款收取的支付手续费：新加坡发行的银行卡为价格的 3.4% 加 S$0.50，新加坡境外发行的银行卡为 3.9% 加 S$0.50，PayNow 为 1.3%；如 Stripe 收取消费税（GST），则另加消费税。Stripe 报告后，这里会显示确切金额。',
+  'learnerClass.seat.withdrawFullAmount':
+    '由于班级有变动，您可以在班级于 {date} 开始前退出，我们将全额退还 {amount}。',
+  'learnerClass.seat.withdrawFull':
+    '由于班级有变动，您可以在班级于 {date} 开始前退出，我们将全额退还您支付的价格。',
+  'learnerClass.seat.withdraw': '退出班级',
+  'learnerClass.seat.confirmTitle': '要退出这个班级吗？',
+  'learnerClass.seat.confirmBody': '您会立即失去名额，名额可能会转给其他人。此操作无法撤销。',
+  'learnerClass.seat.confirm': '是的，退出',
+  'learnerClass.seat.keep': '保留我的名额',
+  'learnerClass.seat.closedTitle': '退出期限已过',
+  'learnerClass.seat.closed':
+    '退出期限已于第一节课开始前 7 天截止。现在是否退款由教师决定，请联系教师。',
+  'learnerClass.seat.attended': '您已出席这个班级，是否退款由教师决定。',
+  'learnerClass.seat.markOpen':
+    '您已被手动标记为出席。在 {date} 之前，除非您先在下方对该标记提出申诉，否则不能退出。',
+
+  'learnerClass.refund.onItsWay': '退款处理中',
+  'learnerClass.refund.onItsWayAmount':
+    '我们正在将 {amount} 退回您的原付款方式，退款发出后会通过电子邮件通知您。',
+  'learnerClass.refund.onItsWayBody':
+    '我们正在将款项退回您的原付款方式，退款发出后会通过电子邮件通知您。',
+  'learnerClass.refund.refunded': '已退款',
+  'learnerClass.refund.refundedBody':
+    '我们已于 {date} 将 {amount} 退回您的原付款方式。退回银行卡的款项通常在 5 到 10 个工作日后显示在您的账单上。',
+  'learnerClass.refund.bankReturned': '您的银行已将款项退还给您，因此无需再退款。',
+  'learnerClass.refund.support': 'Elevate 支持团队已处理这笔退款。',
+  'learnerClass.refund.withdrawn': '您已退出这个班级，不再拥有名额。',
+  'learnerClass.refund.discretionary': '教师已为您退款，您仍保留名额。',
+
+  'learnerClass.cancelled.title': '这个班级已取消',
+  'learnerClass.cancelled.refundFull': '我们会全额退还您支付的价格。',
+  'learnerClass.cancelled.refundPart':
+    '您已出席部分课程，因此我们会退还取消时尚未开始的课节所对应的那部分价格。',
+  'learnerClass.cancelled.markOpen':
+    '您曾被手动标记为出席，您可以在 {date} 之前对该标记提出申诉。如果您提出申诉，我们会全额退还您支付的价格。如果您不提出申诉，该标记将计为出席，我们会退还尚未开始的课节所对应的那部分价格。',
+  'learnerClass.cancelled.attended':
+    '所有课节均已开始，且您被计为已出席，因此不予退款。如果您认为有误，请联系教师。',
+
   'learnerClass.signedOut.title': '登录后签到',
   'learnerClass.signedOut.body': '您可以在 Elevate App 中签到，也可以在此页面登录后签到。',
   'learnerClass.signedOut.openApp': '打开 Elevate App 并输入签到码',

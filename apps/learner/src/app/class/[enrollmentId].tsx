@@ -5,12 +5,14 @@ import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { ArrowLeft, CalendarDays, MapPin, Video } from 'lucide-react-native'
 import { useState } from 'react'
 import { Pressable, View } from 'react-native'
+import { ClassSeat } from '@/components/ClassSeat'
 import { useErrorMessage } from '@/lib/api-error'
 import {
   classKeys,
   disputeMark,
   formatBlockTime,
   formatClassDay,
+  seatState,
   useMyClasses,
 } from '@/lib/classes'
 import { usePreferences } from '@/lib/preferences'
@@ -42,8 +44,9 @@ const STATE_TONE: Record<AttendanceState, BadgeTone> = {
 const CAN_CHECK_IN: readonly AttendanceState[] = ['not_arrived', 'mark_voided']
 
 /**
- * One class enrolment: the class, each session with the learner's own state, check-in while a
- * session's window is open, and "This was not me" on a manual mark. Part 3 adds materials here.
+ * One class enrolment: the class, the seat (withdrawing, a refund, a cancelled class), each
+ * session with the learner's own state, check-in while a session's window is open, and "This was
+ * not me" on a manual mark. Part 3 adds materials here.
  */
 export default function ClassScreen() {
   const { enrollmentId = '' } = useLocalSearchParams<{ enrollmentId: string }>()
@@ -81,6 +84,8 @@ export default function ClassScreen() {
   }
 
   const c = item.class
+  // A seat given up, or a class cancelled, takes no more check-ins; an open mark can still be disputed.
+  const seatEnded = item.seat.classCancelled || seatState(item).kind === 'withdrawn'
   return (
     <Screen maxWidth={880}>
       <View style={{ gap: theme.space[6] }}>
@@ -114,10 +119,12 @@ export default function ClassScreen() {
           </View>
         </View>
 
+        <ClassSeat item={item} />
+
         <View style={{ gap: theme.space[3] }}>
           <Text variant="h2">{t('learnerClass.class.sessions')}</Text>
           {item.blocks.map((block) => (
-            <BlockCard key={block.id} item={item} block={block} />
+            <BlockCard key={block.id} item={item} block={block} seatEnded={seatEnded} />
           ))}
         </View>
       </View>
@@ -125,7 +132,15 @@ export default function ClassScreen() {
   )
 }
 
-function BlockCard({ item, block }: { item: LearnerClass; block: Block }) {
+function BlockCard({
+  item,
+  block,
+  seatEnded,
+}: {
+  item: LearnerClass
+  block: Block
+  seatEnded: boolean
+}) {
   const theme = useTheme()
   const router = useRouter()
   const { t, locale } = usePreferences()
@@ -168,7 +183,7 @@ function BlockCard({ item, block }: { item: LearnerClass; block: Block }) {
 
       {mark ? <MarkDetails item={item} mark={mark} zoned={zoned} /> : null}
 
-      {block.checkInOpen && CAN_CHECK_IN.includes(block.state) ? (
+      {!seatEnded && block.checkInOpen && CAN_CHECK_IN.includes(block.state) ? (
         <Button
           testID={`class-check-in-${block.id}`}
           label={t('learnerClass.class.checkIn')}

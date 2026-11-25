@@ -27,7 +27,13 @@ jest.mock('@/lib/api', () => ({
         $get: jest.fn(),
         blocks: { ':blockId': { $get: jest.fn(), 'check-in': { $post: jest.fn() } } },
         attendance: { ':eventId': { dispute: { $post: jest.fn() } } },
+        ':enrollmentId': { withdraw: { $post: jest.fn() } },
       },
+    },
+    catalog: { courses: { ':slug': { $get: jest.fn() } } },
+    checkout: {
+      classes: { ':classId': { $get: jest.fn(), $post: jest.fn() } },
+      sessions: { ':id': { sync: { $get: jest.fn() } } },
     },
     auth: {
       'magic-link': { $post: jest.fn() },

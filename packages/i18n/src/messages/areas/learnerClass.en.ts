@@ -104,6 +104,68 @@ export const learnerClassEn = {
   'learnerClass.checkIn.notOpenUntil': 'Check-in for this session opens at {time}.',
   'learnerClass.checkIn.closedAt': 'Check-in for this session closed at {time}.',
 
+  // The seat card on the class screen: withdrawing, a move or a changed class, a refund, and a
+  // cancelled class. {date} is an instant, as 'learnerClass.instant' words it, unless a comment
+  // says it is a day. {amount} is like "S$480.00".
+  'learnerClass.seat.title': 'Your seat',
+  'learnerClass.seat.moved':
+    'You were moved to this class by the teacher. We emailed you the new times.',
+  'learnerClass.seat.timesChanged':
+    "This class's times changed after you paid. We emailed you the old and the new times.",
+  // learner_withdrew: what is returned is the price less the fee Stripe charged on the payment
+  'learnerClass.seat.withdrawAmount':
+    'You can withdraw until {date}. We would refund {amount}: the price you paid less the payment processing fee Stripe charged on your payment.',
+  // Before Stripe's fee is known, the rates of the refund terms stand in for the amount
+  'learnerClass.seat.withdrawRate':
+    'You can withdraw until {date}. We would refund the price you paid less the payment processing fee Stripe charged on your payment: 3.4% of the price plus S$0.50 for a card issued in Singapore, 3.9% plus S$0.50 for a card issued outside Singapore, or 1.3% for PayNow, with Goods and Services Tax where Stripe charges it. The exact amount shows here once Stripe has reported it.',
+  // changed_withdrew: the full refund after a move or a changed time, until the class starts
+  'learnerClass.seat.withdrawFullAmount':
+    'Because the class changed, you can withdraw until it starts on {date}, and we would refund the full {amount}.',
+  'learnerClass.seat.withdrawFull':
+    'Because the class changed, you can withdraw until it starts on {date}, and we would refund the price you paid in full.',
+  'learnerClass.seat.withdraw': 'Withdraw',
+  'learnerClass.seat.confirmTitle': 'Withdraw from this class?',
+  'learnerClass.seat.confirmBody':
+    'You lose your seat at once, and it can go to someone else. This cannot be undone.',
+  'learnerClass.seat.confirm': 'Yes, withdraw',
+  'learnerClass.seat.keep': 'Keep my seat',
+  'learnerClass.seat.closedTitle': 'Withdrawal has closed',
+  'learnerClass.seat.closed':
+    "Withdrawal closed 7 days before the first session. A refund is now the teacher's decision: contact the teacher.",
+  'learnerClass.seat.attended':
+    "You have attended this class, so a refund is the teacher's decision.",
+  // {date} is a day: the last day the learner's manual mark can be disputed
+  'learnerClass.seat.markOpen':
+    'You were marked present by hand. Until {date} you cannot withdraw unless you dispute the mark first, below.',
+
+  // The latest refund of the seat
+  'learnerClass.refund.onItsWay': 'Refund on its way',
+  'learnerClass.refund.onItsWayAmount':
+    'We are returning {amount} to the payment method you paid with, and we email you when it has been sent.',
+  'learnerClass.refund.onItsWayBody':
+    'We are returning your money to the payment method you paid with, and we email you when it has been sent.',
+  'learnerClass.refund.refunded': 'Refunded',
+  // {date} is a day
+  'learnerClass.refund.refundedBody':
+    'We returned {amount} to the payment method you paid with on {date}. A refund to a card usually shows on your statement 5 to 10 business days later.',
+  'learnerClass.refund.bankReturned':
+    'Your bank returned your payment to you, so no refund is needed.',
+  'learnerClass.refund.support': "Elevate's support team has dealt with this refund.",
+  'learnerClass.refund.withdrawn': 'You withdrew from this class, and you no longer have a seat.',
+  // A refund the teacher chose to give; the learner keeps the seat
+  'learnerClass.refund.discretionary': 'The teacher gave you a refund. You keep your seat.',
+
+  // A cancelled class, in one of three states
+  'learnerClass.cancelled.title': 'This class was cancelled',
+  'learnerClass.cancelled.refundFull': 'We refund the price you paid in full.',
+  'learnerClass.cancelled.refundPart':
+    'You attended part of the class, so we refund the part of the price for the sessions that had not started when it was cancelled.',
+  // {date} is a day: the last day the learner's manual mark can be disputed
+  'learnerClass.cancelled.markOpen':
+    'You were marked present by hand, and you can dispute the mark until {date}. If you dispute it, we refund the price you paid in full. If you do not, the mark counts as attendance, and we refund the part of the price for any sessions that had not started.',
+  'learnerClass.cancelled.attended':
+    'Every session had started and you are counted as having attended, so no refund is due. If you think this is wrong, contact the teacher.',
+
   // Signed out in a browser: two ways to check in
   'learnerClass.signedOut.title': 'Sign in to check in',
   'learnerClass.signedOut.body': 'Check in with the Elevate app, or sign in on this page.',

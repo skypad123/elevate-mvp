@@ -5,6 +5,7 @@ import type {
   CheckInPlatform,
   CheckInResult,
   LearnerClass,
+  SeatRefundView,
 } from '@elevate/core'
 import { intlLocale, type Locale, type Translator } from '@elevate/i18n'
 import { useQuery } from '@tanstack/react-query'
@@ -71,6 +72,116 @@ export async function disputeMark(eventId: string, reason: string): Promise<Lear
       }),
     )
   ).class as LearnerClass
+}
+
+/**
+ * Withdraws the learner from their seat (docs/designs/scheduled-classes-selling.md, "Withdraw").
+ * The seat is freed at once and the refund is sent by the release job; answers the class as it
+ * now stands, with the refund row in `seat.refund`.
+ */
+export async function withdraw(enrollmentId: string): Promise<LearnerClass> {
+  return (
+    await unwrap(await api.me.classes[':enrollmentId'].withdraw.$post({ param: { enrollmentId } }))
+  ).class as LearnerClass
+}
+
+// ── The seat's state ────────────────────────────────────────────────────────
+
+const WITHDREW: readonly string[] = ['learner_withdrew', 'changed_withdrew']
+const CANCELLED: readonly string[] = [
+  'teacher_cancelled',
+  'teacher_cancelled_part',
+  'elevate_cancelled',
+]
+const UNFINISHED: readonly string[] = ['waiting', 'pending', 'refund_sent', 'failed']
+
+/** A seat refund row that the release job has not finished. */
+export const refundUnfinished = (refund: SeatRefundView) => UNFINISHED.includes(refund.status)
+
+/**
+ * Counted as attended, from the learner's own states: a check-in that stands (flagged or not) or
+ * a manual mark whose time to dispute has passed. The API's `moneyAttendance` rule.
+ */
+export function countedAsAttended(blocks: LearnerClass['blocks']): boolean {
+  return blocks.some(
+    (b) =>
+      b.state === 'present' ||
+      b.state === 'present_flagged' ||
+      (b.state === 'marked_by_hand' && b.manualMark?.subState === 'settled'),
+  )
+}
+
+/** The latest dispute deadline among the learner's open manual marks, or null. */
+function openMarkUntil(item: LearnerClass): string | null {
+  let latest: string | null = null
+  for (const mark of item.seat.openMarks) {
+    if (latest === null || Date.parse(mark.disputeUntil) > Date.parse(latest)) {
+      latest = mark.disputeUntil
+    }
+  }
+  return latest
+}
+
+/**
+ * What the class screen says about the seat, from `LearnerSeat`:
+ * - `withdrawn`: the learner withdrew; the refund row says where the money is.
+ * - `cancelled`: the class was cancelled, and the learner is refunded (in full or in part), waits
+ *   on an open manual mark, or is counted as attended with nothing to refund.
+ * - `withdraw`: the learner can withdraw now, for the amount (or the rate) until the deadline.
+ * - `refund`: a refund the teacher gave is under way, so withdrawing waits for it.
+ * - `markOpen`, `attended`, `closed`: why withdrawing is not offered.
+ */
+export type SeatState =
+  | { kind: 'withdrawn'; refund: SeatRefundView }
+  | { kind: 'cancelled'; outcome: 'refunded'; part: boolean; refund: SeatRefundView }
+  | { kind: 'cancelled'; outcome: 'markOpen'; until: string }
+  | { kind: 'cancelled'; outcome: 'attended' }
+  | {
+      kind: 'withdraw'
+      full: boolean
+      amountCents: number | null
+      closesAt: string
+    }
+  | { kind: 'refund'; refund: SeatRefundView }
+  | { kind: 'markOpen'; until: string }
+  | { kind: 'attended' }
+  | { kind: 'closed' }
+
+export function seatState(item: LearnerClass): SeatState {
+  const { seat } = item
+  const refund = seat.refund
+  const markUntil = openMarkUntil(item)
+  if (refund && WITHDREW.includes(refund.kind)) return { kind: 'withdrawn', refund }
+  if (seat.classCancelled) {
+    if (refund && CANCELLED.includes(refund.kind)) {
+      if (refund.status === 'waiting' && refund.waitingFor === 'manual_mark' && markUntil) {
+        return { kind: 'cancelled', outcome: 'markOpen', until: markUntil }
+      }
+      if (refund.status === 'closed' && refund.closedReason === 'mark_settled') {
+        return { kind: 'cancelled', outcome: 'attended' }
+      }
+      return {
+        kind: 'cancelled',
+        outcome: 'refunded',
+        part: refund.kind === 'teacher_cancelled_part',
+        refund,
+      }
+    }
+    if (markUntil) return { kind: 'cancelled', outcome: 'markOpen', until: markUntil }
+    return { kind: 'cancelled', outcome: 'attended' }
+  }
+  if (seat.withdrawKind && seat.withdrawClosesAt) {
+    return {
+      kind: 'withdraw',
+      full: seat.withdrawKind === 'changed_withdrew',
+      amountCents: seat.withdrawRefundCents,
+      closesAt: seat.withdrawClosesAt,
+    }
+  }
+  if (refund && refundUnfinished(refund)) return { kind: 'refund', refund }
+  if (markUntil) return { kind: 'markOpen', until: markUntil }
+  if (countedAsAttended(item.blocks)) return { kind: 'attended' }
+  return { kind: 'closed' }
 }
 
 // ── Times, in the class's own time zone ─────────────────────────────────────
