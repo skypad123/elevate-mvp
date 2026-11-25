@@ -32,6 +32,8 @@ jobs:
       ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
       ECS_SERVICE: ${{ vars.ECS_SERVICE }}
       ECS_TASK_FAMILY: ${{ vars.ECS_TASK_FAMILY }}
+      ECS_MIGRATE_TASK_FAMILY: ${{ vars.ECS_MIGRATE_TASK_FAMILY }}
+      API_USES_RESTRICTED_DATABASE_USER: ${{ vars.API_USES_RESTRICTED_DATABASE_USER }}
       ECS_CONTAINER: ${{ vars.ECS_CONTAINER }}
       ECS_SUBNETS: ${{ vars.ECS_SUBNETS }}
       ECS_SECURITY_GROUP: ${{ vars.ECS_SECURITY_GROUP }}
@@ -86,13 +88,19 @@ jobs:
           fi
           echo "uri=$IMAGE" >> "$GITHUB_OUTPUT"
 
-      # Terraform owns the task definition's configuration; a deploy copies the latest revision
-      # and swaps in the new image.
+      # Terraform owns the task definitions' configuration; a deploy copies the latest revision
+      # of each and swaps in the new image. The API's task connects as the restricted database
+      # user; the migration task holds the owner's connection string (ADR 012).
       - name: Register the task definition
         id: taskdef
         env:
           IMAGE: ${{ steps.image.outputs.uri }}
         run: |
+          if [ -z "$ECS_MIGRATE_TASK_FAMILY" ]; then
+            echo "::error::The GitHub Environment has no ECS_MIGRATE_TASK_FAMILY. Copy terraform output github_environment_variables into it again (infra/README.md, step 3)."
+            exit 1
+          fi
+
           aws ecs describe-task-definition --task-definition "$ECS_TASK_FAMILY" --query taskDefinition > current.json
           jq --arg image "$IMAGE" --arg name "$ECS_CONTAINER" '
             {family, taskRoleArn, executionRoleArn, networkMode, containerDefinitions, volumes,
@@ -103,9 +111,21 @@ jobs:
             --query taskDefinition.taskDefinitionArn --output text)
           echo "arn=$arn" >> "$GITHUB_OUTPUT"
 
+          aws ecs describe-task-definition --task-definition "$ECS_MIGRATE_TASK_FAMILY" --query taskDefinition > migrate-current.json
+          jq --arg image "$IMAGE" --arg name "$ECS_CONTAINER" '
+            {family, taskRoleArn, executionRoleArn, networkMode, containerDefinitions, volumes,
+             placementConstraints, requiresCompatibilities, cpu, memory, runtimePlatform}
+            | (.containerDefinitions[] | select(.name == $name) | .image) = $image
+          ' migrate-current.json > migrate-next.json
+          migrate_arn=$(aws ecs register-task-definition --cli-input-json file://migrate-next.json \
+            --query taskDefinition.taskDefinitionArn --output text)
+          echo "migrate_arn=$migrate_arn" >> "$GITHUB_OUTPUT"
+
+      # From the migration task: it connects as the owner, then creates or updates the API's
+      # database user and its grants.
       - name: Run database migrations
         env:
-          TASK_DEFINITION: ${{ steps.taskdef.outputs.arn }}
+          TASK_DEFINITION: ${{ steps.taskdef.outputs.migrate_arn }}
         run: |
           overrides=$(jq -cn --arg name "$ECS_CONTAINER" \
             '{containerOverrides: [{name: $name, command: ["node", "dist/migrate.js"]}]}')
@@ -146,6 +166,40 @@ jobs:
             --query 'services[0].taskDefinition' --output text)
           if [ "$running" != "$TASK_DEFINITION" ]; then
             echo "::error::The new version failed to start and ECS rolled back to $running."
+            exit 1
+          fi
+
+      # Runs the new API revision once, as the API's database user, and expects the database to
+      # refuse it an update of attendance_events. Exit 0: refused, as intended; 1: the update was
+      # allowed; 2: any other error. Skipped while api_uses_restricted_database_user is false.
+      - name: Check the API's database user
+        if: env.API_USES_RESTRICTED_DATABASE_USER == 'true'
+        env:
+          TASK_DEFINITION: ${{ steps.taskdef.outputs.arn }}
+        run: |
+          overrides=$(jq -cn --arg name "$ECS_CONTAINER" \
+            '{containerOverrides: [{name: $name, command: ["node", "dist/check-api-role.js"]}]}')
+          task=$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "$TASK_DEFINITION" \
+            --launch-type FARGATE \
+            --started-by "deploy-$GITHUB_SHA" \
+            --network-configuration "awsvpcConfiguration={subnets=[$ECS_SUBNETS],securityGroups=[$ECS_SECURITY_GROUP],assignPublicIp=ENABLED}" \
+            --overrides "$overrides" \
+            --query 'tasks[0].taskArn' --output text)
+          echo "Check task: $task"
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$task"
+
+          aws logs get-log-events --log-group-name "$API_LOG_GROUP" \
+            --log-stream-name "api/$ECS_CONTAINER/${task##*/}" \
+            --query 'events[].message' --output text || true
+
+          code=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          if [ "$code" != "0" ]; then
+            aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$task" \
+              --query 'tasks[0].{stopped:stoppedReason,container:containers[0].reason}'
+            echo "::error::The API's database user check failed (exit code $code; 1 means the database allowed an update of attendance_events). The new version is already serving."
             exit 1
           fi
 

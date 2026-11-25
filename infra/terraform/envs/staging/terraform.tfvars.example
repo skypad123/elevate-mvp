@@ -16,6 +16,13 @@ csp_report_only = true
 
 # course_previews = true  # false stops hover-preview clips being made and shown
 
+# Scheduled classes and attendance. On in staging.
+classes = true
+
+# The API connects as the restricted database user elevate_api. false is the way back: the API
+# connects as the owner again (apply, copy the GitHub variables, deploy).
+# api_uses_restricted_database_user = true
+
 # Staging is reachable only over Tailscale. Optional fallback addresses (IPv4, at most 4) that are
 # let in as well, for when the connector is down.
 # private_access_extra_cidrs = ["203.0.113.7/32"]

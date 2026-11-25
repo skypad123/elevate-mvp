@@ -125,10 +125,14 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["*"]
   }
 
+  # The migrate family runs migrations; the API family runs check-api-role, the seed and previews.
   statement {
-    sid       = "EcsRunMigration"
-    actions   = ["ecs:RunTask"]
-    resources = ["arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${aws_ecs_task_definition.api.family}:*"]
+    sid     = "EcsRunMigration"
+    actions = ["ecs:RunTask"]
+    resources = [
+      "arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${aws_ecs_task_definition.api.family}:*",
+      "arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${aws_ecs_task_definition.migrate.family}:*",
+    ]
 
     condition {
       test     = "ArnEquals"

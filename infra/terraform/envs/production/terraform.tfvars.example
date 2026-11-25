@@ -16,6 +16,13 @@ csp_report_only = true
 
 # course_previews = true  # false stops hover-preview clips being made and shown
 
+# Scheduled classes and attendance. Off in production until Part 2 (selling a class) turns it on.
+# classes = false
+
+# The API connects as the restricted database user elevate_api. false is the way back: the API
+# connects as the owner again (apply, copy the GitHub variables, deploy).
+# api_uses_restricted_database_user = true
+
 # GitHub's OIDC subject for this repo: sub_claim_prefix from
 #   gh api repos/<owner>/<repo>/actions/oidc/customization/sub
 github_oidc_subject_prefix = "repo:skypad123@27288135/elevate-mvp@1356076279"

@@ -4,6 +4,10 @@
 # workflow copies the latest revision, swaps in the image it just built, registers that as a new
 # revision and points the service at it, which is why the service ignores task_definition here.
 # A configuration change therefore takes effect on the next deploy (re-run the Deploy workflow).
+#
+# A second task definition, `migrate`, runs the programs that need the database owner
+# (`migrate.js`, `reset-schema.js`). The deploy workflow registers a new revision of it the same
+# way. The API's own task definition connects as the restricted user (ADR 012).
 
 locals {
   api_port      = 4400
@@ -27,13 +31,15 @@ locals {
       MAIL_FROM       = local.mail_from
       VIDEO_DRIVER    = var.integrations.mux ? "mux" : "local"
       COURSE_PREVIEWS = tostring(var.course_previews)
+      CLASSES         = tostring(var.classes)
     },
     var.seed_super_admin_email == null ? {} : { SEED_SUPER_ADMIN_EMAIL = var.seed_super_admin_email },
   )
 
   api_secrets = merge(
     {
-      DATABASE_URL   = aws_ssm_parameter.database_url.arn
+      # false is the way back to the owner, should the restricted user break a path (ADR 012).
+      DATABASE_URL   = var.api_uses_restricted_database_user ? aws_ssm_parameter.database_url_api.arn : aws_ssm_parameter.database_url.arn
       SESSION_SECRET = aws_ssm_parameter.session_secret.arn
     },
     { for name in local.enabled_secret_names : name => aws_ssm_parameter.manual[name].arn },
@@ -72,6 +78,45 @@ resource "aws_ecs_task_definition" "api" {
 
     environment = [for k in sort(keys(local.api_environment)) : { name = k, value = local.api_environment[k] }]
     secrets     = [for k in sort(keys(local.api_secrets)) : { name = k, valueFrom = local.api_secrets[k] }]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.api.name
+        "awslogs-region"        = local.region
+        "awslogs-stream-prefix" = "api"
+      }
+    }
+  }])
+}
+
+# The owner-only programs. Same image, roles, sizing and container name as the API, so the deploy
+# workflow's image swap and the log stream name work for both. It reads only the owner's
+# connection string and what applyApiRole needs.
+resource "aws_ecs_task_definition" "migrate" {
+  family                   = "${local.prefix}-migrate"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.api_cpu
+  memory                   = var.api_memory
+  execution_role_arn       = aws_iam_role.api_execution.arn
+  task_role_arn            = aws_iam_role.api_task.arn
+
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "X86_64"
+  }
+
+  container_definitions = jsonencode([{
+    name      = local.api_container
+    image     = local.bootstrap_image
+    essential = true
+
+    environment = [{ name = "API_DATABASE_USER", value = local.api_database_user }]
+    secrets = [
+      { name = "API_DATABASE_PASSWORD", valueFrom = aws_ssm_parameter.api_database_password.arn },
+      { name = "MIGRATION_DATABASE_URL", valueFrom = aws_ssm_parameter.database_url.arn },
+    ]
 
     logConfiguration = {
       logDriver = "awslogs"

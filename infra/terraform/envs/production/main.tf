@@ -94,6 +94,18 @@ variable "course_previews" {
   default = true
 }
 
+variable "classes" {
+  description = "Scheduled classes (the API's CLASSES setting)."
+  type        = bool
+  default     = false
+}
+
+variable "api_uses_restricted_database_user" {
+  description = "The API connects as elevate_api; false is the way back to the owner (ADR 012)."
+  type        = bool
+  default     = true
+}
+
 module "environment" {
   source = "../../modules/environment"
 
@@ -112,6 +124,9 @@ module "environment" {
   seed_super_admin_email = var.seed_super_admin_email
   csp_report_only        = var.csp_report_only
   course_previews        = var.course_previews
+  classes                = var.classes
+
+  api_uses_restricted_database_user = var.api_uses_restricted_database_user
 
   # Data is protected: deletion protection, a final snapshot, a week of backups, versioned uploads.
   # Turn on db_multi_az when downtime during an AZ failure or maintenance is no longer acceptable.

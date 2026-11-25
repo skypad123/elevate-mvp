@@ -72,6 +72,18 @@ variable "seed_super_admin_email" {
   default     = null
 }
 
+variable "classes" {
+  description = "Whether the API serves scheduled classes (the CLASSES setting). Off: every class route answers 404, and the learner's class list is empty."
+  type        = bool
+  default     = false
+}
+
+variable "api_uses_restricted_database_user" {
+  description = "Whether the API connects as the restricted database user elevate_api (ADR 012). false is the way back: the API connects as the owner again, and the deploy skips its check of the user."
+  type        = bool
+  default     = true
+}
+
 variable "integrations" {
   description = <<-EOT
     Third-party integrations to switch on. Each one reads its keys from SSM parameters that are
