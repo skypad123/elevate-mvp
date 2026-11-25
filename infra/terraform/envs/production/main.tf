@@ -100,6 +100,23 @@ variable "classes" {
   default     = false
 }
 
+variable "class_sales" {
+  description = "Selling classes (the API's CLASS_SALES setting)."
+  type        = bool
+  default     = false
+}
+
+variable "release_schedule_enabled" {
+  description = "The schedule starts the release job every 15 minutes. Keep true while any profile is opted in."
+  type        = bool
+  default     = false
+}
+
+variable "alarm_email" {
+  description = "Email address the release job's alarms are sent to."
+  type        = string
+}
+
 variable "api_uses_restricted_database_user" {
   description = "The API connects as elevate_api; false is the way back to the owner (ADR 012)."
   type        = bool
@@ -125,6 +142,10 @@ module "environment" {
   csp_report_only        = var.csp_report_only
   course_previews        = var.course_previews
   classes                = var.classes
+  class_sales            = var.class_sales
+
+  release_schedule_enabled = var.release_schedule_enabled
+  alarm_email              = var.alarm_email
 
   api_uses_restricted_database_user = var.api_uses_restricted_database_user
 

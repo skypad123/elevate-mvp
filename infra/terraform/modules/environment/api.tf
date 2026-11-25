@@ -8,6 +8,11 @@
 # A second task definition, `migrate`, runs the programs that need the database owner
 # (`migrate.js`, `reset-schema.js`). The deploy workflow registers a new revision of it the same
 # way. The API's own task definition connects as the restricted user (ADR 012).
+#
+# A third, `release`, runs the release job (`release.js`) on a schedule (scheduler.tf). It has the
+# API's environment and secrets, and its command built in, because a schedule cannot change the
+# command of the task it starts. The deploy registers a new revision of it too, then points the
+# schedule at that revision.
 
 locals {
   api_port      = 4400
@@ -32,6 +37,7 @@ locals {
       VIDEO_DRIVER    = var.integrations.mux ? "mux" : "local"
       COURSE_PREVIEWS = tostring(var.course_previews)
       CLASSES         = tostring(var.classes)
+      CLASS_SALES     = tostring(var.class_sales)
     },
     var.seed_super_admin_email == null ? {} : { SEED_SUPER_ADMIN_EMAIL = var.seed_super_admin_email },
   )
@@ -117,6 +123,43 @@ resource "aws_ecs_task_definition" "migrate" {
       { name = "API_DATABASE_PASSWORD", valueFrom = aws_ssm_parameter.api_database_password.arn },
       { name = "MIGRATION_DATABASE_URL", valueFrom = aws_ssm_parameter.database_url.arn },
     ]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.api.name
+        "awslogs-region"        = local.region
+        "awslogs-stream-prefix" = "api"
+      }
+    }
+  }])
+}
+
+# The release job. Same image, roles, sizing, environment, secrets and container name as the API
+# (release.js loads the API's whole environment and connects as the API's database user), no
+# port, and its command built in.
+resource "aws_ecs_task_definition" "release" {
+  family                   = "${local.prefix}-release"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.api_cpu
+  memory                   = var.api_memory
+  execution_role_arn       = aws_iam_role.api_execution.arn
+  task_role_arn            = aws_iam_role.api_task.arn
+
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "X86_64"
+  }
+
+  container_definitions = jsonencode([{
+    name      = local.api_container
+    image     = local.bootstrap_image
+    essential = true
+    command   = ["node", "dist/release.js"]
+
+    environment = [for k in sort(keys(local.api_environment)) : { name = k, value = local.api_environment[k] }]
+    secrets     = [for k in sort(keys(local.api_secrets)) : { name = k, valueFrom = local.api_secrets[k] }]
 
     logConfiguration = {
       logDriver = "awslogs"

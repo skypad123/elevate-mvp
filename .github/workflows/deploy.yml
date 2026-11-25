@@ -33,6 +33,8 @@ jobs:
       ECS_SERVICE: ${{ vars.ECS_SERVICE }}
       ECS_TASK_FAMILY: ${{ vars.ECS_TASK_FAMILY }}
       ECS_MIGRATE_TASK_FAMILY: ${{ vars.ECS_MIGRATE_TASK_FAMILY }}
+      ECS_RELEASE_TASK_FAMILY: ${{ vars.ECS_RELEASE_TASK_FAMILY }}
+      RELEASE_SCHEDULE_NAME: ${{ vars.RELEASE_SCHEDULE_NAME }}
       API_USES_RESTRICTED_DATABASE_USER: ${{ vars.API_USES_RESTRICTED_DATABASE_USER }}
       ECS_CONTAINER: ${{ vars.ECS_CONTAINER }}
       ECS_SUBNETS: ${{ vars.ECS_SUBNETS }}
@@ -89,17 +91,19 @@ jobs:
           echo "uri=$IMAGE" >> "$GITHUB_OUTPUT"
 
       # Terraform owns the task definitions' configuration; a deploy copies the latest revision
-      # of each and swaps in the new image. The API's task connects as the restricted database
-      # user; the migration task holds the owner's connection string (ADR 012).
+      # of each and swaps in the new image. The API's task and the release task connect as the
+      # restricted database user; the migration task holds the owner's connection string (ADR 012).
       - name: Register the task definition
         id: taskdef
         env:
           IMAGE: ${{ steps.image.outputs.uri }}
         run: |
-          if [ -z "$ECS_MIGRATE_TASK_FAMILY" ]; then
-            echo "::error::The GitHub Environment has no ECS_MIGRATE_TASK_FAMILY. Copy terraform output github_environment_variables into it again (infra/README.md, step 3)."
-            exit 1
-          fi
+          for name in ECS_MIGRATE_TASK_FAMILY ECS_RELEASE_TASK_FAMILY RELEASE_SCHEDULE_NAME; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The GitHub Environment has no $name. Copy terraform output github_environment_variables into it again (infra/README.md, step 3)."
+              exit 1
+            fi
+          done
 
           aws ecs describe-task-definition --task-definition "$ECS_TASK_FAMILY" --query taskDefinition > current.json
           jq --arg image "$IMAGE" --arg name "$ECS_CONTAINER" '
@@ -120,6 +124,16 @@ jobs:
           migrate_arn=$(aws ecs register-task-definition --cli-input-json file://migrate-next.json \
             --query taskDefinition.taskDefinitionArn --output text)
           echo "migrate_arn=$migrate_arn" >> "$GITHUB_OUTPUT"
+
+          aws ecs describe-task-definition --task-definition "$ECS_RELEASE_TASK_FAMILY" --query taskDefinition > release-current.json
+          jq --arg image "$IMAGE" --arg name "$ECS_CONTAINER" '
+            {family, taskRoleArn, executionRoleArn, networkMode, containerDefinitions, volumes,
+             placementConstraints, requiresCompatibilities, cpu, memory, runtimePlatform}
+            | (.containerDefinitions[] | select(.name == $name) | .image) = $image
+          ' release-current.json > release-next.json
+          release_arn=$(aws ecs register-task-definition --cli-input-json file://release-next.json \
+            --query taskDefinition.taskDefinitionArn --output text)
+          echo "release_arn=$release_arn" >> "$GITHUB_OUTPUT"
 
       # From the migration task: it connects as the owner, then creates or updates the API's
       # database user and its grants.
@@ -168,6 +182,26 @@ jobs:
             echo "::error::The new version failed to start and ECS rolled back to $running."
             exit 1
           fi
+
+      # After the migrations and the roll, so a scheduled run never starts new code on an old
+      # schema, and the job follows the version the service runs. A failed deploy before this
+      # point leaves the schedule on the previous release revision. Everything but the task
+      # definition is written back as read: state, expression, window, retries and dead-letter
+      # queue. Older revisions stay registered, so pointing the schedule back is the same call.
+      - name: Point the release schedule at the new version
+        env:
+          TASK_DEFINITION: ${{ steps.taskdef.outputs.release_arn }}
+        run: |
+          aws scheduler get-schedule --name "$RELEASE_SCHEDULE_NAME" > schedule-current.json
+          jq --arg arn "$TASK_DEFINITION" '
+            {Name, GroupName, Description, ScheduleExpression, ScheduleExpressionTimezone,
+             StartDate, EndDate, State, KmsKeyArn, FlexibleTimeWindow, ActionAfterCompletion, Target}
+            | .Target.EcsParameters.TaskDefinitionArn = $arn
+            | walk(if type == "object" then with_entries(select(.value != null and .value != [])) else . end)
+          ' schedule-current.json > schedule-next.json
+          aws scheduler update-schedule --cli-input-json file://schedule-next.json --query ScheduleArn --output text
+          state=$(jq -r .State schedule-next.json)
+          echo "The release schedule ($state) now starts $TASK_DEFINITION."
 
       # Runs the new API revision once, as the API's database user, and expects the database to
       # refuse it an update of attendance_events. Exit 0: refused, as intended; 1: the update was

@@ -61,5 +61,9 @@ output "github_environment_variables" {
     # The migration task (owner-only programs), and whether the deploy checks the API's user.
     ECS_MIGRATE_TASK_FAMILY           = aws_ecs_task_definition.migrate.family
     API_USES_RESTRICTED_DATABASE_USER = tostring(var.api_uses_restricted_database_user)
+
+    # The release job's task, and the schedule the deploy points at each new revision of it.
+    ECS_RELEASE_TASK_FAMILY = aws_ecs_task_definition.release.family
+    RELEASE_SCHEDULE_NAME   = aws_scheduler_schedule.release.name
   }
 }
