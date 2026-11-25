@@ -2,6 +2,8 @@ import { RequireAuth, RouteError, SignInPage, VerifyPage } from '@elevate/web-ui
 import { createBrowserRouter, Navigate } from 'react-router'
 import { api } from './lib/api'
 import { AuditLogPage } from './routes/audit'
+import { ClassView } from './routes/class-view'
+import { Classes } from './routes/classes'
 import { InsightsPage } from './routes/insights'
 import { SupportLayout } from './routes/layout'
 import { People } from './routes/people'
@@ -45,6 +47,8 @@ export const router = createBrowserRouter([
           { path: 'profiles/:id', element: <Profile /> },
           { path: 'transactions', element: <TransactionsPage /> },
           { path: 'transactions/:id', element: <TransactionDetailPage /> },
+          { path: 'classes', element: <Classes /> },
+          { path: 'classes/:id', element: <ClassView /> },
           { path: 'audit', element: <AuditLogPage /> },
           { path: 'insights', element: <InsightsPage /> },
           { path: 'settings', element: <SettingsPage /> },

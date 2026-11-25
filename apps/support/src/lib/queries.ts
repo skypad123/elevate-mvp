@@ -6,6 +6,10 @@ import type {
   PayoutLedgerRow,
   PersonDetail,
   PersonSummary,
+  SupportClass,
+  SupportClassBlock,
+  SupportClassSummary,
+  SupportFeatures,
   SupportProfileDetail,
   SupportProfileSummary,
   TransactionDetail,
@@ -187,6 +191,61 @@ export function useAuditLog() {
         await api.support['audit-log'].$get({ query: pageParam ? { cursor: pageParam } : {} }),
       )) as Page<AuditEntry>,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+// ── scheduled classes: read only ────────────────────────────────────────────
+export const classKeys = {
+  features: ['support', 'features'] as const,
+  search: (q: string) => ['support', 'classes', 'search', q] as const,
+  detail: (id: string) => ['support', 'classes', 'detail', id] as const,
+  block: (id: string, blockId: string) => ['support', 'classes', 'block', id, blockId] as const,
+}
+
+/** Which optional areas the API has switched on; the navigation hides the ones that are off. */
+export function useSupportFeatures(enabled = true) {
+  return useQuery({
+    queryKey: classKeys.features,
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: async () => (await unwrap(await api.support.features.$get())) as SupportFeatures,
+  })
+}
+
+/** Classes whose name, profile name or a learner's email contains `q`. Runs only with text. */
+export function useClassSearch(q: string) {
+  return useQuery({
+    queryKey: classKeys.search(q),
+    enabled: q.length > 0,
+    placeholderData: keepPreviousData,
+    queryFn: async () =>
+      (await unwrap(await api.support.classes.$get({ query: { q, limit: '50' } })))
+        .items as SupportClassSummary[],
+  })
+}
+
+export function useSupportClass(id: string) {
+  return useQuery({
+    queryKey: classKeys.detail(id),
+    enabled: !!id,
+    queryFn: async () =>
+      (await unwrap(await api.support.classes[':id'].$get({ param: { id } })))
+        .class as SupportClass,
+  })
+}
+
+/** One block with each learner's row, coordinates and events. `blockId` empty means none chosen. */
+export function useSupportBlock(id: string, blockId: string) {
+  return useQuery({
+    queryKey: classKeys.block(id, blockId),
+    enabled: !!id && !!blockId,
+    placeholderData: keepPreviousData,
+    queryFn: async () =>
+      (
+        await unwrap(
+          await api.support.classes[':id'].blocks[':blockId'].$get({ param: { id, blockId } }),
+        )
+      ).block as SupportClassBlock,
   })
 }
 
