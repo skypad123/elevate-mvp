@@ -30,6 +30,9 @@ export const CAPABILITIES = [
   'attendance.read',
   'attendance.take',
   'attendance.review',
+  // Selling classes: a discretionary refund of a seat spends the profile's money, so only the
+  // owner and managers hold it.
+  'class.refund',
 ] as const
 export type Capability = (typeof CAPABILITIES)[number]
 

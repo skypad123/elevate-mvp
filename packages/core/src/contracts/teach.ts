@@ -4,6 +4,7 @@ import { COURSE_PREVIEW, type CoursePreviewState } from '../domain/course-previe
 import { quizDefinitionSchema } from '../domain/quiz'
 import { richTextDocSchema } from '../domain/richtext'
 import { ENTITY_TYPES, type EntityType, isValidUen, normaliseUen, UEN_EXAMPLE } from '../domain/uen'
+import type { HeldClassView, ProfilePayoutView } from './class-sales'
 import { emailSchema, uuidSchema } from './common'
 
 /** What every application says about the teaching: the same for a person and for a company. */
@@ -459,8 +460,11 @@ export type MoneyBreakdown = {
   discountCents: number
   stripeFeeCents: number
   commissionCents: number
+  /** The profile's share after refunds: gross − Stripe fees − commission − refunded + feeReturned. */
   netCents: number
   refundedCents: number
+  /** The part of Elevate's fee that refunds returned to the profile. */
+  feeReturnedCents: number
 }
 
 export type EarningsView = {
@@ -477,6 +481,15 @@ export type EarningsView = {
   }>
   stripe: { connected: boolean; chargesEnabled: boolean; payoutsEnabled: boolean }
   commissionBps: number
+  // Class sales (docs/designs/scheduled-classes-selling.md). Zero and empty for a profile that
+  // has not opted in.
+  /** Class money not yet released. */
+  heldCents: number
+  heldClasses: HeldClassView[]
+  /** The most recent payouts, newest first, with what each paid. */
+  payouts: ProfilePayoutView[]
+  /** What the profile owes that no payout has covered yet, as a positive amount. */
+  debtCents: number
 }
 
 export type ReconciliationView = {
@@ -503,6 +516,7 @@ export type CourseEarningsView = {
     commissionCents: number
     netCents: number
     refundedCents: number
+    feeReturnedCents: number
     status: 'succeeded' | 'refunded' | 'partially_refunded'
     promoCode: string | null
     paidAt: string

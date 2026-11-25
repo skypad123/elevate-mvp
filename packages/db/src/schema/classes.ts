@@ -16,6 +16,7 @@ import { createdAt, id, ts, updatedAt } from './columns'
 import { enrollments } from './commerce'
 import { courses } from './courses'
 import { attendanceEventTypeEnum, classDeliveryEnum, classStatusEnum } from './enums'
+import { payoutRuns } from './payouts'
 import { profiles } from './profiles'
 
 /**
@@ -57,6 +58,22 @@ export const classes = snakeCase.table(
     createdBy: uuid().references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
+    // Selling a class (docs/designs/scheduled-classes-selling.md).
+    /** Set with the status `cancelled`. */
+    cancelledAt: ts(),
+    cancelledBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    cancelReason: text(),
+    /** Set by the run that releases the class's money. `payouts.ts` imports this file. */
+    releasedRunId: uuid().references((): AnyPgColumn => payoutRuns.id, { onDelete: 'restrict' }),
+    releasedAt: ts(),
+    /** `due` or `support`. */
+    releaseReason: text(),
+    /** Set by a run that finds the class due with no learner counted as attended. */
+    reviewNeededAt: ts(),
+    /** Set when a Support admin releases a class under review. */
+    reviewClearedAt: ts(),
+    reviewClearedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    reviewNote: text(),
   },
   (t) => [index().on(t.profileId, t.status)],
 )

@@ -25,14 +25,16 @@ import {
   type RefusalReason,
 } from '../domain/attendance'
 import { LINK_CODE_LENGTH, normaliseTypedCode, TYPED_CODE_LENGTH } from '../domain/class-code'
+import type { NotOnSaleReason } from '../domain/class-sales'
 import { isValidZonedDateTime, MAX_BLOCKS } from '../domain/class-time'
+import type { LearnerSeat } from './class-sales'
 import { uuidSchema } from './common'
 
 // ── Requests ────────────────────────────────────────────────────────────────
 
 export const classDeliverySchema = z.enum(['in_person', 'remote'])
 export type ClassDelivery = z.infer<typeof classDeliverySchema>
-export const classStatusSchema = z.enum(['draft', 'published'])
+export const classStatusSchema = z.enum(['draft', 'published', 'cancelled'])
 export type ClassStatus = z.infer<typeof classStatusSchema>
 
 /** One block as the Teach form sends it: a wall-clock date and times in the class's time zone. */
@@ -228,6 +230,16 @@ export type ClassDetail = ClassSummary & {
   viewerIsInstructor: boolean
   blocks: (ClassBlockView & { mix: CheckInMix })[]
   mix: CheckInMix
+  /** Why learners cannot buy a seat now, or null when the class is on sale. */
+  notOnSaleReason: NotOnSaleReason | null
+  cancelReason: string | null
+  cancelledAt: string | null
+  /** When the release job released the class's money; the profile can no longer cancel it. */
+  releasedAt: string | null
+  /** Active seats and current reservations. */
+  seatsTaken: number
+  /** The seats a block-time edit would give the right to withdraw in full. */
+  seatsWithChangeRight: number
 }
 
 export type ManualMarkView = {
@@ -288,6 +300,8 @@ export type LearnerClass = {
     manualMark: ManualMarkView | null
     overturn: { reasonCode: OverturnReasonCode; at: string } | null
   }[]
+  /** The seat: withdrawing, a move or a changed class, its refund, and marks still open. */
+  seat: LearnerSeat
 }
 
 /** `GET /me/classes/blocks/:blockId`. */

@@ -39,6 +39,7 @@ const EXPECTED: Record<
   'attendance.read': [true, true, false, true],
   'attendance.take': [true, true, true, false],
   'attendance.review': [true, true, false, false],
+  'class.refund': [true, true, false, false],
 }
 
 const ROLES: ActorRole[] = ['owner', 'manager', 'writer', 'staff']
@@ -123,7 +124,7 @@ describe('can', () => {
     const classCapabilities = CAPABILITIES.filter(
       (capability) => capability.startsWith('class.') || capability.startsWith('attendance.'),
     )
-    expect(classCapabilities).toHaveLength(5)
+    expect(classCapabilities).toHaveLength(6)
     for (const profileStatus of ['applied', 'rejected'] as const) {
       for (const profileType of TYPES) {
         for (const role of ['owner', 'manager', 'writer'] as const) {
@@ -150,11 +151,24 @@ describe('can', () => {
       'members.manageManagers',
       'stripe.links',
       'class.manage',
+      'class.refund',
       'attendance.take',
       'attendance.review',
     ]
     for (const capability of forbidden) {
       expect(can(actor('staff', 'corporate'), capability), capability).toBe(false)
+    }
+  })
+
+  it('lets only the owner and a manager grant a discretionary seat refund', () => {
+    for (const profileType of TYPES) {
+      expect(can(actor('owner', profileType), 'class.refund')).toBe(true)
+      expect(can(actor('manager', profileType), 'class.refund')).toBe(profileType === 'corporate')
+      expect(can(actor('writer', profileType), 'class.refund')).toBe(false)
+      expect(can(actor('staff', profileType), 'class.refund')).toBe(false)
+      expect(can(actor('owner', profileType, { profileStatus: 'applied' }), 'class.refund')).toBe(
+        false,
+      )
     }
   })
 })

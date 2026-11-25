@@ -58,6 +58,19 @@ export const USER_ERROR_CODES = [
   'check_in_overturned', // the instructor overturned this block's check-in
   'dispute_window_closed', // details.disputeUntil
   'already_disputed',
+  // Selling a class (class checkout, withdrawing a seat)
+  'class_not_on_sale', // details.reason, one of NOT_ON_SALE_REASONS
+  'class_full',
+  'already_in_class', // details.enrollmentId
+  'own_class', // the learner is the profile's owner or a member
+  'class_requires_payment', // a promo code that makes a seat free
+  'terms_changed', // details.current, the refund terms version now
+  'too_many_reservations', // details.retryAt
+  'withdrawal_closed', // details.closesAt
+  'withdrawal_attended', // counted as attended, or a manual mark still open
+  'class_cancelled', // the cancellation handles the refund
+  'refund_in_progress', // the seat already has an unfinished seat refund
+  'seat_has_no_payment', // a seat given without a payment (the demo seed), so nothing to return
 ] as const
 
 export type UserErrorCode = (typeof USER_ERROR_CODES)[number]

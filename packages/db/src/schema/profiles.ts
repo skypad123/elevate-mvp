@@ -19,6 +19,7 @@ import {
   invitationStatusEnum,
   membershipRoleEnum,
   payoutAccountStatusEnum,
+  payoutModeEnum,
   profileStatusEnum,
   profileTypeEnum,
   stripeBusinessTypeEnum,
@@ -60,6 +61,10 @@ export const profiles = snakeCase.table(
     reviewedAt: ts(),
     reviewedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
     updatedAt: updatedAt(),
+    /** The owner's acceptance of the held-payout terms, which lets the profile sell classes. */
+    classSalesAcceptedAt: ts(),
+    classSalesAcceptedBy: uuid().references(() => users.id, { onDelete: 'set null' }),
+    classSalesTermsVersion: text(),
   },
   (t) => [
     // A user may own many profiles, but only one personal profile.
@@ -122,6 +127,16 @@ export const payoutAccounts = snakeCase.table('payout_accounts', {
   nameVerifiedAt: ts(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
+  /**
+   * `manual` once the profile has opted in to class sales: Stripe pays out only what the release
+   * job asks for. `switching` while the opt-in is half done.
+   */
+  payoutMode: payoutModeEnum().notNull().default('automatic'),
+  /** When the opening amounts were read. Payments before this are inside them. */
+  manualSince: ts(),
+  /** Set when the owner gives 30 days' notice to leave class sales (G16). */
+  leaveRequestedAt: ts(),
+  leaveOn: ts(),
 })
 
 /**

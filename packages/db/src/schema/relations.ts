@@ -12,6 +12,7 @@ import {
 } from './courses'
 import { artefactProgress, certificates, quizAttempts } from './learning'
 import { mediaAssets } from './media'
+import { classCancellations, payoutAdjustments, payoutRuns, payouts, seatRefunds } from './payouts'
 import {
   legalEntities,
   payoutAccounts,
@@ -54,6 +55,11 @@ const tables = {
   classBlocks,
   attendanceEvents,
   attendanceEventLocations,
+  seatRefunds,
+  classCancellations,
+  payoutRuns,
+  payouts,
+  payoutAdjustments,
   webhookEvents,
   auditLog,
   analyticsEvents,
@@ -232,9 +238,17 @@ export const relations = defineRelations(tables, (r) => ({
     }),
     promoCode: r.one.promoCodes({ from: r.payments.promoCodeId, to: r.promoCodes.id }),
     refunds: r.many.refunds({ from: r.payments.id, to: r.refunds.paymentId }),
+    /** Null for a self-paced payment. */
+    class: r.one.classes({ from: r.payments.classId, to: r.classes.id }),
+    releaseRun: r.one.payoutRuns({ from: r.payments.releasedRunId, to: r.payoutRuns.id }),
+    /** The payout that paid this payment (decision R1's mark). */
+    payout: r.one.payouts({ from: r.payments.payoutId, to: r.payouts.id }),
+    seatRefunds: r.many.seatRefunds({ from: r.payments.id, to: r.seatRefunds.paymentId }),
   },
   refunds: {
     payment: r.one.payments({ from: r.refunds.paymentId, to: r.payments.id, optional: false }),
+    /** Set when the release job made this refund for a seat refund row. */
+    seatRefund: r.one.seatRefunds({ from: r.refunds.seatRefundId, to: r.seatRefunds.id }),
   },
   artefactProgress: {
     enrollment: r.one.enrollments({
@@ -273,6 +287,10 @@ export const relations = defineRelations(tables, (r) => ({
     }),
     blocks: r.many.classBlocks({ from: r.classes.id, to: r.classBlocks.classId }),
     enrollments: r.many.enrollments({ from: r.classes.id, to: r.enrollments.classId }),
+    cancellation: r.one.classCancellations({
+      from: r.classes.id,
+      to: r.classCancellations.classId,
+    }),
   },
   classBlocks: {
     class: r.one.classes({ from: r.classBlocks.classId, to: r.classes.id, optional: false }),
@@ -301,5 +319,55 @@ export const relations = defineRelations(tables, (r) => ({
       from: r.attendanceEvents.id,
       to: r.attendanceEventLocations.eventId,
     }),
+  },
+  seatRefunds: {
+    enrollment: r.one.enrollments({
+      from: r.seatRefunds.enrollmentId,
+      to: r.enrollments.id,
+      optional: false,
+    }),
+    payment: r.one.payments({ from: r.seatRefunds.paymentId, to: r.payments.id, optional: false }),
+    class: r.one.classes({ from: r.seatRefunds.classId, to: r.classes.id, optional: false }),
+    cancellation: r.one.classCancellations({
+      from: r.seatRefunds.cancellationId,
+      to: r.classCancellations.id,
+    }),
+  },
+  classCancellations: {
+    class: r.one.classes({
+      from: r.classCancellations.classId,
+      to: r.classes.id,
+      optional: false,
+    }),
+    seatRefunds: r.many.seatRefunds({
+      from: r.classCancellations.id,
+      to: r.seatRefunds.cancellationId,
+    }),
+  },
+  payoutRuns: {
+    payouts: r.many.payouts({ from: r.payoutRuns.id, to: r.payouts.runId }),
+  },
+  payouts: {
+    run: r.one.payoutRuns({ from: r.payouts.runId, to: r.payoutRuns.id, optional: false }),
+    payoutAccount: r.one.payoutAccounts({
+      from: r.payouts.payoutAccountId,
+      to: r.payoutAccounts.id,
+      optional: false,
+    }),
+    payments: r.many.payments({ from: r.payouts.id, to: r.payments.payoutId }),
+    adjustments: r.many.payoutAdjustments({
+      from: r.payouts.id,
+      to: r.payoutAdjustments.payoutId,
+    }),
+  },
+  payoutAdjustments: {
+    payoutAccount: r.one.payoutAccounts({
+      from: r.payoutAdjustments.payoutAccountId,
+      to: r.payoutAccounts.id,
+      optional: false,
+    }),
+    payment: r.one.payments({ from: r.payoutAdjustments.paymentId, to: r.payments.id }),
+    refund: r.one.refunds({ from: r.payoutAdjustments.refundId, to: r.refunds.id }),
+    payout: r.one.payouts({ from: r.payoutAdjustments.payoutId, to: r.payouts.id }),
   },
 }))

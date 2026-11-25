@@ -1,4 +1,12 @@
-import type { supportedLocales } from '@elevate/core'
+import type {
+  ELEVATE_CANCEL_REASONS,
+  PAYOUT_ADJUSTMENT_KINDS,
+  PAYOUT_MODES,
+  PAYOUT_OUTCOMES,
+  SEAT_REFUND_KINDS,
+  SEAT_REFUND_STATUSES,
+  supportedLocales,
+} from '@elevate/core'
 import { pgEnum } from 'drizzle-orm/pg-core'
 
 export const identityProviderEnum = pgEnum('identity_provider', ['email', 'singpass'])
@@ -63,8 +71,8 @@ export const progressStatusEnum = pgEnum('progress_status', [
 export const webhookProviderEnum = pgEnum('webhook_provider', ['stripe', 'mux'])
 /** How a scheduled class meets. An in-person class measures check-ins against its venue. */
 export const classDeliveryEnum = pgEnum('class_delivery', ['in_person', 'remote'])
-/** A scheduled class's status. Part 2 adds more values. */
-export const classStatusEnum = pgEnum('class_status', ['draft', 'published'])
+/** A scheduled class's status. A cancelled class also has `classes.cancelled_at`. */
+export const classStatusEnum = pgEnum('class_status', ['draft', 'published', 'cancelled'])
 /** What one attendance row records. Rows are only ever inserted (see `classes.ts`). */
 export const attendanceEventTypeEnum = pgEnum('attendance_event_type', [
   'attempt_refused',
@@ -74,3 +82,54 @@ export const attendanceEventTypeEnum = pgEnum('attendance_event_type', [
   'dispute',
   'dispute_decision',
 ])
+
+// Selling a class (docs/designs/scheduled-classes-selling.md). Typecheck fails until each list
+// matches its list in `@elevate/core`'s `class-sales.ts`.
+
+/** Why a seat refund row exists; decides its amounts (`seatRefund` in `@elevate/core`). */
+export const seatRefundKindEnum = pgEnum('seat_refund_kind', [
+  'teacher_cancelled',
+  'teacher_cancelled_part',
+  'changed_withdrew',
+  'learner_withdrew',
+  'discretionary',
+  'elevate_cancelled',
+  'seat_lost',
+  'dispute_lost',
+] as const satisfies typeof SEAT_REFUND_KINDS)
+/** `waiting`, `pending`, `refund_sent` and `failed` are unfinished. */
+export const seatRefundStatusEnum = pgEnum('seat_refund_status', [
+  'waiting',
+  'pending',
+  'refund_sent',
+  'done',
+  'closed',
+  'failed',
+] as const satisfies typeof SEAT_REFUND_STATUSES)
+/** The grounds on which Elevate may cancel a class. */
+export const elevateCancelReasonEnum = pgEnum('elevate_cancel_reason', [
+  'teacher_absent',
+  'venue_unavailable',
+  'rules_breach',
+  'profile_suspended',
+  'required_by_law',
+] as const satisfies typeof ELEVATE_CANCEL_REASONS)
+export const payoutOutcomeEnum = pgEnum('payout_outcome', [
+  'paid',
+  'below_minimum',
+  'nothing_payable',
+  'failed',
+] as const satisfies typeof PAYOUT_OUTCOMES)
+/** How Stripe pays a profile's balance out. The release job pays only `manual` accounts. */
+export const payoutModeEnum = pgEnum('payout_mode', [
+  'automatic',
+  'switching',
+  'manual',
+] as const satisfies typeof PAYOUT_MODES)
+export const payoutAdjustmentKindEnum = pgEnum('payout_adjustment_kind', [
+  'opening_available',
+  'opening_pending',
+  'refund_after_payout',
+  'bank_dispute_after_payout',
+  'correction',
+] as const satisfies typeof PAYOUT_ADJUSTMENT_KINDS)

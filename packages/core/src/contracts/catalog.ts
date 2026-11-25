@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { courseCategorySchema } from '../domain/categories'
+import type { ClassForSale, ViewerClassSeat } from './class-sales'
 import { paginationSchema } from './common'
 
 export const catalogSortSchema = z.enum(['newest', 'popular'])
@@ -76,6 +77,10 @@ export type CoursePublicView = {
     status: 'pending_payment' | 'active' | 'refunded' | 'cancelled'
     completedAt: string | null
   } | null
+  /** The classes of this course that are on sale. */
+  classes: ClassForSale[]
+  /** The signed-in learner's seats in classes of this course; beside `viewer`, not in it. */
+  viewerClassSeats: ViewerClassSeat[]
 }
 
 export type CategoryCount = { slug: string; label: string; count: number }

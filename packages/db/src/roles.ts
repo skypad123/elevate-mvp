@@ -7,6 +7,11 @@ import type pg from 'pg'
  *
  * The user can read and write every table except that it can never change or remove an attendance
  * row, and can erase a reading's coordinates but not alter them.
+ *
+ * Only `attendance_events` and `attendance_event_locations` are restricted. Every other table is
+ * an ordinary table for this user, covered by the default privileges below: so the class-sales
+ * tables (`seat_refunds`, `class_cancellations`, `payout_runs`, `payouts`, `payout_adjustments`)
+ * and a view the migrations recreate, such as `self_paced_enrollments`, need no grant here.
  */
 
 const ROLE_NAME = /^[a-z_][a-z0-9_]*$/

@@ -24,6 +24,7 @@ import {
   type LocationStatus,
   locationStatus,
   lockedUntil,
+  moneyAttendance,
   type RefusalReason,
   type Venue,
 } from '../src'
@@ -398,5 +399,64 @@ describe('checkInMix', () => {
       markedByHand: 0,
       notArrived: 0,
     })
+  })
+})
+
+describe('moneyAttendance', () => {
+  const NONE = { counted: false, openMarkUntil: null }
+
+  it('counts a check-in that stands, flagged or not', () => {
+    expect(moneyAttendance({ b1: [checkIn('ok')] }, at(MIN))).toEqual({
+      counted: true,
+      openMarkUntil: null,
+    })
+    expect(moneyAttendance({ b1: [checkIn('out_of_range')] }, at(MIN)).counted).toBe(true)
+  })
+
+  it('does not count an overturned check-in', () => {
+    const c = checkIn('out_of_range')
+    expect(moneyAttendance({ b1: [c, overturn(c)] }, at(2 * MIN))).toEqual(NONE)
+  })
+
+  it('reads a manual mark by its sub-state, at exactly 7 days and one millisecond after', () => {
+    const m = mark(0)
+    // Open: not counted, and its deadline is the one the learner can still dispute until.
+    expect(moneyAttendance({ b1: [m] }, at(DISPUTE_WINDOW_MS))).toEqual({
+      counted: false,
+      openMarkUntil: at(DISPUTE_WINDOW_MS),
+    })
+    // Settled.
+    expect(moneyAttendance({ b1: [m] }, at(DISPUTE_WINDOW_MS + 1))).toEqual({
+      counted: true,
+      openMarkUntil: null,
+    })
+    // Disputed, and upheld: a mark the learner disputed never counts.
+    const d = dispute(m, MIN)
+    expect(moneyAttendance({ b1: [m, d] }, at(DISPUTE_WINDOW_MS + 1))).toEqual(NONE)
+    expect(
+      moneyAttendance({ b1: [m, d, decision(d, 'upheld', 2 * MIN)] }, at(DISPUTE_WINDOW_MS + 1)),
+    ).toEqual(NONE)
+    // Voided: the mark no longer stands.
+    expect(moneyAttendance({ b1: voidedMark(0) }, at(DISPUTE_WINDOW_MS + 1))).toEqual(NONE)
+  })
+
+  it('counts any block, and keeps the latest open deadline', () => {
+    const early = mark(0)
+    const late = mark(60 * MIN)
+    const now = at(DISPUTE_WINDOW_MS)
+    expect(
+      moneyAttendance(
+        new Map([
+          ['b1', [early]],
+          ['b2', [late]],
+        ]),
+        now,
+      ),
+    ).toEqual({
+      counted: false,
+      openMarkUntil: at(60 * MIN + DISPUTE_WINDOW_MS),
+    })
+    expect(moneyAttendance({ b1: [early], b2: [late], b3: [checkIn()] }, now).counted).toBe(true)
+    expect(moneyAttendance({}, now)).toEqual(NONE)
   })
 })

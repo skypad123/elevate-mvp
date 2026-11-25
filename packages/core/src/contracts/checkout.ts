@@ -40,6 +40,11 @@ export type CheckoutStartResponse =
   | { kind: 'redirect'; url: string; sessionId: string }
   | { kind: 'enrolled'; enrollmentId: string }
 
+/**
+ * A class payment answers `paid` with its `classId`, or `seat_lost` when the payment got no seat
+ * and is being returned in full. An older app reads `seat_lost` as not paid.
+ */
 export type CheckoutSyncResponse =
-  | { status: 'paid'; enrollmentId: string; courseSlug: string }
+  | { status: 'paid'; enrollmentId: string; courseSlug: string; classId?: string }
+  | { status: 'seat_lost'; classId: string; courseSlug: string }
   | { status: 'pending' | 'expired' }

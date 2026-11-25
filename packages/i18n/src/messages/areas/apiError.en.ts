@@ -55,4 +55,21 @@ export const apiErrorEn = {
     'Your check-in for this class was overturned. Speak to your instructor.',
   'apiError.dispute_window_closed': 'The time to dispute this has passed.',
   'apiError.already_disputed': 'You have already disputed this.',
+
+  'apiError.class_not_on_sale': 'This class is not open for booking.',
+  'apiError.class_full': 'This class is full.',
+  'apiError.already_in_class': 'You already have a seat in this class.',
+  'apiError.own_class': 'You cannot book a seat in a class you teach or manage.',
+  'apiError.class_requires_payment': 'This code cannot be used on a class.',
+  'apiError.terms_changed': 'The refund terms have changed. Reload this page to read them.',
+  'apiError.too_many_reservations':
+    'You have started paying for this class too many times. Try again later.',
+  'apiError.withdrawal_closed': 'Withdrawal has closed for this class. Contact the teacher.',
+  'apiError.withdrawal_attended':
+    "You have attended this class, so a refund is the teacher's decision.",
+  'apiError.class_cancelled':
+    'This class was cancelled. Your refund is handled with the cancellation.',
+  'apiError.refund_in_progress': 'A refund for this seat is already on its way.',
+  'apiError.seat_has_no_payment':
+    'This seat was not paid for, so there is nothing to refund. Contact the teacher.',
 } as const

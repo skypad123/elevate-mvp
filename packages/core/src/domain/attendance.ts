@@ -355,6 +355,46 @@ export function attendanceState(
   return { ...NO_DETAIL, state: 'not_arrived' }
 }
 
+// ── Attendance for money ────────────────────────────────────────────────────
+
+/** What a learner's attendance in a class means for refunds and release (Part 2, decision 3). */
+export type MoneyAttendance = {
+  /**
+   * Counted as attended: some block has a check-in that stands (flagged or not) or a manual mark
+   * whose sub-state is `settled`. A mark the learner disputed never counts, even when upheld.
+   */
+  counted: boolean
+  /** The latest dispute deadline among the learner's manual marks that are `open`, or null. */
+  openMarkUntil: Date | null
+}
+
+/**
+ * Reads one learner's events in a class, grouped by block (a map or a record keyed by block id),
+ * through `attendanceState` and its manual mark sub-states.
+ */
+export function moneyAttendance(
+  eventsByBlock:
+    | ReadonlyMap<string, readonly AttendanceEventFacts[]>
+    | Readonly<Record<string, readonly AttendanceEventFacts[]>>,
+  now: Instant,
+): MoneyAttendance {
+  const blocks =
+    eventsByBlock instanceof Map
+      ? [...eventsByBlock.values()]
+      : Object.values(eventsByBlock as Readonly<Record<string, readonly AttendanceEventFacts[]>>)
+  let counted = false
+  let openMarkUntil: Date | null = null
+  for (const events of blocks) {
+    const view = attendanceState(events, now)
+    if (view.state === 'present' || view.state === 'present_flagged') counted = true
+    if (view.state === 'marked_by_hand' && view.subState === 'settled') counted = true
+    if (view.state === 'marked_by_hand' && view.subState === 'open' && view.disputeUntil) {
+      if (!openMarkUntil || view.disputeUntil > openMarkUntil) openMarkUntil = view.disputeUntil
+    }
+  }
+  return { counted, openMarkUntil }
+}
+
 // ── What may follow what ────────────────────────────────────────────────────
 
 /** A check-in may be overturned only while it stands and carries a location flag. */
