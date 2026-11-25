@@ -1,21 +1,27 @@
-import type {
-  ClassDetail,
-  ClassSummary,
-  CodeView,
-  CreateClass,
-  DisputeDecisionInput,
-  DisputeView,
-  ManualMark,
-  Overturn,
-  RosterView,
-  SetVenueLocation,
-  UpdateClass,
+import {
+  type CancelClass,
+  CLASS_SALES_TERMS_VERSION,
+  type ClassDetail,
+  type ClassSalesStatus,
+  type ClassSummary,
+  type CodeView,
+  type CreateClass,
+  type DisputeDecisionInput,
+  type DisputeView,
+  type ManualMark,
+  type MoveTarget,
+  type Overturn,
+  type RosterView,
+  type SeatRefundRequest,
+  type SeatView,
+  type SetVenueLocation,
+  type UpdateClass,
 } from '@elevate/core'
 import { ApiError, unwrap } from '@elevate/web-ui/portal'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { api } from './api'
-import { classKeys } from './keys'
+import { classKeys, teachKeys } from './keys'
 import { useCurrentProfile } from './profile'
 
 export { classKeys }
@@ -103,6 +109,52 @@ export function useDisputes(id: string, enabled = true) {
     queryFn: async () =>
       (await unwrap(await scoped.classes[':id'].disputes.$get({ param: { profileId, id } })))
         .items as DisputeView[],
+  })
+}
+
+/** The profile's class sales: whether it has opted in, is switching, or has given notice. */
+export function useClassSales(enabled = true) {
+  const { profileId } = useCurrentProfile()
+  return useQuery({
+    queryKey: classKeys.sales(profileId),
+    enabled,
+    retry: retryUnlessRefused,
+    queryFn: async () =>
+      (await unwrap(await scoped['class-sales'].$get({ param: { profileId } })))
+        .classSales as ClassSalesStatus,
+  })
+}
+
+/** The seats bought in a class. Needs `earnings.read`, since each row shows money. */
+export function useSeats(id: string, enabled = true) {
+  const { profileId } = useCurrentProfile()
+  return useQuery({
+    queryKey: classKeys.seats(profileId, id),
+    enabled: enabled && !!id,
+    retry: retryUnlessRefused,
+    queryFn: async () =>
+      (await unwrap(await scoped.classes[':id'].seats.$get({ param: { profileId, id } })))
+        .items as SeatView[],
+  })
+}
+
+/** The classes a learner can be moved to, each with the problems that stop the move. */
+export function useMoveTargets(id: string, enrollmentId: string | null) {
+  const { profileId } = useCurrentProfile()
+  return useQuery({
+    queryKey: classKeys.moveTargets(profileId, id, enrollmentId ?? ''),
+    enabled: !!id && !!enrollmentId,
+    retry: retryUnlessRefused,
+    // A seat elsewhere may have gone since the dialog was last opened.
+    staleTime: 0,
+    queryFn: async () =>
+      (
+        await unwrap(
+          await scoped.classes[':id'].learners[':enrollmentId']['move-targets'].$get({
+            param: { profileId, id, enrollmentId: enrollmentId ?? '' },
+          }),
+        )
+      ).items as MoveTarget[],
   })
 }
 
@@ -212,6 +264,70 @@ export function useClassActions() {
         )
         await reloadClass(id)
         return dispute as DisputeView
+      },
+
+      // ── Class sales ──
+      /** The owner accepts the held-payout terms shown, which are the current version. */
+      acceptClassSales: async () => {
+        const { classSales } = await unwrap(
+          await scoped['class-sales'].accept.$post({
+            param: { profileId },
+            json: { termsVersion: CLASS_SALES_TERMS_VERSION },
+          }),
+        )
+        queryClient.setQueryData(classKeys.sales(profileId), classSales)
+        // Whether each class is on sale, and the earnings page's held money, follow from it.
+        void queryClient.invalidateQueries({ queryKey: ['teach', profileId, 'class'] })
+        void queryClient.invalidateQueries({ queryKey: teachKeys.earnings(profileId) })
+        return classSales as ClassSalesStatus
+      },
+      /** The owner gives 30 days' notice to stop selling classes. */
+      leaveClassSales: async () => {
+        const { classSales } = await unwrap(
+          await scoped['class-sales'].leave.$post({ param: { profileId } }),
+        )
+        queryClient.setQueryData(classKeys.sales(profileId), classSales)
+        void queryClient.invalidateQueries({ queryKey: ['teach', profileId, 'class'] })
+        return classSales as ClassSalesStatus
+      },
+
+      // ── Seats ──
+      /** Cancels the class. Every seat's refund is written now and sent by the release job. */
+      cancelClass: async (id: string, input: CancelClass) => {
+        const detail = storeClass(
+          (await unwrap(await scoped.classes[':id'].cancel.$post({ param: on(id), json: input })))
+            .class as ClassDetail,
+        )
+        await queryClient.invalidateQueries({ queryKey: classKeys.seats(profileId, id) })
+        return detail
+      },
+      /** Moves a learner's seat, and its payment, to another class of the course. */
+      moveSeat: async (id: string, enrollmentId: string, toClassId: string) => {
+        const { seat } = await unwrap(
+          await scoped.classes[':id'].learners[':enrollmentId'].move.$post({
+            param: { profileId, id, enrollmentId },
+            json: { toClassId },
+          }),
+        )
+        // Both classes' seat counts and rosters change.
+        await Promise.all([reloadClass(id), reloadClass(toClassId)])
+        void queryClient.invalidateQueries({ queryKey: classKeys.list(profileId) })
+        return seat as SeatView
+      },
+      /** A discretionary refund. The learner keeps the seat. */
+      refundSeat: async (id: string, enrollmentId: string, input: SeatRefundRequest) => {
+        const { seat } = await unwrap(
+          await scoped.classes[':id'].learners[':enrollmentId'].refund.$post({
+            param: { profileId, id, enrollmentId },
+            json: input,
+          }),
+        )
+        const view = seat as SeatView
+        queryClient.setQueryData<SeatView[]>(classKeys.seats(profileId, id), (list) =>
+          list?.map((s) => (s.enrollmentId === view.enrollmentId ? view : s)),
+        )
+        void queryClient.invalidateQueries({ queryKey: teachKeys.earnings(profileId) })
+        return view
       },
     }
   }, [profileId, queryClient])

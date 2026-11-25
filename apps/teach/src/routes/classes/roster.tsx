@@ -178,6 +178,8 @@ function Roster({
   const [marking, setMarking] = useState<RosterRow | null>(null)
   const zone = detail.timeZone
   const runs = detail.viewerIsInstructor
+  // A cancelled class has no block to run: no code screen, no venue to set.
+  const cancelled = detail.status === 'cancelled'
   const blockIndex = detail.blocks.findIndex((b) => b.id === view.block.id)
   const ageMs = now - updatedAt
   const stale = ageMs > ROSTER_STALE_MS
@@ -226,7 +228,7 @@ function Roster({
           </span>
         }
         actions={
-          runs ? (
+          runs && !cancelled ? (
             <>
               {detail.delivery === 'in_person' ? <VenueButton detail={detail} /> : null}
               <Button icon={MonitorUp} onClick={openCodeScreen}>
@@ -237,7 +239,12 @@ function Roster({
         }
       />
 
-      {runs && detail.delivery === 'in_person' && !view.venueSet ? (
+      {cancelled ? (
+        <p role="status" className="mb-4 text-small text-ink-secondary">
+          This class was cancelled, so this block does not run. You can read the roster.
+        </p>
+      ) : null}
+      {runs && !cancelled && detail.delivery === 'in_person' && !view.venueSet ? (
         <div
           role="alert"
           className="mb-6 rounded-card border border-warning bg-warning-tint px-4 py-3 text-small text-ink"
@@ -246,7 +253,7 @@ function Roster({
           the venue location here"; until then no learner can check in.
         </div>
       ) : null}
-      {!runs ? (
+      {!runs && !cancelled ? (
         <p className="mb-4 text-small text-ink-secondary">
           Only the class's instructor, {detail.instructor.displayName}, runs this block and corrects
           its attendance. You can read the roster.

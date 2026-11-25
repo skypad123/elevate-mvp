@@ -21,6 +21,7 @@ import { useCurrentProfile } from '../../lib/profile'
 export const CLASS_STATUS: Record<ClassStatus, { label: string; tone: 'neutral' | 'success' }> = {
   draft: { label: 'Draft', tone: 'neutral' },
   published: { label: 'Published', tone: 'success' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
 }
 
 export const DELIVERY_LABEL = { in_person: 'In person', remote: 'Remote' } as const

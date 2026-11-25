@@ -8,6 +8,7 @@ import {
 import {
   Button,
   Card,
+  Dialog,
   EmptyState,
   focusFirstInvalid,
   Input,
@@ -30,7 +31,7 @@ import {
   type ScheduleRow,
   scheduleProblems,
 } from '../../components/class-schedule-editor'
-import { useClass, useClassActions } from '../../lib/classes'
+import { formatClassInstant, useClass, useClassActions } from '../../lib/classes'
 import { useCourses } from '../../lib/courses'
 import { useMembers } from '../../lib/members'
 import { useCurrentProfile } from '../../lib/profile'
@@ -92,6 +93,14 @@ function valuesOf(detail: ClassDetail | null, ownerId: string): Values {
   }
 }
 
+/** The blocks' times, ignoring their order: what a learner's right to withdraw in full follows. */
+function timesKey(blocks: readonly { date: string; startTime: string; endTime: string }[]): string {
+  return blocks
+    .map((b) => `${b.date} ${b.startTime}-${b.endTime}`)
+    .sort()
+    .join('|')
+}
+
 /** The details of an `ApiError` as a plain record, when it has one. */
 function detailsOf(error: unknown): Record<string, unknown> {
   return error instanceof ApiError && error.details && typeof error.details === 'object'
@@ -121,6 +130,8 @@ function ClassForm({ initial }: { initial: ClassDetail | null }) {
   const [rowErrors, setRowErrors] = useState<Map<string, string>>(new Map())
   const [tried, setTried] = useState(false)
   const [busy, setBusy] = useState(false)
+  /** An edit held back until the change to the blocks' times is confirmed. */
+  const [confirming, setConfirming] = useState<UpdateClass | null>(null)
 
   const set = <K extends keyof Values>(key: K, value: Values[K]) =>
     setValues((v) => ({ ...v, [key]: value }))
@@ -223,12 +234,18 @@ function ClassForm({ initial }: { initial: ClassDetail | null }) {
       if (row) byRow.set(row.key, error.message)
     }
     if (code === 'instructor_not_member') fields.instructorUserId = errorMessage(error)
+    if (code === 'capacity_below_taken' && typeof details.taken === 'number') {
+      fields.seats = `${details.taken} seats are taken, so the class needs at least that many.`
+    }
     setErrors(fields)
     setRowErrors(byRow)
     toast({
       tone: 'danger',
       title: initial ? 'Could not save the class' : 'Could not create the class',
-      description: errorMessage(error),
+      description:
+        code === 'class_too_late_for_seat' && typeof details.latestEndsAt === 'string'
+          ? `The class must end by ${formatClassInstant(details.latestEndsAt, timeZone)}, 75 days after a learner’s payment.`
+          : errorMessage(error),
     })
     focusFirstInvalid(formRef.current)
   }
@@ -242,18 +259,39 @@ function ClassForm({ initial }: { initial: ClassDetail | null }) {
       focusFirstInvalid(formRef.current)
       return
     }
+    if (initial) {
+      const patch = patchBody(initial)
+      // Changing a block's time gives every seat not counted as attended the right to withdraw
+      // with a full refund, at the profile's cost, so it is confirmed first.
+      if (
+        patch.blocks &&
+        initial.seatsWithChangeRight > 0 &&
+        timesKey(patch.blocks) !== timesKey(blocksFromRows(startRows))
+      ) {
+        setConfirming(patch)
+        return
+      }
+      await save(initial, patch)
+      return
+    }
     setBusy(true)
     try {
-      if (initial) {
-        const patch = patchBody(initial)
-        if (Object.keys(patch).length > 0) await actions.update(initial.id, patch)
-        toast({ tone: 'success', title: 'Class saved' })
-        navigate(path(`/classes/${initial.id}`))
-      } else {
-        const created = await actions.create(requestBody())
-        toast({ tone: 'success', title: 'Draft class created' })
-        navigate(path(`/classes/${created.id}`))
-      }
+      const created = await actions.create(requestBody())
+      toast({ tone: 'success', title: 'Draft class created' })
+      navigate(path(`/classes/${created.id}`))
+    } catch (error) {
+      showRefusal(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function save(detail: ClassDetail, patch: UpdateClass) {
+    setBusy(true)
+    try {
+      if (Object.keys(patch).length > 0) await actions.update(detail.id, patch)
+      toast({ tone: 'success', title: 'Class saved' })
+      navigate(path(`/classes/${detail.id}`))
     } catch (error) {
       showRefusal(error)
     } finally {
@@ -399,6 +437,35 @@ function ClassForm({ initial }: { initial: ClassDetail | null }) {
           </Button>
         </div>
       </form>
+      {initial ? (
+        <Dialog
+          open={confirming !== null}
+          onOpenChange={(open) => !open && setConfirming(null)}
+          title="Change the class’s times?"
+          description={
+            initial.seatsWithChangeRight === 1
+              ? '1 learner has a seat and has not attended. They are emailed the new times, and can then withdraw with a full refund until the class starts. You bear Stripe’s fee on that refund.'
+              : `${initial.seatsWithChangeRight} learners have a seat and have not attended. Each is emailed the new times, and can then withdraw with a full refund until the class starts. You bear Stripe’s fee on each of those refunds.`
+          }
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setConfirming(null)}>
+                Keep the times
+              </Button>
+              <Button
+                loading={busy}
+                onClick={() => {
+                  const patch = confirming
+                  setConfirming(null)
+                  if (patch) void save(initial, patch)
+                }}
+              >
+                Change the times
+              </Button>
+            </>
+          }
+        />
+      ) : null}
     </>
   )
 }

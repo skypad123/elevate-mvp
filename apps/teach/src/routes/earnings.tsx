@@ -1,4 +1,10 @@
-import { type EarningsView, formatSgd, type MoneyBreakdown } from '@elevate/core'
+import {
+  type EarningsView,
+  formatSgd,
+  type HeldClassView,
+  type MoneyBreakdown,
+  type ProfilePayoutView,
+} from '@elevate/core'
 import {
   Badge,
   Button,
@@ -22,8 +28,9 @@ import {
   TR,
 } from '@elevate/web-ui'
 import { errorMessage } from '@elevate/web-ui/portal'
-import { ArrowLeft, ExternalLink, Receipt, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ChevronRight, ExternalLink, Receipt, RefreshCw } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { useClassSales } from '../lib/classes'
 import { useCurrentProfile } from '../lib/profile'
 import { useCourseEarnings, useEarnings, useReconciliation, useStripeLinks } from '../lib/queries'
 
@@ -41,11 +48,11 @@ function Money({ cents, className }: { cents: number; className?: string }) {
 
 function BreakdownStats({ b, commissionBps }: { b: MoneyBreakdown; commissionBps?: number }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <StatCard
         label="Net earnings"
         value={formatSgd(b.netCents)}
-        hint="What Stripe transfers to you"
+        hint="Gross, less Stripe fees, commission and refunds, plus Elevate’s fee returned"
         className="border-brand"
       />
       <StatCard
@@ -58,7 +65,7 @@ function BreakdownStats({ b, commissionBps }: { b: MoneyBreakdown; commissionBps
       <StatCard
         label="Stripe fees"
         value={formatSgd(b.stripeFeeCents)}
-        hint="Actual fee once Stripe reports it"
+        hint="Taken in Elevate’s fee at checkout. Elevate pays Stripe’s actual fee."
       />
       <StatCard
         label="Commission"
@@ -74,7 +81,157 @@ function BreakdownStats({ b, commissionBps }: { b: MoneyBreakdown; commissionBps
         value={formatSgd(b.refundedCents)}
         hint="Reversed from your transfers"
       />
+      <StatCard
+        label="Elevate’s fee returned"
+        value={formatSgd(b.feeReturnedCents)}
+        hint="The part of Elevate’s fee that refunds gave back to you"
+      />
     </div>
+  )
+}
+
+const HELD_WAITING: Record<NonNullable<HeldClassView['waitingFor']>, string> = {
+  open_marks: 'Waits until no manual mark in the class can still be disputed',
+  cancellation: 'Waits until every refund of the cancellation is done',
+  review: 'Elevate is reviewing it: no learner was counted as attended',
+}
+
+const PAYOUT_STATUS: Record<string, { label: string; tone: 'neutral' | 'success' | 'danger' }> = {
+  pending: { label: 'On its way', tone: 'neutral' },
+  paid: { label: 'In your bank', tone: 'success' },
+  failed: { label: 'Failed', tone: 'danger' },
+}
+
+/**
+ * For a profile that sells classes: Elevate pays it once a day, so the page shows what is held
+ * and when each class is due, any debt not yet covered, and the recent payouts with what each
+ * one paid.
+ */
+function HeldMoney({ e }: { e: EarningsView }) {
+  return (
+    <div className="mt-8 space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <StatCard
+          label="Held"
+          value={formatSgd(e.heldCents)}
+          hint="Your share of class seats, kept in your Stripe account until each class is released"
+        />
+        {e.debtCents > 0 ? (
+          <StatCard
+            label="Owed"
+            value={formatSgd(e.debtCents)}
+            hint="Refunds or bank disputes after a payout. Taken from your next payouts first."
+            className="border-danger"
+          />
+        ) : null}
+      </div>
+
+      <section>
+        <h2 className="mb-3 font-display text-h3 font-semibold text-ink">Held for classes</h2>
+        {e.heldClasses.length === 0 ? (
+          <p className="text-small text-ink-tertiary">No class money is held.</p>
+        ) : (
+          <Table>
+            <THead>
+              <TR>
+                <TH>Class</TH>
+                <TH className="text-right">Held</TH>
+                <TH>Released</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {e.heldClasses.map((c) => (
+                <TR key={c.classId}>
+                  <TD className="font-semibold">{c.className}</TD>
+                  <TD className="text-right">
+                    <Money cents={c.heldCents} />
+                  </TD>
+                  <TD className="text-ink-secondary">
+                    {c.waitingFor
+                      ? HELD_WAITING[c.waitingFor]
+                      : c.releaseDueAt
+                        ? `From ${formatDate(c.releaseDueAt, dateTime)}`
+                        : 'Once the class has ended'}
+                    {c.waitingFor && c.releaseDueAt ? (
+                      <span className="block text-caption text-ink-tertiary">
+                        Not before {formatDate(c.releaseDueAt, dateTime)}
+                      </span>
+                    ) : null}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-3 font-display text-h3 font-semibold text-ink">Payouts</h2>
+        {e.payouts.length === 0 ? (
+          <p className="text-small text-ink-tertiary">No payouts yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {e.payouts.map((p) => (
+              <PayoutRow key={p.id} payout={p} />
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  )
+}
+
+/** One payout, opening to the payments and adjustments it paid. */
+function PayoutRow({ payout }: { payout: ProfilePayoutView }) {
+  const status = payout.payoutStatus
+    ? (PAYOUT_STATUS[payout.payoutStatus] ?? { label: payout.payoutStatus, tone: 'neutral' })
+    : { label: 'Sending', tone: 'neutral' as const }
+  return (
+    <li>
+      <details className="group rounded-card border border-border bg-surface">
+        <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
+          <ChevronRight
+            className="size-4 shrink-0 text-ink-tertiary transition-transform group-open:rotate-90"
+            aria-hidden
+          />
+          <span className="font-semibold text-ink">
+            {formatDate(payout.payDate, { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
+          <Badge tone={status.tone}>{status.label}</Badge>
+          <Money cents={payout.amountCents} className="ml-auto font-semibold" />
+        </summary>
+        <div className="border-t border-border px-4 py-3">
+          {payout.payoutStatus === 'failed' ? (
+            <p className="mb-2 text-small text-danger">
+              This payout did not reach your bank. What it would have paid is paid again in a later
+              payout.
+            </p>
+          ) : null}
+          {payout.items.length === 0 ? (
+            <p className="text-small text-ink-tertiary">Nothing is listed for this payout.</p>
+          ) : (
+            <ul className="divide-y divide-border text-small">
+              {payout.items.map((item, index) => (
+                <li
+                  // The same sale can appear in two payouts, never twice in one.
+                  // biome-ignore lint/suspicious/noArrayIndexKey: items have no id of their own
+                  key={index}
+                  className="flex items-center justify-between gap-3 py-1.5"
+                >
+                  <span className={item.kind === 'payment' ? 'text-ink' : 'text-ink-secondary'}>
+                    {item.label}
+                  </span>
+                  <Money
+                    cents={item.amountCents}
+                    className={item.amountCents < 0 ? 'text-danger' : undefined}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </details>
+    </li>
   )
 }
 
@@ -140,8 +297,11 @@ function ReconcilePanel({ stripe }: { stripe: EarningsView['stripe'] }) {
 export function EarningsPage() {
   const earnings = useEarnings()
   const navigate = useNavigate()
-  const { path, can } = useCurrentProfile()
+  const { path, can, profile } = useCurrentProfile()
   const links = useStripeLinks()
+  const sales = useClassSales(!!profile?.classesEnabled)
+  // On manual payouts Elevate pays the profile; until then Stripe does, on its own schedule.
+  const heldPayouts = sales.data?.payoutMode === 'manual'
   // Stripe links are the owner's; everyone else who can read earnings sees the figures only.
   const canManageStripe = can('stripe.links')
 
@@ -169,7 +329,11 @@ export function EarningsPage() {
       <PageHeader
         eyebrow="Earnings"
         title="Earnings"
-        description="Gross, Stripe fees, commission and net per course, derived from Stripe events. Payouts land in your bank on Stripe’s schedule."
+        description={
+          heldPayouts
+            ? 'Gross, Stripe fees, commission and net per course, derived from Stripe events. Elevate pays you once a day; class money is held until each class is released.'
+            : 'Gross, Stripe fees, commission and net per course, derived from Stripe events. Payouts land in your bank on Stripe’s schedule.'
+        }
       />
       <div className="mb-6 flex flex-wrap items-center gap-3">
         {!canManageStripe ? null : e.stripe.connected ? (
@@ -191,6 +355,7 @@ export function EarningsPage() {
         </span>
       </div>
       <BreakdownStats b={e.totals} commissionBps={e.commissionBps} />
+      {heldPayouts ? <HeldMoney e={e} /> : null}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <section>
@@ -214,6 +379,8 @@ export function EarningsPage() {
                   <TH className="text-right">Gross</TH>
                   <TH className="text-right">Fees</TH>
                   <TH className="text-right">Commission</TH>
+                  <TH className="text-right">Refunded</TH>
+                  <TH className="text-right">Fee returned</TH>
                   <TH className="text-right">Net</TH>
                 </TR>
               </THead>
@@ -237,6 +404,12 @@ export function EarningsPage() {
                     </TD>
                     <TD className="text-right">
                       <Money cents={c.commissionCents} className="text-ink-secondary" />
+                    </TD>
+                    <TD className="text-right">
+                      <Money cents={c.refundedCents} className="text-ink-secondary" />
+                    </TD>
+                    <TD className="text-right">
+                      <Money cents={c.feeReturnedCents} className="text-ink-secondary" />
                     </TD>
                     <TD className="text-right">
                       <Money cents={c.netCents} className="font-semibold" />
@@ -341,6 +514,8 @@ export function CourseEarningsPage() {
                 <TH>Promo</TH>
                 <TH className="text-right">Stripe fee</TH>
                 <TH className="text-right">Commission</TH>
+                <TH className="text-right">Refunded</TH>
+                <TH className="text-right">Fee returned</TH>
                 <TH className="text-right">Your net</TH>
                 <TH>Status</TH>
               </TR>
@@ -367,6 +542,12 @@ export function CourseEarningsPage() {
                   </TD>
                   <TD className="text-right">
                     <Money cents={p.commissionCents} className="text-ink-secondary" />
+                  </TD>
+                  <TD className="text-right">
+                    <Money cents={p.refundedCents} className="text-ink-secondary" />
+                  </TD>
+                  <TD className="text-right">
+                    <Money cents={p.feeReturnedCents} className="text-ink-secondary" />
                   </TD>
                   <TD className="text-right">
                     <Money cents={p.netCents} className="font-semibold" />

@@ -34,4 +34,11 @@ export const classKeys = {
     ['teach', profileId, 'class', id, 'block', blockId, 'codes'] as const,
   disputes: (profileId: string, id: string) =>
     ['teach', profileId, 'class', id, 'disputes'] as const,
+  /** The seats bought in a class, with their money and refunds. */
+  seats: (profileId: string, id: string) => ['teach', profileId, 'class', id, 'seats'] as const,
+  /** The classes one learner of this class can be moved to. */
+  moveTargets: (profileId: string, id: string, enrollmentId: string) =>
+    ['teach', profileId, 'class', id, 'move-targets', enrollmentId] as const,
+  /** The profile's class-sales status: opted in, switching, leaving. */
+  sales: (profileId: string) => ['teach', profileId, 'class-sales'] as const,
 }

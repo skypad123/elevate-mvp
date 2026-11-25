@@ -15,6 +15,7 @@ import { usePortalAuth } from '@elevate/web-ui/portal'
 import { useErrorMessage, useT } from '@elevate/web-ui/preferences'
 import { ArrowRight, BookOpen, CreditCard, ExternalLink, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router'
+import { useClassSales } from '../lib/classes'
 import { useCourses } from '../lib/courses'
 import { useCurrentProfile } from '../lib/profile'
 import { useEarnings, useStripeLinks, useStripeStatus } from '../lib/queries'
@@ -27,6 +28,10 @@ export function StripeCard() {
   const t = useT()
   const status = stripe.data
   const canManage = can('stripe.links')
+  // Once the profile has accepted the held-payout terms, Elevate times its payouts, not Stripe.
+  const classSales = useClassSales(profile?.classesEnabled ?? false)
+  const held =
+    classSales.data?.payoutMode === 'manual' || classSales.data?.payoutMode === 'switching'
 
   // Payable: the account is active on our side and Stripe allows charges.
   const enabled = status?.status === 'active' && status.chargesEnabled
@@ -39,7 +44,7 @@ export function StripeCard() {
         title={t('payments.title')}
         description={
           enabled
-            ? t('payments.description.enabled')
+            ? t(held ? 'payments.description.held' : 'payments.description.enabled')
             : awaitingNameCheck
               ? t('payments.description.nameCheck')
               : t('payments.description.connect')

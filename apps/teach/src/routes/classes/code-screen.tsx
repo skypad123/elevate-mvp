@@ -56,7 +56,14 @@ export function CodeScreen() {
   const refusal = codes.error instanceof ApiError ? codes.error : null
 
   let body: ReactNode
-  if (!codes.data && refusal?.code === 'venue_not_set') {
+  if (detail.data?.status === 'cancelled') {
+    body = (
+      <Message
+        title="This class was cancelled"
+        body="Its blocks do not run, so there is no code to show."
+      />
+    )
+  } else if (!codes.data && refusal?.code === 'venue_not_set') {
     body = (
       <Message
         title="Set the venue location first"

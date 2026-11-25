@@ -1,4 +1,16 @@
-import type { CheckInMix, ClassDetail, DisputeDecision, DisputeView } from '@elevate/core'
+import {
+  type CheckInMix,
+  type ClassDetail,
+  type DisputeDecision,
+  type DisputeView,
+  formatSgd,
+  type NotOnSaleReason,
+  type SeatRefundKind,
+  type SeatRefundStatus,
+  type SeatRefundView,
+  type SeatView,
+  UNFINISHED_SEAT_REFUND_STATUSES,
+} from '@elevate/core'
 import {
   Badge,
   Button,
@@ -21,10 +33,11 @@ import {
   useToast,
 } from '@elevate/web-ui'
 import { ApiError, errorMessage } from '@elevate/web-ui/portal'
-import { ArrowLeft, Lock, Pencil, Send, Trash2, UserRoundCog } from 'lucide-react'
+import { ArrowLeft, Ban, Lock, Pencil, Send, Trash2, UserRoundCog } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { MANUAL_MARK_REASON_LABEL } from '../../components/attendance-dialogs'
+import { CancelClassDialog, MoveSeatDialog, RefundSeatDialog } from '../../components/seat-dialogs'
 import {
   formatBlockSpan,
   formatClassInstant,
@@ -32,6 +45,7 @@ import {
   useClass,
   useClassActions,
   useDisputes,
+  useSeats,
   zoneLabel,
 } from '../../lib/classes'
 import { useMembers } from '../../lib/members'
@@ -54,6 +68,94 @@ const PUBLISH_PROBLEM: Record<string, string> = {
   block_ended: 'A block has already ended. Move it or remove it.',
   instructor_not_member: 'The instructor is no longer the owner or a member of this profile.',
   venue_address_missing: 'An in-person class needs a venue address.',
+}
+
+/** Why learners cannot buy a seat in a published class, in words. */
+const NOT_ON_SALE: Record<NotOnSaleReason, string> = {
+  sales_off: 'Class sales are switched off on Elevate for now.',
+  not_published: 'The class is not published.',
+  cancelled: 'The class was cancelled.',
+  started: 'The class has started, so no more seats are sold.',
+  too_far_ahead:
+    'Its last block ends more than 75 days from now. It goes on sale once it ends within 75 days.',
+  profile_not_opted_in:
+    'This profile does not sell classes yet. The owner can accept the held-payout terms in Settings.',
+  profile_leaving: 'This profile has stopped selling classes.',
+  account_not_payable:
+    'The profile’s Stripe account cannot take payments. The owner can finish it from Settings.',
+  course_not_on_sale: 'The course is not on sale.',
+}
+
+type Tone = 'neutral' | 'warning' | 'success' | 'danger'
+
+const SEAT_STATUS: Record<SeatView['status'], { label: string; tone: Tone }> = {
+  pending_payment: { label: 'Paying', tone: 'neutral' },
+  active: { label: 'Seat', tone: 'success' },
+  refunded: { label: 'Refunded', tone: 'neutral' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
+}
+
+/** A refunded seat whose refund is not done yet, by the refund's state. */
+const SEAT_REFUND_PENDING: Record<
+  Exclude<SeatRefundStatus, 'done'>,
+  { label: string; tone: Tone }
+> = {
+  waiting: { label: 'Refund waiting', tone: 'warning' },
+  pending: { label: 'Refund queued', tone: 'warning' },
+  refund_sent: { label: 'Refund sent', tone: 'warning' },
+  closed: { label: 'Refund closed', tone: 'neutral' },
+  failed: { label: 'Refund failed', tone: 'danger' },
+}
+
+const WITHDREW: readonly SeatRefundKind[] = ['learner_withdrew', 'changed_withdrew']
+
+/**
+ * A seat's status in words. A seat the learner withdrew from says so, and a refunded seat whose
+ * refund is still on its way shows the refund's state instead of "Refunded".
+ */
+function seatStatus(seat: SeatView): { label: string; tone: Tone } {
+  if (seat.status === 'cancelled' && seat.refunds.some((r) => WITHDREW.includes(r.kind)))
+    return { label: 'Withdrew', tone: 'neutral' }
+  // The refunds are listed oldest first; the last is the one that refunded the seat.
+  const latest = seat.refunds.at(-1)
+  if (seat.status === 'refunded' && latest && latest.status !== 'done')
+    return SEAT_REFUND_PENDING[latest.status]
+  return SEAT_STATUS[seat.status]
+}
+
+export const REFUND_KIND_LABEL: Record<SeatRefundKind, string> = {
+  teacher_cancelled: 'Class cancelled',
+  teacher_cancelled_part: 'Class cancelled, part refund',
+  changed_withdrew: 'Withdrew after a change',
+  learner_withdrew: 'Withdrew',
+  discretionary: 'Refund given',
+  elevate_cancelled: 'Cancelled by Elevate',
+  seat_lost: 'Seat lost while paying',
+  dispute_lost: 'Bank dispute lost',
+}
+
+const REFUND_STATUS: Record<
+  SeatRefundStatus,
+  { label: string; tone: 'neutral' | 'warning' | 'success' | 'danger' }
+> = {
+  waiting: { label: 'Waiting', tone: 'warning' },
+  pending: { label: 'Queued', tone: 'warning' },
+  refund_sent: { label: 'Sent to Stripe', tone: 'warning' },
+  done: { label: 'Refunded', tone: 'success' },
+  closed: { label: 'Closed', tone: 'neutral' },
+  failed: { label: 'Failed', tone: 'danger' },
+}
+
+const WAITING_FOR: Record<string, string> = {
+  manual_mark: 'Waits until the learner’s manual mark is settled or disputed.',
+  bank_dispute: 'Waits for the learner’s bank to decide a dispute.',
+  stripe_fee: 'Waits for Stripe to report its fee.',
+}
+
+const CLOSED_REASON: Record<string, string> = {
+  mark_settled: 'The manual mark settled, so the learner counts as attended.',
+  bank_returned: 'The learner’s bank returned the money.',
+  support: 'Closed by Elevate.',
 }
 
 /** One class: its details, its blocks with their check-in mix, publishing and its disputes. */
@@ -111,9 +213,17 @@ function ClassView({ detail }: { detail: ClassDetail }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [reassigning, setReassigning] = useState(false)
 
+  const [cancelling, setCancelling] = useState(false)
+
   const manages = can('class.manage')
   const readsRosters = detail.viewerIsInstructor || can('attendance.read')
+  const readsSeats = can('earnings.read')
+  const seats = useSeats(detail.id, readsSeats)
   const draft = detail.status === 'draft'
+  const cancelled = detail.status === 'cancelled'
+  // A released class cannot be cancelled by the profile; a Support admin still can.
+  const canCancel =
+    manages && detail.status === 'published' && detail.releasedAt === null && seats.isSuccess
   const zone = detail.timeZone
 
   async function publish() {
@@ -165,9 +275,16 @@ function ClassView({ detail }: { detail: ClassDetail }) {
         actions={
           manages ? (
             <>
-              <Button asChild variant="secondary" icon={Pencil}>
-                <Link to={path(`/classes/${detail.id}/edit`)}>Edit</Link>
-              </Button>
+              {cancelled ? null : (
+                <Button asChild variant="secondary" icon={Pencil}>
+                  <Link to={path(`/classes/${detail.id}/edit`)}>Edit</Link>
+                </Button>
+              )}
+              {canCancel ? (
+                <Button variant="danger" icon={Ban} onClick={() => setCancelling(true)}>
+                  Cancel class
+                </Button>
+              ) : null}
               {draft ? (
                 <Button icon={Send} loading={busy === 'publish'} onClick={() => void publish()}>
                   Publish
@@ -177,6 +294,32 @@ function ClassView({ detail }: { detail: ClassDetail }) {
           ) : undefined
         }
       />
+
+      {cancelled ? (
+        <div
+          role="status"
+          className="mb-6 rounded-card border border-border bg-surface-muted px-4 py-3 text-small text-ink"
+        >
+          <p className="font-semibold">
+            This class was cancelled
+            {detail.cancelledAt ? ` on ${formatClassInstant(detail.cancelledAt, zone)}` : ''}.
+          </p>
+          {detail.cancelReason ? <p className="mt-1">Reason: “{detail.cancelReason}”</p> : null}
+          <p className="mt-1 text-ink-secondary">
+            {readsSeats
+              ? 'Each learner’s refund and its state are listed under Seats.'
+              : 'The learners’ refunds are sent by Elevate.'}
+          </p>
+        </div>
+      ) : detail.status === 'published' && detail.notOnSaleReason ? (
+        <div
+          role="status"
+          className="mb-6 rounded-card border border-warning bg-warning-tint px-4 py-3 text-small text-ink"
+        >
+          <p className="font-semibold">Not on sale</p>
+          <p className="mt-1">{NOT_ON_SALE[detail.notOnSaleReason]}</p>
+        </div>
+      ) : null}
 
       {problems.length > 0 ? (
         <div
@@ -243,7 +386,7 @@ function ClassView({ detail }: { detail: ClassDetail }) {
                       {readsRosters ? (
                         <Button asChild size="sm" variant="secondary">
                           <Link to={path(`/classes/${detail.id}/blocks/${block.id}`)}>
-                            {detail.viewerIsInstructor ? 'Run block' : 'View roster'}
+                            {detail.viewerIsInstructor && !cancelled ? 'Run block' : 'View roster'}
                           </Link>
                         </Button>
                       ) : null}
@@ -253,6 +396,8 @@ function ClassView({ detail }: { detail: ClassDetail }) {
               </TBody>
             </Table>
           </section>
+
+          {readsSeats ? <SeatsSection detail={detail} seats={seats} /> : null}
 
           {can('attendance.review') ? <DisputesSection detail={detail} /> : null}
         </div>
@@ -266,7 +411,20 @@ function ClassView({ detail }: { detail: ClassDetail }) {
                 { label: 'Delivery', value: DELIVERY_LABEL[detail.delivery] },
                 ...(detail.delivery === 'in_person'
                   ? [
-                      { label: 'Venue', value: detail.venueAddress || 'No address yet' },
+                      {
+                        label: 'Venue',
+                        value:
+                          detail.status === 'published' && detail.venueAddress ? (
+                            <>
+                              {detail.venueAddress}
+                              <span className="block text-caption text-ink-tertiary">
+                                Public: the course page shows this address to everyone.
+                              </span>
+                            </>
+                          ) : (
+                            detail.venueAddress || 'No address yet'
+                          ),
+                      },
                       {
                         label: 'Venue position',
                         value: detail.venue
@@ -275,7 +433,17 @@ function ClassView({ detail }: { detail: ClassDetail }) {
                       },
                     ]
                   : []),
-                { label: 'Seats', value: `${detail.enrolledCount} enrolled of ${detail.seats}` },
+                {
+                  label: 'Seats',
+                  value: `${detail.enrolledCount} enrolled of ${detail.seats}${
+                    detail.seatsTaken > detail.enrolledCount
+                      ? ` (${detail.seatsTaken} taken, counting learners paying now)`
+                      : ''
+                  }`,
+                },
+                ...(detail.status === 'published'
+                  ? [{ label: 'On sale', value: detail.notOnSaleReason ? 'No' : 'Yes' }]
+                  : []),
                 { label: 'Instructor', value: detail.instructor.displayName },
                 { label: 'Time zone', value: `${zoneLabel(zone)} (${zone})` },
                 ...(detail.publishedAt
@@ -283,7 +451,7 @@ function ClassView({ detail }: { detail: ClassDetail }) {
                   : []),
               ]}
             />
-            {manages ? (
+            {manages && !cancelled ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   variant="secondary"
@@ -326,6 +494,14 @@ function ClassView({ detail }: { detail: ClassDetail }) {
         }
       />
       <ReassignDialog detail={detail} open={reassigning} onOpenChange={setReassigning} />
+      {canCancel ? (
+        <CancelClassDialog
+          detail={detail}
+          seats={seats.data ?? []}
+          open={cancelling}
+          onOpenChange={setCancelling}
+        />
+      ) : null}
     </>
   )
 }
@@ -599,6 +775,194 @@ function DisputesSection({ detail }: { detail: ClassDetail }) {
           </div>
         </form>
       </Dialog>
+    </section>
+  )
+}
+
+/** A seat refund's state in words: its status, and what it waits for or why it was closed. */
+function RefundState({ refund, zone }: { refund: SeatRefundView; zone: string }) {
+  const status = REFUND_STATUS[refund.status]
+  const note =
+    refund.status === 'waiting' && refund.waitingFor
+      ? WAITING_FOR[refund.waitingFor]
+      : refund.status === 'closed' && refund.closedReason
+        ? CLOSED_REASON[refund.closedReason]
+        : refund.status === 'failed'
+          ? 'Stripe refused it. Elevate is looking at it.'
+          : refund.status === 'done' && refund.completedAt
+            ? `On ${formatClassInstant(refund.completedAt, zone)}.`
+            : null
+  return (
+    <span className="block">
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        <span className="font-semibold">{REFUND_KIND_LABEL[refund.kind]}</span>
+        <Badge tone={status.tone}>{status.label}</Badge>
+        {refund.learnerRefundCents !== null ? (
+          <span className="font-mono tabular-nums">{formatSgd(refund.learnerRefundCents)}</span>
+        ) : null}
+      </span>
+      {note ? <span className="block text-caption text-ink-secondary">{note}</span> : null}
+    </span>
+  )
+}
+
+/**
+ * The seats bought in the class, for those who read earnings: each learner's money, attendance
+ * as the refund rules count it, and their refunds. The owner and managers move a learner; a
+ * discretionary refund needs `class.refund`.
+ */
+function SeatsSection({
+  detail,
+  seats,
+}: {
+  detail: ClassDetail
+  seats: ReturnType<typeof useSeats>
+}) {
+  const { can } = useCurrentProfile()
+  const [moving, setMoving] = useState<SeatView | null>(null)
+  const [refunding, setRefunding] = useState<SeatView | null>(null)
+  const zone = detail.timeZone
+  const manages = can('class.manage')
+  const refunds = can('class.refund')
+
+  return (
+    <section className="space-y-3">
+      <h2 className="font-display text-h3 font-semibold text-ink">Seats</h2>
+      <p className="text-small text-ink-secondary">
+        A learner counts as attended once they check in themselves, or once a manual mark has gone 7
+        days without a dispute. Refunds are sent within 15 minutes.
+      </p>
+      {seats.isPending ? (
+        <Skeleton className="h-24 w-full rounded-card" />
+      ) : seats.isError ? (
+        <EmptyState
+          tone="danger"
+          title="Could not load the seats"
+          body={errorMessage(seats.error)}
+        />
+      ) : seats.data.length === 0 ? (
+        <p className="text-small text-ink-tertiary">No seats sold yet.</p>
+      ) : (
+        <Table>
+          <THead>
+            <TR>
+              <TH>Learner</TH>
+              <TH>Status</TH>
+              <TH className="text-right">Paid</TH>
+              <TH className="text-right">Refunded</TH>
+              <TH>Attendance</TH>
+              <TH>Refund</TH>
+              <TH>
+                <span className="sr-only">Actions</span>
+              </TH>
+            </TR>
+          </THead>
+          <TBody>
+            {seats.data.map((seat) => {
+              const canMove = manages && seat.canMove
+              const canRefund = refunds && seat.canRefundUpToCents > 0
+              const status = seatStatus(seat)
+              // Nothing has gone back while the latest refund is on its way: no S$0.00.
+              const latest = seat.refunds.at(-1)
+              const refundPending =
+                seat.refundedCents === 0 &&
+                !!latest &&
+                (UNFINISHED_SEAT_REFUND_STATUSES as readonly string[]).includes(latest.status)
+              return (
+                <TR key={seat.enrollmentId}>
+                  <TD>
+                    <span className="font-semibold">{seat.learner.displayName}</span>
+                    <span className="block text-caption text-ink-secondary">
+                      {seat.learner.email}
+                    </span>
+                    {seat.movedAt ? (
+                      <span className="block text-caption text-ink-tertiary">
+                        Moved here {formatClassInstant(seat.movedAt, zone)}
+                      </span>
+                    ) : null}
+                  </TD>
+                  <TD>
+                    <Badge tone={status.tone}>{status.label}</Badge>
+                    {seat.bankDisputeStatus === 'open' ? (
+                      <span className="mt-1 block text-caption text-warning">
+                        Bank dispute open
+                      </span>
+                    ) : seat.bankDisputeStatus === 'lost' ? (
+                      <span className="mt-1 block text-caption text-danger">Bank dispute lost</span>
+                    ) : null}
+                  </TD>
+                  <TD className="text-right">
+                    <span className="font-mono tabular-nums">{formatSgd(seat.paidCents)}</span>
+                    {seat.released ? (
+                      <span className="block text-caption text-ink-tertiary">Released</span>
+                    ) : null}
+                  </TD>
+                  <TD className="text-right">
+                    {refundPending ? (
+                      <span className="text-ink-tertiary">—</span>
+                    ) : (
+                      <span className="font-mono tabular-nums text-ink-secondary">
+                        {formatSgd(seat.refundedCents)}
+                      </span>
+                    )}
+                  </TD>
+                  <TD className="text-small">
+                    {seat.counted ? (
+                      'Counted as attended'
+                    ) : seat.openMarkUntil ? (
+                      <>
+                        Manual mark open until
+                        <span className="block text-caption text-ink-secondary">
+                          {formatClassInstant(seat.openMarkUntil, zone)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-ink-tertiary">Not attended</span>
+                    )}
+                    {seat.classChangedAt && !seat.counted && seat.status === 'active' ? (
+                      <span className="block text-caption text-ink-secondary">
+                        Can withdraw in full until the class starts
+                      </span>
+                    ) : null}
+                  </TD>
+                  <TD className="text-small">
+                    {seat.refunds.length > 0 ? (
+                      <div className="space-y-1">
+                        {seat.refunds.map((refund) => (
+                          <RefundState key={refund.id} refund={refund} zone={zone} />
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-ink-tertiary">—</span>
+                    )}
+                  </TD>
+                  <TD className="text-right">
+                    <div className="flex justify-end gap-2">
+                      {canMove ? (
+                        <Button size="sm" variant="secondary" onClick={() => setMoving(seat)}>
+                          Move
+                        </Button>
+                      ) : null}
+                      {canRefund ? (
+                        <Button size="sm" variant="secondary" onClick={() => setRefunding(seat)}>
+                          Refund
+                        </Button>
+                      ) : null}
+                    </div>
+                  </TD>
+                </TR>
+              )
+            })}
+          </TBody>
+        </Table>
+      )}
+      <MoveSeatDialog
+        classId={detail.id}
+        seat={moving}
+        timeZone={zone}
+        onClose={() => setMoving(null)}
+      />
+      <RefundSeatDialog classId={detail.id} seat={refunding} onClose={() => setRefunding(null)} />
     </section>
   )
 }
