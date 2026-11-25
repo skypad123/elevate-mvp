@@ -1067,8 +1067,24 @@ and move as earlier entries land.
 **Phase 1 is built.** Its entries, 1.1 to 1.20, were built in commits
 `58ab5dc`, `4be1739`, `99c894b` and `e62c2d3`, and merged on 2026-11-24. Those
 entries were corrected afterwards to describe what was built, where the build
-found the plan wrong or silent. Each correction is marked "As built". Phases 2
-to 7 are not built.
+found the plan wrong or silent. Each correction is marked "As built".
+
+**Phase 2 is built** in the working tree, not yet committed, on 2026-11-25.
+Lint, typecheck and every test pass (API: 41 files, 387 tests). Where the
+build differed from an entry, the difference is listed under "As built" at
+the start of Phase 2. Phases 3 and 4 are built in the same way, with their
+notes at the start of each phase. Phase 6 is built and validated through
+Docker; nothing was planned or applied in AWS. Phases 5 and 7 are built.
+Every phase is built. Across the repository, lint, typecheck, every build
+and 684 tests pass. The local walkthrough, steps 1 to 9, passed on
+2026-11-25 against a throwaway database, with the API running as the
+database owner. It ran after the demo class's day, so steps 2 to 9 used a
+class created in step 1, with the demo class's enrollments copied onto it.
+It found one misleading line, fixed before the commit: a session whose
+check-in had not opened showed every learner as "not arrived"; it now says
+"Check-in not open yet". Left as they are: the roster shows "too many wrong
+codes" in two columns, and Support's audit log shows action codes such as
+`class.created`. Staging steps 10 to 13 have not been run.
 
 ### Shared definitions used by the entries
 
@@ -1546,6 +1562,47 @@ behaviour those tests cover did not change.
 **Ends with:** `npx turbo run typecheck test` passing, with the whole API suite
 running as the restricted database role.
 
+**As built.** Where the build found an entry wrong or silent:
+
+- **2.3:** `matchCode` returns `{ kind, period }`, because check-in stores the
+  matched `code_period`. The typed code is the first 6 characters of the
+  20-character link code; if a hash has too few usable bytes, it is
+  rehashed with `period:counter`.
+- **2.4:** Blocks are ordered by start time, not by the order they were sent.
+  `too_many` cannot be reached through the API, because the request schema
+  caps blocks at 60 and 61 answers 400. A repeated or unknown block id in a
+  PATCH answers 404. The roster's `mix` counts only blocks whose check-in has
+  opened, so future blocks do not count as "not arrived".
+- **2.4, 2.5:** Audit rows are written after the transaction commits, because
+  a write through `deps.db` inside a PGlite transaction blocks on its single
+  connection.
+- **2.5:** In a remote class a reading sent anyway is not stored (status
+  `not_required`). Refused attempts also carry the location columns and the
+  side-table row; a refused attempt with a reading before the venue is set
+  keeps the reading with no status. `POST .../dispute` answers
+  `{ class: LearnerClass }`. `supportBlock` takes coordinates from the
+  check-in, or from the latest refused attempt when there is none. A second
+  submit of a correction writes nothing and answers 409 (`already_present`
+  or `no_check_in`).
+- **2.5, not checked:** check-in and `GET /me/classes` do not check that the
+  class is published, since only a published class has enrollments. The
+  code route serves codes whenever the venue rule passes, also outside the
+  check-in window; the design sets no limit there.
+- **2.7:** The check-in rate limit, 20 a minute, is kept in each process's
+  memory.
+- **2.8:** `GET /support/features` answers `{ classes }` unwrapped. Other
+  answers are wrapped: `{ class }`, `{ roster }`, `{ code }`, `{ context }`,
+  `{ result }`, `{ block }`, `{ dispute }`, `{ items }`, and `{ ok: true }`
+  for a delete.
+- **2.18:** With no `DATABASE_URL`, `check-api-role` exits 2, not 1, because
+  1 means the update was allowed.
+- **2.21:** On profiles other than the approved one, the fixture's
+  instructor is a separate `fixture-instructor-N` writer, because a route in
+  the table deletes `memberId`.
+- **2.22:** `class-guards.test.ts` scans Drizzle calls only, so the raw SQL in
+  `check-api-role.ts` is allowed. Part 2's class checkout sets `classId` on an
+  enrollment and must change this guard on purpose.
+
 #### 2.1 `apps/api/src/env.ts` and `.env.example` (Modify)
 
 - **Change:** `env.ts`: add `CLASSES: bool.default(false)` beside
@@ -1895,6 +1952,32 @@ running as the restricted database role.
 
 ### Phase 3: Teach portal
 
+**As built.** Where the build found an entry wrong or silent:
+
+- **3.6:** `useClassActions` takes no arguments, so each action takes the
+  class, block and enrollment ids. A refusal from the API is not retried, so
+  `venue_not_set` shows at once. The code screen keeps polling while its
+  window is hidden, so a projector window behind another does not run out of
+  codes; the roster pauses while hidden, as by default.
+- **3.8:** An edit sends only the fields that changed, so the
+  `class.updated` audit entry names the real fields. The instructor can be
+  changed from the form as well as from the detail page.
+- **3.10:** The roster screen also loads the class, because `RosterView`
+  has no class name, delivery, venue or `viewerIsInstructor`. "Too many wrong
+  codes" is judged against the roster's `serverTime`.
+- **3.11:** The code screen also loads the class, for its name and block
+  time. The QR image is shown as an `<img>` data URL, which the deployed
+  `img-src` allows.
+- **3.12, a field added to Phase 2:** `ClassBlockView` gains `removable`, true
+  when the block has no attendance event of any kind. The editor hides the
+  remove button on a block that is not removable and says why, in place of a
+  general note. `classes.test.ts` covers the flag.
+- **3.13:** The dialogs use `NativeSelect` and `Textarea`, which already
+  contain `Field`.
+- The class pages are English, as the design says; only the navigation label
+  is translated, as `nav.classes`. Its Chinese text needs the author's
+  sign-off.
+
 **Ends with:** `npx turbo run typecheck build` passing.
 
 #### 3.1 `packages/i18n/src/messages/areas/chrome.en.ts` and `chrome.zh.ts` (Modify)
@@ -2004,6 +2087,22 @@ running as the restricted database role.
 
 ### Phase 4: Support portal
 
+**As built.** Where the build found an entry wrong or silent:
+
+- **4.3:** The features query runs only for a user with `support_agent`, so a
+  user on the "staff only" screen does not fire a request that answers 403.
+- **4.4:** With no block chosen, the page opens on the block whose check-in
+  window is open, else the next one, else the last (CUJ 11). Times are shown
+  in the class's time zone with its short name. A learner's "last attempt"
+  is their latest check-in or refused attempt. Distance and accuracy come
+  from the check-in only, while coordinates fall back to the latest refused
+  attempt, so a refused learner can show coordinates and no distance; the
+  table says so. The corrections table also lists disputes and their
+  decisions.
+- **4.4, a field added to Phase 2:** each event in `SupportClassBlock` gains
+  `decision` (`upheld`, `voided` or null), so the corrections table can show
+  a decision's outcome. `support-classes.test.ts` covers it.
+
 **Ends with:** `npx turbo run typecheck build` passing.
 
 #### 4.1 `apps/support/src/router.tsx` (Modify)
@@ -2036,6 +2135,31 @@ running as the restricted database role.
 - **Why:** CUJ 11.
 
 ### Phase 5: Learner app
+
+**As built.** Where the build found an entry wrong or silent:
+
+- **5.6:** The web reader enforces its own 10-second limit, because the
+  browser's `timeout` does not count the time its permission prompt is open.
+  A browser without geolocation answers `unavailable`. Location needs a
+  secure origin, so a walkthrough over a LAN address records `denied`.
+- **5.7:** A manual mark with the reason `other` shows the instructor's note.
+- **5.8:** After the emailed sign-in, the learner returns to the check-in
+  screen without the link's code, which has expired by then and would count
+  toward the lockout. A remote class asks for no location and sends
+  `unsupported`, because the request needs a value; the API stores
+  `not_required`. A link code is used only if it has 20 characters; editing
+  it, or a refusal, turns the next try into a typed code. Opening, closing
+  and lockout times are worded from the error's `details` with
+  `learnerClass` keys, falling back to `apiError.<code>`. On the web, "Open
+  the Elevate app" uses `elevate://` in the same tab; Expo Go does not
+  handle it.
+- **5.8, a field added to Phase 2:** `CheckInContext` gains `enrollmentId`, so
+  the screen links back to the learner's class without reading their class
+  list. `check-in.test.ts` covers it.
+- **5.10:** `jest.setup.ts` mocks the new client paths. There is no test for
+  the class screen or the dispute form; the entry lists none.
+- The Chinese text in `learnerClass.zh.ts`, and the class terms added to the
+  header of `zh.ts`, need the author's sign-off.
 
 **Ends with:** `npx turbo run typecheck test` passing, including
 `npm -w @elevate/learner test`, and then the local walkthrough below.
@@ -2137,6 +2261,28 @@ running as the restricted database role.
 
 ### Phase 6: Infrastructure and deploy
 
+**As built.** Where the build found an entry wrong or silent:
+
+- **6.5, 6.7:** The staging root defaults `classes` to false; staging gets
+  true only from its own `terraform.tfvars`, which is not tracked, so the
+  line must be added there by hand.
+- **6.6:** The two new output keys sit in their own commented group, so
+  `terraform fmt` does not re-align the other lines.
+- **6.9:** The register step stops with a clear error when
+  `ECS_MIGRATE_TASK_FAMILY` is empty. If the role check fails, the new
+  version is already serving, as intended; the error says so, and that exit
+  1 means the update was allowed.
+- **Order before the first deploy that carries this:** add `classes = true`
+  to staging's `terraform.tfvars`; from a clean checkout of the commit being
+  deployed, `plan` and `apply` in `envs/staging`; copy
+  `github_environment_variables` into the staging GitHub environment again;
+  deploy; run the demo seed. Between the apply and the deploy, run no
+  one-off task from the API family: until the deploy creates `elevate_api`,
+  its newest revision connects as a user that does not exist. Production
+  follows after the staging rehearsal.
+- `infra/README.md`'s reset and seed examples still name the API family; the
+  reset must now run from the migrate family. That is entry 7.4.
+
 **Ends with:** Terraform validated and the workflow linted, both through
 Docker. Nothing is applied to AWS and no deploy branch is pushed in this
 phase.
@@ -2229,6 +2375,18 @@ phase.
 ### Phase 7: Documents
 
 **Ends with:** `npm run lint` passing.
+
+**As built.** Where the documents follow the build, not the entry:
+
+- **7.1:** `docs/spec.md` also gains short Class and Attendance entries in
+  "Data Model".
+- **7.4:** The first deploy follows Phase 6's order. Running
+  `check-api-role.js` is not a separate step, because the deploy runs it;
+  the README says how to run it by hand. The way back, setting
+  `api_uses_restricted_database_user` to false, also needs the GitHub
+  variables copied again before the deploy, or the deploy still runs the
+  check and fails. The README notes that the demo class has no venue
+  position until its instructor sets one.
 
 #### 7.1 `docs/spec.md` (Modify)
 

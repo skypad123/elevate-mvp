@@ -50,8 +50,9 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
 - Teaching is not a platform role. A teacher is whoever owns (or belongs to) a teaching profile;
   `user_roles` holds staff roles only. Courses, payments and course media belong to a profile.
 - Every Teach API route lives under `/teach/profiles/:profileId` and uses `requireProfile` with a
-  capability from the route table in `docs/designs/teacher-profiles.md` (item 1.15); the Teach
-  portal mirrors it under `/p/:profileId`. The role table is `packages/core/src/domain/permissions.ts`;
+  capability from the route table in `docs/designs/teacher-profiles.md` (item 1.15), or, for the
+  class routes, in `docs/designs/scheduled-classes-attendance.md`; the Teach portal mirrors it
+  under `/p/:profileId`. The role table is `packages/core/src/domain/permissions.ts`;
   a new route also needs a row in `apps/api/test/role-routes.test.ts`.
 - A lookup of a course, lesson or artefact for Teach filters by the actor's profile in the same
   query and answers 404 when it is not there. Money queries select payments by `payout_account_id`.
@@ -76,6 +77,18 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
   edit to a live course's lessons or items finishes through `CoursesService.edited`, which deletes a
   clip whose video has left the course; nothing checks that again when the catalog is read
   (ADR 011).
+- Only `attendance.service.ts` inserts into `attendance_events` and `attendance_event_locations`,
+  and nothing updates or deletes `attendance_events`; a correction is a new row
+  (`apps/api/test/class-guards.test.ts`, ADR 012).
+- A learner-facing read of an enrollment goes through `deps.learnerDb`, whose `enrollments` is the
+  `self_paced_enrollments` view, so a class enrollment is never found there. A full-client lookup
+  by learner and course adds `classId: { isNull: true }`.
+- A lookup of a class for Teach goes through `ClassesService.load`, which filters by the actor's
+  profile (and a writer's assignment) in the same query and answers 404 when no row matches.
+- The API runs as the database user `elevate_api`, which owns no table, cannot create one and
+  cannot update or delete `attendance_events`; the API tests run as it too. Anything that needs
+  the owner, such as a migration or `reset-schema.js`, runs from the migration task
+  (`infra/README.md`).
 - Run `npm run lint` (Biome) and `npx turbo run typecheck test` before committing.
 
 ## Expo conventions (apps/learner)

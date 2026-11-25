@@ -17,7 +17,7 @@ Per environment, in one AWS account, region `ap-southeast-1`:
 | Piece           | AWS                                                                                            | Hostname                               |
 | --------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------- |
 | API             | ECS Fargate, one task, behind an HTTPS Application Load Balancer; logs in CloudWatch           | `api.`                                 |
-| Database        | RDS Postgres 17 in private subnets, reachable only from the API task                           | –                                      |
+| Database        | RDS Postgres 17 in private subnets, reachable only from the API's tasks; two database users    | –                                      |
 | Uploads         | Private S3 bucket (presigned uploads and downloads), accessed through the task's IAM role      | –                                      |
 | Learner web     | S3 + CloudFront, single-page-app fallback                                                      | `<domain>`                             |
 | Teach, Support  | S3 + CloudFront, single-page-app fallback                                                      | `teach.`, `support.`                   |
@@ -165,10 +165,14 @@ A deploy:
    changing anything if it has not (see "Terraform before deploy" below);
 2. builds the API image and pushes it to ECR, tagged with the commit SHA (a commit that already
    has an image, such as one promoted from staging, reuses it);
-3. runs the database migrations as a one-off task, and stops if they fail, leaving the running API
-   untouched;
-4. starts the new API task, waits for it to pass health checks, then stops the old one;
-5. builds the three web apps with that environment's URLs, uploads them to S3 and invalidates
+3. registers a new revision of both task definitions, the API's and the migration task's, with
+   that image;
+4. runs the database migrations as a one-off task from the migration task definition, and stops if
+   they fail, leaving the running API untouched;
+5. starts the new API task, waits for it to pass health checks, then stops the old one;
+6. checks that the database refuses the API's user an update of an attendance row (see "Database
+   users");
+7. builds the three web apps with that environment's URLs, uploads them to S3 and invalidates
    CloudFront.
 
 #### Terraform before deploy
@@ -329,16 +333,114 @@ learns which addresses to route from the DNS lookups. Linux devices also need
   Changes to the API's environment variables take effect on the next deploy.
 - **Roll back**: `git revert` the commit on the environment's branch and push. The deploy builds
   and rolls out the reverted code like any other commit. Database migrations are not reversed, so
-  keep them additive. The one-time reset below is the exception: it cannot be rolled back.
+  keep them additive. The one-time reset below is the exception: it cannot be rolled back. Once a
+  class has been sold, no version older than the scheduled-classes release (Part 1) may be
+  deployed: an older version treats a class enrollment as a self-paced one
+  ([ADR 012](../docs/adr/012-class-records-and-attendance.md)).
 - **Logs**: `aws logs tail /ecs/elevate-<environment>/api --follow`.
 - **Native apps**: `apps/learner/eas.json` has a `preview` profile pointing at staging and a
   `production` profile. Replace the `example.com` URLs in it with your domain. Builds run on EAS,
   not AWS.
 
+## Database users
+
+Each environment's database has two users
+([ADR 012](../docs/adr/012-class-records-and-attendance.md)):
+
+| User          | Connects as it                                                         | SSM parameters under `/elevate/<environment>/` |
+| ------------- | ---------------------------------------------------------------------- | ---------------------------------------------- |
+| `elevate`     | the migration task only; it is the RDS master user and owns the tables | `DATABASE_URL`                                 |
+| `elevate_api` | the running API, and every one-off task from the API's task definition | `DATABASE_URL_API`, `API_DATABASE_PASSWORD`    |
+
+Terraform generates `elevate_api`'s password. Each run of the migrations creates the user if it is
+missing, sets its password, and sets its grants: select, insert, update and delete on every table,
+except that it cannot update, delete or truncate `attendance_events`, and cannot update or truncate
+`attendance_event_locations`. Default privileges give it the same on tables that later migrations
+create.
+
+### Two task definitions
+
+Both run the same image, with the same roles, sizing, log group and container name. The deploy
+registers a new revision of each.
+
+| Task definition | GitHub variable           | Database user                          | What runs from it                                          |
+| --------------- | ------------------------- | -------------------------------------- | ---------------------------------------------------------- |
+| API             | `ECS_TASK_FAMILY`         | `elevate_api`, as `DATABASE_URL`       | the service, `seed.js`, `previews.js`, `check-api-role.js` |
+| Migration       | `ECS_MIGRATE_TASK_FAMILY` | `elevate`, as `MIGRATION_DATABASE_URL` | `migrate.js` and `reset-schema.js`, nothing else           |
+
+The migration task holds only `MIGRATION_DATABASE_URL`, `API_DATABASE_USER` and
+`API_DATABASE_PASSWORD`, none of the API's other configuration, so the running API never holds the
+owner's credential.
+
+### Checking the API's user
+
+After rolling the service, the deploy runs `["node", "dist/check-api-role.js"]` once from the new
+API revision. It tries an update of `attendance_events` that matches no row, so it changes nothing
+even where the update is allowed.
+
+| Exit code | Meaning                                                                      |
+| --------- | ---------------------------------------------------------------------------- |
+| 0         | The database refused the update (`42501`), as intended.                      |
+| 1         | The update was allowed: the API's user has a grant it must not have.         |
+| 2         | Any other error, such as no `DATABASE_URL` or no connection to the database. |
+
+Any code but 0 fails the run. By then the new version is already serving, and the error says so.
+The step is skipped while `api_uses_restricted_database_user` is false. To run the check by hand,
+use the `run-task` call under "Seeding" with the command `["node", "dist/check-api-role.js"]`.
+
+### Settings
+
+Both are Terraform variables, set in the environment's `terraform.tfvars`.
+
+- **`classes`** (default `false`) is the API's `CLASSES` setting. Off, every class route answers
+  404, a learner's class list is empty, and the demo seed creates no class data. Staging sets it
+  to `true`; its `terraform.tfvars` is not tracked, so add the line by hand. Production leaves it
+  off until Part 2 (selling a class). A change takes effect on the next deploy.
+- **`api_uses_restricted_database_user`** (default `true`) is the way back. If `elevate_api`
+  breaks a path, set it to `false`, `terraform apply`, copy `github_environment_variables` into
+  the GitHub Environment again (step 3 of Setup), and run Deploy. The API then connects as
+  `elevate`, and the deploy skips its check, because `API_USES_RESTRICTED_DATABASE_USER` is now
+  `false`. The same steps with `true` return to `elevate_api`. The migrations keep the user and its
+  grants either way.
+
+### The first deploy with two users
+
+Do staging first, and production after staging has been checked. Before the first deploy of the
+commit that adds the migration task:
+
+1. On staging, add `classes = true` to `envs/staging/terraform.tfvars`.
+2. From a clean checkout of the commit being deployed, `terraform plan` and `terraform apply` in
+   `envs/<environment>`. This creates the two parameters, the migration task definition and the
+   deploy role's permission to run it. The running service does not restart.
+3. Copy `github_environment_variables` into the GitHub Environment again (step 3 of Setup), so
+   `ECS_MIGRATE_TASK_FAMILY` and `API_USES_RESTRICTED_DATABASE_USER` exist. Without
+   `ECS_MIGRATE_TASK_FAMILY` the deploy stops at "Register the task definition".
+4. Deploy. The migrations, run from the migration task, create `elevate_api`; the service then
+   rolls onto it, and the check runs.
+5. On staging, run the demo seed (see "Seeding").
+
+Between steps 2 and 4, run no one-off task from the API's task definition: its newest revision
+connects as `elevate_api`, which does not exist until the deploy's migrations create it.
+
 ## Seeding
 
-The API image has a seed command, run as a one-off task (the `run-task` call is the one in
-"Resetting an environment" below, with a different command):
+The API image has a seed command, run as a one-off task from the API's task definition:
+
+```bash
+# The newest revision of the family is the one the last deploy registered.
+TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "$ECS_TASK_FAMILY" \
+  --query taskDefinition.taskDefinitionArn --output text)
+
+aws ecs run-task \
+  --cluster "$ECS_CLUSTER" \
+  --task-definition "$TASK_DEFINITION" \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[$ECS_SUBNETS],securityGroups=[$ECS_SECURITY_GROUP],assignPublicIp=ENABLED}" \
+  --overrides "$(jq -cn --arg name "$ECS_CONTAINER" '{containerOverrides: [{name: $name,
+    command: ["node", "dist/seed.js", "--demo"]}]}')"
+```
+
+The values come from `terraform output github_environment_variables` in `envs/<environment>`.
 
 - `["node", "dist/seed.js", "--demo"]` for staging: the super admin, a support agent, demo
   teachers with their courses, a writer on the first demo profile, a demo company with a manager
@@ -349,6 +451,26 @@ The API image has a seed command, run as a one-off task (the `run-task` call is 
 
 Both need `SEED_SUPER_ADMIN_EMAIL` in the task's environment and write course thumbnails through
 the API's own storage, so they land in the environment's S3 bucket. Running a seed twice is safe.
+
+With `classes` on, `--demo` also creates a demo class on the first demo profile: published, in
+person, on that profile's first course on sale, taught by the demo writer, with three blocks from
+09:00 to 17:00 Singapore time on the day of the run and the two days after. It has 20 class
+enrollments: the demo learner and 19 made-up class learners. A later run reuses the newest demo
+class while any of its blocks has not ended, and only adds enrollments that are missing, so a
+second run within one class's dates adds no class. Once the last block has ended, the next run
+creates a fresh class. The class has no venue position: its instructor sets one on the roster
+screen ("Set the venue location here") before a code can be shown.
+
+To put testers in the demo class, pass their addresses, comma-separated, as an environment
+override on the seed task, as the reset passes `ALLOW_SCHEMA_RESET`:
+
+```bash
+  --overrides "$(jq -cn --arg name "$ECS_CONTAINER" '{containerOverrides: [{name: $name,
+    command: ["node", "dist/seed.js", "--demo"],
+    environment: [{name: "SEED_CLASS_LEARNER_EMAILS", value: "<address>,<address>"}]}]}')"
+```
+
+An address nobody has gets a new user; an existing user's name is not changed.
 
 ## Hover previews
 
@@ -393,17 +515,18 @@ first; do production only after staging has been checked.
 The values used below come from `terraform output github_environment_variables` in
 `envs/<environment>`.
 
-1. **Push the commit to the environment's branch.** Deploy builds the image and registers a task
-   definition, then fails at "Run database migrations". That is expected: the database lists two
+1. **Push the commit to the environment's branch.** Deploy builds the image and registers the task
+   definitions, then fails at "Run database migrations". That is expected: the database lists two
    old migrations and the image holds one new one, so the migration command stops with
    `we found 2 migrations (ids: 1, 2) in the database that do not match any local migration`. It
    changes nothing, and the running API stays on the old version. On production, the run first
    waits for the required reviewer.
-2. **Empty the database** with the task definition that run registered:
+2. **Empty the database** with the migration task definition that run registered. The reset needs
+   the database owner, so it runs from the migration task, not the API's (see "Database users"):
 
    ```bash
    # The newest revision of the family is the one the failed run registered.
-   TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "$ECS_TASK_FAMILY" \
+   TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "$ECS_MIGRATE_TASK_FAMILY" \
      --query taskDefinition.taskDefinitionArn --output text)
 
    aws ecs run-task \
@@ -422,7 +545,7 @@ The values used below come from `terraform output github_environment_variables` 
 3. **Run Deploy again** for the branch: `gh workflow run deploy.yml --ref <branch>`. It reuses the
    image, applies the new migration and rolls the service. Between step 2 and this step the old
    API answers with errors; that is accepted because there are no users yet.
-4. **Seed** (see "Seeding" above): the same `run-task` call with
+4. **Seed** (see "Seeding" above): the `run-task` call there, from the API's task definition, with
    `command: ["node", "dist/seed.js", "--demo"]` on staging or `"--admin-only"` on production,
    and without `ALLOW_SCHEMA_RESET`.
 

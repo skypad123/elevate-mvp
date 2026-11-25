@@ -10,6 +10,8 @@
 
 **Product decision (2026-11-11):** corporate profiles are in the MVP because they are a market requirement, beside the pilot of freelance teachers. The design is `docs/designs/teacher-profiles.md`; the decisions are in ADR 006 and ADR 007.
 
+**Product decision (2026-11-24):** class scheduling and attendance are in scope, in three parts: class and attendance records with check-in (Part 1), selling a class (Part 2), and the class page, class materials and change notices (Part 3). A class is one run of a course at fixed dates, with one instructor and a limited number of seats, at a venue or remote. Part 1's design is [`docs/designs/scheduled-classes-attendance.md`](designs/scheduled-classes-attendance.md); its decisions are in ADR 012.
+
 ---
 
 ## Portal Depth
@@ -30,7 +32,9 @@
 - **Teaching profile** — what learners buy from; its own record, separate from the users who run it. `personal` or `corporate`. Exactly one owner; managers (corporate only) and writers are members. A writer's edits to a live course wait for an owner or manager to approve them.
 - **Payout account** — the Stripe account a profile is paid through. Every payment records the account it paid.
 - **Course** — collection of lessons; belongs to a profile; price, status (`draft → pending_review → live → rejected`), scheme fields **present but null**: `scheme_status`, `scheme_type`.
-- **Enrollment** — learner↔course; mode `self_directed | class_based` (class-based unused in MVP); `attendance_records[]` empty-array field.
+- **Enrollment** — learner↔course. `class_id` null is a self-paced enrollment; a value is a class enrollment, a separate row from a self-paced enrollment of the same course. The `mode` column and the `attendance_records[]` field are superseded and unused.
+- **Class** — one run of a course: dates split into blocks, an instructor, seats, a venue or remote. Belongs to a profile.
+- **Attendance** — lives in `attendance_events`, one row per refused attempt, check-in, overturn, manual mark, dispute or dispute decision. The API never changes or deletes a row; a correction is a new row that points at the row it corrects. A location reading's coordinates sit beside the event in `attendance_event_locations`.
 - **Commission** — per-profile rate field (15–20% default), **not a constant**.
 - **Auth** — email magic link. Design user identity so an external provider (Singpass) can be linked later; do not build it now.
 
@@ -60,7 +64,7 @@
 
 ## Out of Scope (Phase 2+)
 
-SkillsFuture claims + SSG-registration-dependent flows · Culture Pass credits + ATP integration · class scheduling, QR/GPS attendance, Compliance Register · tiered certification · stats/streaks · Singpass · native iOS/Android · AI-assisted drafting · reviews/ratings/cohorts/discussions · offline download, DRM, auto-captions · multi-currency/GST/invoicing · ticketing/CRM, chargeback tooling, feature flags.
+SkillsFuture claims + SSG-registration-dependent flows · Culture Pass credits + ATP integration · Compliance Register · tiered certification · stats/streaks · Singpass · native iOS/Android · AI-assisted drafting · reviews/ratings/cohorts/discussions · offline download, DRM, auto-captions · multi-currency/GST/invoicing · ticketing/CRM, chargeback tooling, feature flags.
 
 ---
 
