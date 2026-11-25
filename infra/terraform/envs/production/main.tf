@@ -128,10 +128,11 @@ module "environment" {
 
   api_uses_restricted_database_user = var.api_uses_restricted_database_user
 
-  # Data is protected: deletion protection, a final snapshot, a week of backups, versioned uploads.
+  # Data is protected: deletion protection, a final snapshot, 35 days of backups (the most RDS keeps;
+  # learners' attendance and payments need a restore window), versioned uploads.
   # Turn on db_multi_az when downtime during an AZ failure or maintenance is no longer acceptable.
   db_instance_class        = "db.t4g.small"
-  db_backup_retention_days = 7
+  db_backup_retention_days = 35
   db_multi_az              = false
   protect_data             = true
   log_retention_days       = 90

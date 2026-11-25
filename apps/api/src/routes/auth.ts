@@ -11,7 +11,9 @@ export const authRoutes = (deps: Deps) => {
   return new Hono<AppEnv>()
     .post(
       '/magic-link',
-      rateLimit({ name: 'magic-link', limit: 30, windowMs: 15 * 60_000 }),
+      // Per network address. A class signing in on one venue network shares an address, so this is
+      // high; `AuthService` still refuses a sixth request per email address in 15 minutes.
+      rateLimit({ name: 'magic-link', limit: 300, windowMs: 15 * 60_000 }),
       validate('json', magicLinkRequestSchema),
       async (c) => {
         const result = await auth.requestMagicLink(c.req.valid('json'))
