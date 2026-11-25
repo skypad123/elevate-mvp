@@ -13,6 +13,7 @@ import {
   StatCard,
   statusLabel,
   statusTone,
+  Textarea,
   useToast,
 } from '@elevate/web-ui'
 import { errorMessage, unwrap, usePortalAuth } from '@elevate/web-ui/portal'
@@ -21,7 +22,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../lib/api'
-import { supportKeys, usePerson } from '../lib/queries'
+import { eraseCoordinates, supportKeys, usePerson } from '../lib/queries'
 
 const ROLE_ON_PROFILE = { owner: 'Owner', manager: 'Manager', writer: 'Writer' } as const
 
@@ -185,6 +186,7 @@ function PersonView({ person }: { person: PersonDetail }) {
               </div>
             </Card>
           ) : null}
+          {isSuperAdmin ? <EraseLocationCard person={person} /> : null}
         </div>
       </div>
       <Dialog
@@ -214,6 +216,87 @@ function PersonView({ person }: { person: PersonDetail }) {
         }
       />
     </>
+  )
+}
+
+/**
+ * A privacy request: deletes the coordinates of every check-in and attempt this person made in a
+ * class. Their attendance is kept, with its distance and accuracy. Super admin only; the reason
+ * and the count go into the audit log. See docs/runbooks/erase-coordinates.md.
+ */
+function EraseLocationCard({ person }: { person: PersonDetail }) {
+  const { toast } = useToast()
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [erased, setErased] = useState<number | null>(null)
+  const readings = (n: number) => (n === 1 ? '1 location reading' : `${n} location readings`)
+
+  async function erase() {
+    setBusy(true)
+    try {
+      const result = await eraseCoordinates(person.id, reason.trim())
+      setErased(result.erased)
+      toast({
+        tone: 'success',
+        title: 'Location data erased',
+        description: readings(result.erased),
+      })
+      setOpen(false)
+      setReason('')
+    } catch (error) {
+      toast({ tone: 'danger', title: 'Erasing failed', description: errorMessage(error) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card as="section">
+      <CardHeader
+        title="Location data"
+        description="The coordinates sent with this person’s class check-ins. Erase them when they ask for their location data to be deleted."
+      />
+      {erased !== null ? (
+        <p className="mb-3 text-small text-ink-secondary">
+          Erased {readings(erased)}. The erasure is in the audit log.
+        </p>
+      ) : null}
+      <Button variant="danger" size="sm" onClick={() => setOpen(true)}>
+        Erase location data
+      </Button>
+      <Dialog
+        open={open}
+        onOpenChange={(o) => !o && setOpen(false)}
+        title={`Erase the location data of ${person.name ?? person.email}?`}
+        description="Every coordinate this person sent when checking in to a class is deleted, in every class. Their attendance stays as it is, with its distance and accuracy. This cannot be undone."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={busy}
+              disabled={reason.trim().length < 3}
+              onClick={erase}
+            >
+              Erase location data
+            </Button>
+          </>
+        }
+      >
+        <Textarea
+          label="Reason"
+          hint="Kept in the audit log with the number of readings erased."
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={3}
+          maxLength={500}
+          placeholder="Privacy request by email on…"
+        />
+      </Dialog>
+    </Card>
   )
 }
 

@@ -167,6 +167,10 @@ export const supportClassSearchSchema = z.object({
 })
 export type SupportClassSearch = z.infer<typeof supportClassSearchSchema>
 
+/** `POST /support/learners/:userId/erase-coordinates`: why, kept in the audit log. */
+export const eraseCoordinatesSchema = z.object({ reason: z.string().trim().min(3).max(500) })
+export type EraseCoordinatesInput = z.infer<typeof eraseCoordinatesSchema>
+
 // ── Answers ─────────────────────────────────────────────────────────────────
 // Every list route answers `{ items: T[] }`.
 
@@ -355,6 +359,9 @@ export type SupportClassBlock = {
     }[]
   })[]
 }
+
+/** The answer to an erasure: how many location rows were deleted. */
+export type EraseCoordinatesResult = { erased: number }
 
 /** `GET /support/features`. */
 export type SupportFeatures = { classes: boolean }

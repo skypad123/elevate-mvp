@@ -1,5 +1,6 @@
 import {
   commissionSchema,
+  eraseCoordinatesSchema,
   grantRoleSchema,
   nameCheckSchema,
   peopleQuerySchema,
@@ -45,6 +46,7 @@ export const supportRoutes = (deps: Deps) => {
   const classesOn = requireClasses(deps)
   const classId = uuidParam('id', 'Class')
   const blockId = uuidParam('blockId', 'Block')
+  const learnerId = uuidParam('userId', 'Learner')
   return (
     new Hono<AppEnv>()
       .use('*', requireRole('support_agent'))
@@ -210,8 +212,29 @@ export const supportRoutes = (deps: Deps) => {
         return c.json({ class: detail }, 200)
       })
       .get('/classes/:id/blocks/:blockId', classesOn, classId, blockId, async (c) => {
-        const block = await attendance.supportBlock(c.req.param('id'), c.req.param('blockId'))
+        const block = await attendance.supportBlock(
+          ensureUser(c.get('user')),
+          c.req.param('id'),
+          c.req.param('blockId'),
+        )
         return c.json({ block }, 200)
       })
+      // ── a learner's coordinates, erased on a privacy request ──
+      // docs/runbooks/erase-coordinates.md. Not under `/classes`, which stays read only, and not
+      // behind `CLASSES`, so a request can be met whether or not classes are on.
+      .post(
+        '/learners/:userId/erase-coordinates',
+        requireRole('super_admin'),
+        learnerId,
+        validate('json', eraseCoordinatesSchema),
+        async (c) => {
+          const result = await attendance.eraseCoordinates(
+            ensureUser(c.get('user')),
+            c.req.param('userId'),
+            c.req.valid('json'),
+          )
+          return c.json(result, 200)
+        },
+      )
   )
 }

@@ -79,7 +79,8 @@ with `npx expo install <pkg>` so versions come from SDK 58's bundled module list
   (ADR 011).
 - Only `attendance.service.ts` inserts into `attendance_events` and `attendance_event_locations`,
   and nothing updates or deletes `attendance_events`; a correction is a new row
-  (`apps/api/test/class-guards.test.ts`, ADR 012).
+  (`apps/api/test/class-guards.test.ts`, ADR 012). The one delete is `eraseCoordinates`, which
+  removes a learner's `attendance_event_locations` rows on request and records it.
 - A learner-facing read of an enrollment goes through `deps.learnerDb`, whose `enrollments` is the
   `self_paced_enrollments` view, so a class enrollment is never found there. A full-client lookup
   by learner and course adds `classId: { isNull: true }`.

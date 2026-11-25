@@ -12,16 +12,19 @@ import { describe, expect, it } from 'vitest'
  * - inserts into `attendanceEvents` or `attendanceEventLocations`, other than
  *   `services/attendance.service.ts`, the one writer (rule "insert");
  * - calls `update` or `delete` on `attendanceEvents` (rule "change");
+ * - deletes from `attendanceEventLocations`, other than the writer, whose Support erasure of one
+ *   learner's coordinates is the only delete (rule "erase");
  * - sets `classId` in an insert into, or an update of, `enrollments`: no route creates a class
  *   enrollment (rule "class enrollment").
  */
 const SRC = fileURLToPath(new URL('../src', import.meta.url))
 const WRITER = 'services/attendance.service.ts'
 
-type Rule = 'insert' | 'change' | 'class enrollment'
+type Rule = 'insert' | 'change' | 'erase' | 'class enrollment'
 
 const INSERT = /\.insert\(\s*(?:s\.)?attendanceEvent(?:s|Locations)\b/
 const CHANGE = /\.(?:update|delete)\(\s*(?:s\.)?attendanceEvents\b/
+const ERASE = /\.delete\(\s*(?:s\.)?attendanceEventLocations\b/
 const ENROLLMENT_WRITE = /\.(?:insert|update)\(\s*(?:s\.)?enrollments\s*\)/g
 
 /** The text of the object passed to the next `.values(` or `.set(` after `from`. */
@@ -49,6 +52,7 @@ function violations(source: string, file = ''): Rule[] {
   const found: Rule[] = []
   if (file !== WRITER && INSERT.test(code)) found.push('insert')
   if (CHANGE.test(code)) found.push('change')
+  if (file !== WRITER && ERASE.test(code)) found.push('erase')
   for (const match of code.matchAll(ENROLLMENT_WRITE)) {
     if (/\bclassId\b/.test(payloadAfter(code, (match.index ?? 0) + match[0].length))) {
       found.push('class enrollment')
@@ -67,7 +71,7 @@ function sourceFiles(dir: string): string[] {
 }
 
 describe('attendance-record guard', () => {
-  it('finds no other writer of attendance rows, no change to one, and no class enrollment made', () => {
+  it('finds no other writer of attendance rows, no change to one, no other erasure, and no class enrollment made', () => {
     const files = sourceFiles(SRC)
     expect(files.length).toBeGreaterThan(40)
     const offenders = files
@@ -77,8 +81,10 @@ describe('attendance-record guard', () => {
       })
       .filter(({ rules }) => rules.length > 0)
     expect(offenders).toEqual([])
-    // the writer is where the guard expects it
-    expect(INSERT.test(readFileSync(join(SRC, WRITER), 'utf8'))).toBe(true)
+    // the writer, and the one erasure, are where the guard expects them
+    const writer = readFileSync(join(SRC, WRITER), 'utf8')
+    expect(INSERT.test(writer)).toBe(true)
+    expect(ERASE.test(writer)).toBe(true)
   })
 
   it('fires on each rule, and not on reads or on words in comments', () => {
@@ -91,6 +97,8 @@ describe('attendance-record guard', () => {
       'change',
     ])
     expect(violations('db.delete(attendanceEvents).where(w)', 'x.ts')).toEqual(['change'])
+    expect(violations('tx.delete(s.attendanceEventLocations).where(w)', 'x.ts')).toEqual(['erase'])
+    expect(violations('tx.delete(s.attendanceEventLocations).where(w)', WRITER)).toEqual([])
     expect(
       violations(
         'db.insert(s.enrollments).values({ userId, courseId, classId: id, status })',
@@ -104,7 +112,8 @@ describe('attendance-record guard', () => {
     const fine = `
       // db.insert(s.attendanceEvents) is only mentioned here
       db.query.attendanceEvents.findMany({ where: { classId } })
-      db.delete(s.attendanceEventLocations).where(w)
+      // db.delete(s.attendanceEventLocations) is only mentioned here
+      db.query.attendanceEventLocations.findMany({ where: { eventId } })
       db.insert(s.enrollments).values({ userId, courseId, status: 'active' })
       db.update(s.enrollments).set({ status: 'active' }).where(eq(s.enrollments.classId, x))
     `

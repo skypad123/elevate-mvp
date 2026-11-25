@@ -26,6 +26,8 @@ import {
   type DisputeDecisionInput,
   type DisputeView,
   distanceMeters,
+  type EraseCoordinatesInput,
+  type EraseCoordinatesResult,
   type LearnerClass,
   locationStatus,
   lockedUntil,
@@ -44,7 +46,7 @@ import {
   type SupportClassSummary,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { and, desc, eq, exists, ilike, or, sql } from 'drizzle-orm'
+import { and, desc, eq, exists, ilike, inArray, or, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 import { codesFor, matchCode, periodStartMs, qrSvg } from '../lib/class-code'
 import { errors, HttpError } from '../lib/errors'
@@ -107,6 +109,7 @@ function roleOf(actor: ProfileActor): AttendanceActorRole {
  *
  * This is the only file that inserts into `attendance_events` and `attendance_event_locations`,
  * and nothing anywhere updates or deletes an attendance row (the API's database user cannot).
+ * The one delete is Support's erasure of a learner's location rows, here too.
  * Every row's `createdAt` is `deps.now()`, the clock every window, lockout and code period reads.
  */
 export class AttendanceService {
@@ -901,8 +904,16 @@ export class AttendanceService {
    * roster row with coordinates and every event. The coordinates are those of the learner's
    * check-in, else of their latest refused attempt: `'erased'` when that event has an accuracy and
    * no location row, null when it sent no reading.
+   *
+   * An answer that holds any coordinates is recorded as a `coordinates.viewed` audit entry under
+   * the viewer, naming the class, the block and whose coordinates were shown. It is written
+   * before the answer is returned, so a view that cannot be recorded is not served.
    */
-  async supportBlock(classId: string, blockId: string): Promise<SupportClassBlock> {
+  async supportBlock(
+    user: SessionUser,
+    classId: string,
+    blockId: string,
+  ): Promise<SupportClassBlock> {
     const { db } = this.deps
     const classView = await this.supportClass(classId)
     const classRow = await db.query.classes.findFirst({ where: { id: classView.id } })
@@ -936,7 +947,7 @@ export class AttendanceService {
       }
     }
 
-    return {
+    const answer: SupportClassBlock = {
       class: classView,
       block: blockView(block, frozen, !rows.some((r) => r.events.length > 0)),
       attemptsByReason,
@@ -962,5 +973,69 @@ export class AttendanceService {
         }
       }),
     }
+    const shown = answer.learners.filter((l) => l.coordinates && l.coordinates !== 'erased')
+    if (shown.length > 0) {
+      await recordAudit(this.deps, {
+        actorId: user.id,
+        action: 'coordinates.viewed',
+        entityType: 'class_block',
+        entityId: block.id,
+        profileId: classRow.profileId,
+        metadata: {
+          classId: classRow.id,
+          blockId: block.id,
+          learnerUserIds: shown.map((l) => l.learner.userId),
+        },
+      })
+    }
+    return answer
+  }
+
+  // ── Support: erasing one learner's coordinates ───────────────────────────
+
+  /**
+   * Deletes every location row of the learner's own events, in every class, and records the
+   * erasure with its count and reason in the same transaction. The events keep their distance,
+   * accuracy and location status, so Support's block view shows `'erased'` in place of the
+   * reading. An unknown user answers 404; a learner with no coordinates is still recorded, with
+   * a count of 0. It is final: only database backups still hold the rows, for up to 35 days
+   * (docs/runbooks/erase-coordinates.md).
+   */
+  async eraseCoordinates(
+    user: SessionUser,
+    learnerUserId: string,
+    input: EraseCoordinatesInput,
+  ): Promise<EraseCoordinatesResult> {
+    const { db } = this.deps
+    const learner = await db.query.users.findFirst({
+      where: { id: learnerUserId },
+      columns: { id: true },
+    })
+    if (!learner) throw errors.notFound('Learner')
+    return db.transaction(async (tx) => {
+      const deleted = await tx
+        .delete(s.attendanceEventLocations)
+        .where(
+          inArray(
+            s.attendanceEventLocations.eventId,
+            tx
+              .select({ id: s.attendanceEvents.id })
+              .from(s.attendanceEvents)
+              .where(eq(s.attendanceEvents.learnerUserId, learner.id)),
+          ),
+        )
+        .returning()
+      await recordAudit(
+        { ...this.deps, db: tx as unknown as Deps['db'] },
+        {
+          actorId: user.id,
+          action: 'coordinates.erased',
+          entityType: 'user',
+          entityId: learner.id,
+          metadata: { erased: deleted.length, reason: input.reason },
+        },
+      )
+      return { erased: deleted.length }
+    })
   }
 }

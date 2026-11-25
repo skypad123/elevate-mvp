@@ -1,6 +1,7 @@
 import type {
   AnalyticsSummary,
   AuditEntry,
+  EraseCoordinatesResult,
   NameCheckView,
   Page,
   PayoutLedgerRow,
@@ -49,6 +50,19 @@ export function usePerson(id: string) {
       (await unwrap(await api.support.people[':id'].$get({ param: { id } })))
         .person as PersonDetail,
   })
+}
+
+/**
+ * Deletes every location reading of one learner's check-ins and attempts, for a super admin, with
+ * the reason kept in the audit log (docs/runbooks/erase-coordinates.md). Final.
+ */
+export async function eraseCoordinates(userId: string, reason: string) {
+  return (await unwrap(
+    await api.support.learners[':userId']['erase-coordinates'].$post({
+      param: { userId },
+      json: { reason },
+    }),
+  )) as EraseCoordinatesResult
 }
 
 // ── teaching profiles ───────────────────────────────────────────────────────
