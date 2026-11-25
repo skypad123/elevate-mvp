@@ -142,6 +142,74 @@ refunded takes back the teacher's whole share after a lost dispute.
   that has passed the liveness check.
 - The fee on a Singapore card.
 
+## PayNow session, 2026-11-25
+
+The author decided that class checkout allows cards and PayNow (decision R6
+in `author_decisions.md`). The first session used cards only, so the calls
+were run again on PayNow payments, in the same sandbox and on the same API
+version.
+
+**How it was run.** Scripts drove the Stripe CLI, as before. Each PayNow
+payment was a S$500 destination charge with the S$89.88 application fee. A
+PayNow payment is authorized on Stripe's test payment page, which the scripts
+opened. For the two payment page tests, a headless browser opened Stripe's
+hosted page, chose PayNow and pressed Pay, so that the QR code existed before
+the page was expired.
+
+### Results from the test account
+
+| #   | Question                                                                                | Result                                                                                                                                                                                                              |
+| --- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1  | Does a Checkout Session take `allowed_payment_method_types` on this version?            | Yes. A session created with `card` and `paynow` reports those two. The hosted page offered Card and PayNow, and showed Apple Pay and Link buttons above them.                                                       |
+| P2  | Does a PayNow destination charge move money as a card one does?                         | Yes. The whole S$500 is transferred and the S$89.88 application fee is taken back, leaving the teacher S$410.12, pending.                                                                                           |
+| P3  | What is Stripe's fee on a PayNow payment?                                               | S$7.09 on S$500: S$6.50 of processing fee, which is 1.3%, and S$0.59 of GST. The estimate is S$17.50. The fee was readable a few seconds after the payment.                                                         |
+| P4  | Withdrawal: refund S$492.91 with the transfer reversed, then refund S$82.79 of the fee? | Both calls succeed. S$492.91 of the transfer is reversed. The teacher ends at zero on the seat, and so does the platform, as the design intends.                                                                    |
+| P5  | Cancellation by the teacher, other order: S$82.79 of the fee first, then refund S$500?  | Both calls succeed. The teacher ends S$7.09 down on the seat, as the design intends.                                                                                                                                |
+| P6  | A lost seat: refund S$500 with the transfer reversed, then the whole S$89.88 fee?       | Both calls succeed. The teacher ends at zero and the platform S$7.09 down, as the design intends.                                                                                                                   |
+| P7  | Is a PayNow refund made at once?                                                        | No. The answer to the refund call has the status `pending`. A few seconds later the refund read `succeeded`. A card refund is `succeeded` in the answer. The refund's id has a different form from a card refund's. |
+| P8  | The same idempotency key sent twice?                                                    | The second call returns the first refund.                                                                                                                                                                           |
+| P9  | Does the teacher's account need the PayNow capability?                                  | No. With the capability turned off on the test account, a PayNow payment and its full refund both went through. The capability was then turned back on.                                                             |
+| P10 | A PayNow payment cancelled while its QR code is open, then authorized?                  | Stripe's test page showed the payment as abandoned. Authorizing it took no money, and the payment stayed cancelled.                                                                                                 |
+| P11 | A payment page expired through the API while its QR code is open, then authorized?      | Expiring the page cancelled the PayNow payment, with the reason `automatic`. Authorizing the QR code took no money.                                                                                                 |
+| P12 | A payment page left to expire by itself while its QR code is open, then authorized?     | The page expired at its time, 31 minutes after it was made. Within a minute Stripe had cancelled the PayNow payment, with the reason `automatic`. Authorizing the QR code then took no money.                       |
+
+All three refunds were made while the teacher's money was still pending.
+
+### Results from Stripe's documentation
+
+Read from `docs.stripe.com/payments/paynow` on 2026-11-25.
+
+| Question                                    | Answer                                                                                                                                                                                                    |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Can a PayNow payment be disputed at a bank? | No. "Customers can't file a chargeback, and funds are never withdrawn from your Stripe balance because of a dispute."                                                                                     |
+| How does a PayNow refund complete?          | "Refunds for PayNow payments are asynchronous and take up to 5 minutes to complete." If one fails, "Stripe returns the amount to your Stripe balance. You must refund the customer using another method." |
+| How late can a PayNow payment be refunded?  | Within 90 days of the payment.                                                                                                                                                                            |
+| How long is a QR code valid?                | 1 hour.                                                                                                                                                                                                   |
+| When is PayNow money available?             | "Funds become available in your Stripe balance 1 day after the transaction." In the sandbox the test payments showed about 7 days.                                                                        |
+
+### Not tested
+
+- A PayNow refund that fails. None could be produced in the sandbox, so it is
+  not known whether Stripe then puts back the transfer it reversed.
+- A QR code in a real bank app after its payment page has expired.
+- A payment through the Link button or the Apple Pay button on the page.
+
+### Two more tests, later the same day
+
+| #   | Question                                                            | Result                                                                                                                                                                                                                                                                   |
+| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P13 | Can one payment page hide the Link button?                          | Yes. A page created with `wallet_options.link.display` set to `never` showed Card, PayNow and Apple Pay, and no Link button. Class checkout does this.                                                                                                                   |
+| P14 | Can a card payment be refunded after Elevate wins its bank dispute? | Yes. While the dispute was open the refund was refused with `charge_disputed`. After it was won with Stripe's test evidence, the refund with the transfer reversed and the fee refund both succeeded. The teacher ended S$20.00 down on the seat, as the design intends. |
+
+### What this changed in the design
+
+- A seat refund counts as made when Stripe reports that it succeeded, not
+  when the call returns. A failed one goes to Support.
+- The open question on PayNow is replaced by three smaller ones: a failed
+  refund, a real bank app, and the Link button.
+- A PayNow payment has the same window as a card payment, because the
+  payment page's expiry cancels it.
+
 ## What the session left in the sandbox
 
 - One test connected account, with its payout schedule put back to daily. Its
@@ -149,3 +217,8 @@ refunded takes back the teacher's whole share after a lost dispute.
 - Eight test payments of S$500: six refunded in full, one refunded S$482.50,
   and one disputed and lost.
 - No webhook endpoint or setting was changed.
+- From the PayNow session: four PayNow payments of S$500, three refunded in
+  full and one refunded S$492.91; three PayNow payments that were cancelled
+  unpaid; and three expired payment pages. The test account's balance is now
+  −S$62.09 after the won-dispute test. Its PayNow capability was turned off for one test and turned back
+  on.
