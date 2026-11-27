@@ -13,8 +13,8 @@
   table under "What each term rests on" names the decision or best guess
   behind each one. The best guesses are in
   [best_guess_answers.md](../designs/reviews/scheduled-classes-selling/best_guess_answers.md).
-- **Chinese text:** not drafted. It follows once the English wording is
-  settled.
+- **Chinese text:** in the message catalogs named above. Signed off by the
+  author on 2026-11-27. Not read by a lawyer.
 
 ## The terms
 
@@ -201,4 +201,5 @@ Stripe keeps its processing fee when a payment is refunded.
   sell only self-paced courses have no written fee terms.
 - **Terms 24 and 25 are a closed list** (G17). A case outside it, such as a
   teacher who stops answering, cannot be cancelled by Elevate.
-- **The Chinese text** is to be drafted, and signed off by the author.
+- **The Chinese text** is in the message catalogs and was signed off by the
+  author on 2026-11-27. A lawyer has not read it.

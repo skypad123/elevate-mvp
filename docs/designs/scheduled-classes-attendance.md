@@ -162,8 +162,8 @@ test or a staging step.
 
 - **The wording shown before the browser asks for location.** It must say why
   the position is taken, that it is kept with the attendance record, and that
-  refusing does not block check-in. The Chinese text needs the author's
-  sign-off. Decision needed from: the author.
+  refusing does not block check-in. The author signed off the Chinese text
+  on 2026-11-27.
 - **Who approves a request to erase one learner's coordinates.** Part 1 makes
   erasure possible without the owner database credential. Who may ask and who
   approves is not decided. Decision needed from: the author, before Part 2.
@@ -1975,8 +1975,8 @@ running as the restricted database role.
 - **3.13:** The dialogs use `NativeSelect` and `Textarea`, which already
   contain `Field`.
 - The class pages are English, as the design says; only the navigation label
-  is translated, as `nav.classes`. Its Chinese text needs the author's
-  sign-off.
+  is translated, as `nav.classes`. The author signed off its Chinese text
+  on 2026-11-27.
 
 **Ends with:** `npx turbo run typecheck build` passing.
 
@@ -2159,7 +2159,7 @@ running as the restricted database role.
 - **5.10:** `jest.setup.ts` mocks the new client paths. There is no test for
   the class screen or the dispute form; the entry lists none.
 - The Chinese text in `learnerClass.zh.ts`, and the class terms added to the
-  header of `zh.ts`, need the author's sign-off.
+  header of `zh.ts`, were signed off by the author on 2026-11-27.
 
 **Ends with:** `npx turbo run typecheck test` passing, including
 `npm -w @elevate/learner test`, and then the local walkthrough below.
@@ -2176,7 +2176,8 @@ running as the restricted database role.
   happens, sign in here"). Whole sentences, following ADR 008. The Chinese
   file ends with the `satisfies` check the other areas use.
 - **Why:** The learner app has no English literals. The Chinese text is drafted
-  with the implementation and needs the author's sign-off before merge.
+  with the implementation and needs the author's sign-off before merge. The
+  author signed it off on 2026-11-27.
 
 #### 5.2 `packages/i18n/src/messages/en.ts` and `zh.ts` (Modify)
 

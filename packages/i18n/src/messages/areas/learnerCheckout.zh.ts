@@ -46,8 +46,8 @@ export const learnerCheckoutZh = {
     '付款确认所需时间比平时长。Stripe 确认后，您的报名会显示在“我的学习”中。',
   'learnerCheckout.failed.myLearning': '前往“我的学习”',
 
-  // Classes and the refund terms: drafted by Claude; needs the author's sign-off before
-  // production. The refund terms also need a lawyer's reading (docs/terms/class-refund-terms.md).
+  // Classes and the refund terms: drafted by Claude; signed off by the author on 2026-11-27.
+  // The refund terms still need a lawyer's reading (docs/terms/class-refund-terms.md).
   'learnerCheckout.class.title': '报名班级名额',
   'learnerCheckout.class.course': '“{course}”课程的班级',
   'learnerCheckout.class.instructor': '讲师：{name}',

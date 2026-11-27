@@ -49,7 +49,7 @@ export const apiErrorZh = {
   'apiError.dispute_window_closed': '申诉期限已过。',
   'apiError.already_disputed': '您已对此提出申诉。',
 
-  // Selling a class: drafted by Claude; needs the author's sign-off before production.
+  // Selling a class: drafted by Claude; signed off by the author on 2026-11-27.
   'apiError.class_not_on_sale': '这个班级暂不开放报名。',
   'apiError.class_full': '这个班级已满。',
   'apiError.already_in_class': '您已在这个班级中有名额。',

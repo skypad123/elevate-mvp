@@ -32,7 +32,7 @@ export const learnerCourseZh = {
   'learnerCourse.about.title': '关于这门课程',
   'learnerCourse.teacher.eyebrow': '授课教师',
 
-  // Classes: drafted by Claude; needs the author's sign-off before production.
+  // Classes: drafted by Claude; signed off by the author on 2026-11-27.
   'learnerCourse.class.title': '以班级形式学习',
   'learnerCourse.class.intro':
     '班级是由讲师在所示日期现场讲授的本课程。班级名额需单独购买，不包含自学课程。',

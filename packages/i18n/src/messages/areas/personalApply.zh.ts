@@ -1,6 +1,6 @@
 import type { personalApplyEn } from './personalApply.en'
 
-/** Drafted by Claude; to be reviewed and signed off by the author. */
+/** Drafted by Claude; signed off by the author on 2026-11-27. */
 export const personalApplyZh = {
   'personalApply.eyebrow.apply': '成为教师',
   'personalApply.eyebrow.reapply': '更新您的申请',

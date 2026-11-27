@@ -1,6 +1,6 @@
 import type { learnerClassEn } from './learnerClass.en'
 
-/** Drafted by Claude; to be reviewed and signed off by the author. */
+/** Drafted by Claude; signed off by the author on 2026-11-27. */
 export const learnerClassZh = {
   'learnerClass.list.title': '您的班级',
   'learnerClass.list.next': '下一节：{time}',

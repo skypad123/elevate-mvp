@@ -30,8 +30,8 @@ export const teachSettingsZh = {
 
   'settings.teach.readOnly': '只有所有者或管理员可以修改学员看到的教学档案信息。',
 
-  // The class-sales card: drafted by Claude; needs the author's sign-off, and the terms a
-  // lawyer's reading, before production.
+  // The class-sales card: drafted by Claude; signed off by the author on 2026-11-27. The terms
+  // still need a lawyer's reading before production.
   'classSales.title': '班级销售',
   'classSales.description': '销售您定期班级的名额。接受暂缓结算条款之前，请先仔细阅读。',
   'classSales.badge.off': '未销售',

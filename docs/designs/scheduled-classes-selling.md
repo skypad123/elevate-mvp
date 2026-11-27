@@ -270,8 +270,8 @@ Each names who can answer it and what waits for the answer.
   selling to real learners.
 - **The wording of the held-payout terms** a profile's owner accepts,
   including the 30 days' notice to leave, and of the refund
-  terms a learner sees before paying. A lawyer. The Chinese text needs the
-  author's sign-off. The wording is kept in `docs/terms/`; both sets of
+  terms a learner sees before paying. A lawyer. The author signed off the
+  Chinese text on 2026-11-27. The wording is kept in `docs/terms/`; both sets of
   terms have a first draft there.
 - **Whether Singapore consumer rules or SSG's rules require a refund when a
   provider cancels**, and whether refusing one to a learner counted as
@@ -1985,8 +1985,8 @@ migration applied, the grants were re-applied, `elevate_api` could read
   core, so the test compares against a copy of it.
 - **1.16:** `class_cancelled` and `refund_in_progress` serve as both learner
   and Teach codes.
-- **1.17:** The Chinese text of the new messages needs the author's
-  sign-off.
+- **1.17:** The Chinese text of the new messages was signed off by the
+  author on 2026-11-27.
 - **For later phases:** `payments.classId` is a new column beside
   `enrollments.classId`, and `class-guards.test.ts` must change on purpose
   when checkout writes it. Text status columns such as `waitingFor`,
@@ -2330,7 +2330,7 @@ unchanged.
 - **Change:** One message per new code; the English text is in the table.
 - **Why:** `catalog.test.ts` fails when a learner-visible code has no message.
 - **Before production:** the author signs off the Chinese text. It does not
-  block this phase.
+  block this phase. Signed off on 2026-11-27.
 
 #### 1.18 Tests in `packages/core/test/` (Modify three, create one)
 
@@ -2537,7 +2537,8 @@ typecheck, every build and 829 tests pass (API: 45 files, 468 tests).
 - **3.11:** `class-guards.test.ts` lets only `class-checkout.service.ts` set
   `classId` on an enrollment; Phase 4 widens that to `seats.service.ts` for
   a move. No rule was added for `payments.classId`; the plan asks for none.
-- The Chinese text of the new email keys needs the author's sign-off.
+- The Chinese text of the new email keys was signed off by the author on
+  2026-11-27.
 - **For Phase 5:** `finishLeaving` waits while any class payment of the
   account is unreleased, lost seats included, so the job must release
   those. The job must call `finishStale` and `finishLeaving`.
@@ -2688,7 +2689,8 @@ and test environments have it on from this phase, with the fake provider.
   the class name, the dates and place as a list, the refund terms in one
   sentence, the button to the class screen) and the `email.seatLost.*` keys.
 - **Why:** Learner emails take their text from this area.
-- **Before production:** the author signs off the Chinese text.
+- **Before production:** the author signs off the Chinese text. Signed off
+  on 2026-11-27.
 
 #### 3.11 `apps/api/test/helpers/test-app.ts`, `role-routes.test.ts` and `class-guards.test.ts` (Modify)
 
@@ -2779,8 +2781,8 @@ S$400.00 to the learner and S$55.90 of Elevate's fee to the profile.
 - **4.10:** `GET /me/classes` also lists a refunded or withdrawn seat for 30
   days, so the learner sees "refunded".
 - **Changes under `packages/`:** `LearnerClass.seat` is required.
-  `seat_has_no_payment` joins `USER_ERROR_CODES`. New email keys; their
-  Chinese text needs the author's sign-off.
+  `seat_has_no_payment` joins `USER_ERROR_CODES`. New email keys; the author
+  signed off their Chinese text on 2026-11-27.
 - **For Phase 5:** call `fillStripeFees` before the sender; remove the
   sender's skip of `dispute_lost` rows, and keep those rows out of the
   bank-dispute wait, which would close them as `bank_returned`; set both
@@ -2971,7 +2973,8 @@ deployed.
 - **Change:** Add the keys for the eight other learner emails in the emails
   table.
 - **Why:** Learner emails take their text from this area.
-- **Before production:** the author signs off the Chinese text.
+- **Before production:** the author signs off the Chinese text. Signed off
+  on 2026-11-27.
 
 #### 4.10 `apps/api/test/role-routes.test.ts` and `class-guards.test.ts` (Modify)
 
@@ -3274,7 +3277,8 @@ payout test on a real connected account is done and recorded.
   place from `GET /me/classes`.
 - `GET /checkout/classes/:classId` reads `promoCode` without a validator, so
   the typed client has no query for it and the app casts its arguments.
-- The Chinese text of the new keys needs the author's sign-off.
+- The Chinese text of the new keys was signed off by the author on
+  2026-11-27.
 
 **Ends with:** `npx turbo run typecheck test` passing, including
 `npm -w @elevate/learner test`.
@@ -3377,8 +3381,8 @@ iOS or Android build.
   profile, taken from `docs/terms/held-payout-terms.md`; the opening drops
   the note that the design says "block", and term 23 is split into two
   sentences. The terms say "session" where the Teach class pages say
-  "Block"; one word should be chosen. The Chinese needs the author's
-  sign-off.
+  "Block"; one word should be chosen. The author signed off the Chinese on
+  2026-11-27.
 - The edit page is `form.tsx`, as Part 1 built it. The sign-in prompt for a
   recent sign-in is shared through a new `useSignInAgain()`.
 - Cancelling is disabled, with a warning, while a seat has a refund under
@@ -3483,8 +3487,8 @@ iOS or Android build.
   `released`, `paidOut` and `seatRefunds`; `seat-refunds.test.ts` covers
   them, added after the build. "Refund in full" is disabled while a seat
   refund is unfinished.
-- `nav.payouts` is 提现 in Chinese, as Support's profile area already says;
-  it needs the author's sign-off.
+- `nav.payouts` is 提现 in Chinese, as Support's profile area already says.
+  The author signed it off on 2026-11-27.
 
 **Ends with:** `npx turbo run typecheck build` passing, and then the local
 walkthrough below.

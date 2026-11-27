@@ -15,8 +15,8 @@
   table under "What each term rests on" names the decision or best guess
   behind each one. The best guesses are in
   [best_guess_answers.md](../designs/reviews/scheduled-classes-selling/best_guess_answers.md).
-- **Chinese text:** not drafted. It follows once the English wording is
-  settled.
+- **Chinese text:** in the message catalogs named above. Signed off by the
+  author on 2026-11-27. Not read by a lawyer.
 
 ## The terms
 
@@ -120,4 +120,5 @@ block; the terms use the word the learner sees in the app.
 - **Term 13 gives Stripe's published rates.** GST was seen on the PayNow fee
   in the sandbox and not on the card fee. The first live payments will show
   where GST applies.
-- **The Chinese text** is to be drafted, and signed off by the author.
+- **The Chinese text** is in the message catalogs and was signed off by the
+  author on 2026-11-27. A lawyer has not read it.

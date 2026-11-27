@@ -38,7 +38,7 @@ export const emailZh = {
     '您为这门课程的另一笔付款也已退款，因此您对这门课程的访问权限已被移除。',
   'email.duplicate.button': '前往课程',
 
-  // Classes: drafted by Claude; needs the author's sign-off before production.
+  // Classes: drafted by Claude; signed off by the author on 2026-11-27.
   'email.class.block': '{date}，{start}–{end}',
   'email.class.instant': '{day} {time}',
 
