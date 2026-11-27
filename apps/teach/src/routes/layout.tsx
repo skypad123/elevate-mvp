@@ -3,6 +3,7 @@ import { usePortalAuth } from '@elevate/web-ui/portal'
 import { fillSlots, useT } from '@elevate/web-ui/preferences'
 import {
   BookOpen,
+  CalendarDays,
   ChevronsUpDown,
   LayoutDashboard,
   LogOut,
@@ -109,6 +110,10 @@ export function TeachLayout() {
             { count: waiting },
           ),
         },
+        // Hidden while the API's `CLASSES` setting is off, when every class route answers 404.
+        ...(profile?.classesEnabled && can('class.read')
+          ? [{ to: path('/classes'), label: t('nav.classes'), icon: CalendarDays }]
+          : []),
         // A writer has no earnings or members page: the API would refuse both.
         ...(can('earnings.read')
           ? [{ to: path('/earnings'), label: t('nav.earnings'), icon: Wallet }]

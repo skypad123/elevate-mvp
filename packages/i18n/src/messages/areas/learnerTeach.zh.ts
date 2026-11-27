@@ -1,6 +1,6 @@
 import type { learnerTeachEn } from './learnerTeach.en'
 
-/** Drafted by Claude; to be reviewed and signed off by the author. */
+/** Drafted by Claude; signed off by the author on 2026-11-27. */
 export const learnerTeachZh = {
   'learnerTeach.banner.title': '在 Elevate 上授课',
   'learnerTeach.banner.body': '为新加坡的学员开设课程，并通过 Stripe 收款。',

@@ -1,15 +1,18 @@
 import type { Locale } from '@elevate/core'
+import { CLASS_SALES_TERMS_VERSION, codePeriod, REFUND_TERMS_VERSION } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { createPgliteDb } from '@elevate/db/pglite'
 import { eq } from 'drizzle-orm'
 import { createApp } from '../../src/app'
 import type { Deps } from '../../src/deps'
 import { loadEnv } from '../../src/env'
+import { codesFor, newBlockSecret } from '../../src/lib/class-code'
 import { silentLogger } from '../../src/lib/logger'
 import { FakeMailer } from '../../src/providers/mailer'
 import { FakePaymentsProvider, type PaymentsWebhookEvent } from '../../src/providers/payments'
 import { FakeStorage } from '../../src/providers/storage'
 import { FakeVideoProvider } from '../../src/providers/video'
+import { ClassSalesService } from '../../src/services/class-sales.service'
 
 export type ApiResponse<T = unknown> = { status: number; body: T; res: Response }
 
@@ -23,9 +26,12 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     LEARNER_URL: 'http://learner.test',
     TEACH_URL: 'http://teach.test',
     SUPPORT_URL: 'http://support.test',
+    CLASSES: 'true',
+    CLASS_SALES: 'true',
     ...overrides,
   })
-  const { db, learnerDb, client } = await createPgliteDb()
+  // The whole suite runs as the API's restricted database user, so a missing grant fails a test.
+  const { db, learnerDb, client } = await createPgliteDb({ apiRole: 'elevate_api' })
   const mailer = new FakeMailer()
   const storage = new FakeStorage(env.API_URL)
   const video = new FakeVideoProvider()
@@ -342,6 +348,197 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     }
   }
 
+  let classCounter = 0
+
+  /**
+   * A class of the profile, written straight to the database: published, in person, with its
+   * venue position set and one block open at the test clock, taught by the profile's owner,
+   * unless told otherwise. Each block is given as offsets in milliseconds from the test clock.
+   * Returns the class and block IDs, blocks in order.
+   */
+  async function createClass(
+    profileId: string,
+    courseId: string,
+    options: {
+      name?: string
+      status?: 'draft' | 'published'
+      delivery?: 'in_person' | 'remote'
+      instructorUserId?: string
+      venueAddress?: string | null
+      /** Null leaves the venue position unset. */
+      venue?: { lat: number; lng: number; accuracyM: number; radiusM?: number } | null
+      blocks?: { startMs: number; endMs: number }[]
+      seats?: number
+    } = {},
+  ) {
+    const profile = await db.query.profiles.findFirst({ where: { id: profileId } })
+    if (!profile) throw new Error(`no profile ${profileId}`)
+    const delivery = options.delivery ?? 'in_person'
+    const status = options.status ?? 'published'
+    const venue =
+      options.venue === undefined
+        ? delivery === 'in_person'
+          ? { lat: 1.29, lng: 103.85, accuracyM: 10 }
+          : null
+        : options.venue
+    const [row] = await db
+      .insert(s.classes)
+      .values({
+        profileId,
+        courseId,
+        name: options.name ?? `Fixture class ${++classCounter}`,
+        delivery,
+        venueAddress:
+          options.venueAddress === undefined
+            ? delivery === 'in_person'
+              ? '1 Fixture Road'
+              : null
+            : options.venueAddress,
+        ...(venue
+          ? {
+              venueLat: venue.lat,
+              venueLng: venue.lng,
+              venueAccuracyM: venue.accuracyM,
+              venueRadiusM: venue.radiusM ?? 200,
+              venueSetAt: clock,
+            }
+          : {}),
+        instructorUserId: options.instructorUserId ?? profile.ownerUserId,
+        seats: options.seats ?? 20,
+        status,
+        publishedAt: status === 'published' ? clock : null,
+      })
+      .returning()
+    if (!row) throw new Error('failed to create class')
+    const spans = options.blocks ?? [{ startMs: -30 * 60_000, endMs: 3 * 60 * 60_000 }]
+    const blocks = spans.length
+      ? await db
+          .insert(s.classBlocks)
+          .values(
+            spans.map((span, position) => ({
+              classId: row.id,
+              position,
+              startsAt: new Date(clock.getTime() + span.startMs),
+              endsAt: new Date(clock.getTime() + span.endMs),
+              codeSecret: newBlockSecret(),
+            })),
+          )
+          .returning()
+      : []
+    const blockIds = blocks.sort((a, b) => a.position - b.position).map((b) => b.id)
+    return { classId: row.id, blockIds, blockId: blockIds[0] as string }
+  }
+
+  /** An active class enrollment for `email` in a class, written straight to the database. */
+  async function enrolInClass(email: string, classId: string) {
+    const user = await ensureUser(email)
+    const found = await db.query.classes.findFirst({ where: { id: classId } })
+    if (!found) throw new Error(`no class ${classId}`)
+    const [enrollment] = await db
+      .insert(s.enrollments)
+      .values({
+        userId: user.id,
+        courseId: found.courseId,
+        classId,
+        status: 'active',
+        enrolledAt: clock,
+      })
+      .returning()
+    if (!enrollment) throw new Error('failed to enrol in the class')
+    return enrollment
+  }
+
+  /**
+   * Opts a profile in to class sales as its owner would, through the service: the account is
+   * switched to manual payouts on the fake Stripe and the opening amounts are written. A profile
+   * with no payout account is first made payable.
+   */
+  async function optIn(profileId: string) {
+    const profile = await db.query.profiles.findFirst({
+      where: { id: profileId },
+      with: { payoutAccount: true },
+    })
+    if (!profile) throw new Error(`no profile ${profileId}`)
+    if (!profile.payoutAccount) await makePayable(profileId)
+    const status = await new ClassSalesService(deps).accept(
+      {
+        role: 'owner',
+        profileId,
+        userId: profile.ownerUserId,
+        profileType: profile.type,
+        profileStatus: profile.status,
+      },
+      { termsVersion: CLASS_SALES_TERMS_VERSION },
+    )
+    if (status.payoutMode !== 'manual') throw new Error(`opting in left ${status.payoutMode}`)
+    return status
+  }
+
+  /** One session per learner for `buySeat`: sign-in codes are limited per address. */
+  const seatTokens = new Map<string, string>()
+  async function learnerToken(email: string) {
+    const known = seatTokens.get(email)
+    if (known) return known
+    const { token } = await signIn(email)
+    if (!token) throw new Error(`could not sign in ${email}`)
+    seatTokens.set(email, token)
+    return token
+  }
+
+  /**
+   * Starts a class checkout for `email` and pays it through the fake provider, delivering Stripe's
+   * webhook. `pay: false` stops after the reservation. Returns the session, the enrollment and,
+   * once paid, the payment.
+   */
+  async function buySeat(
+    email: string,
+    classId: string,
+    options: {
+      promoCode?: string
+      locale?: Locale
+      method?: 'card' | 'paynow'
+      pay?: boolean
+      /** Stripe's time for the payment. */
+      paidAt?: Date
+      /** Stripe's fee on the charge, as fulfilment reads it; null leaves it to be filled later. */
+      stripeFeeCents?: number | null
+    } = {},
+  ) {
+    const token = await learnerToken(email)
+    const started = await api('POST', `/api/checkout/classes/${classId}`, {
+      token,
+      body: {
+        termsVersion: REFUND_TERMS_VERSION,
+        ...(options.promoCode ? { promoCode: options.promoCode } : {}),
+        ...(options.locale ? { locale: options.locale } : {}),
+      },
+    })
+    if (started.status !== 200 || started.body.kind !== 'redirect')
+      throw new Error(`class checkout failed: ${started.status} ${JSON.stringify(started.body)}`)
+    const sessionId = started.body.sessionId as string
+    const user = await ensureUser(email)
+    const enrollment = await db.query.enrollments.findFirst({ where: { userId: user.id, classId } })
+    if (!enrollment) throw new Error('class checkout left no enrollment')
+    if (options.pay === false)
+      return { token, sessionId, enrollmentId: enrollment.id, payment: null }
+    if (options.stripeFeeCents !== undefined)
+      payments.setStripeFee(sessionId, options.stripeFeeCents)
+    const event = payments.completeCheckout(sessionId, options.method ?? 'card', options.paidAt)
+    const hook = await stripeWebhook(event)
+    if (hook.status !== 200) throw new Error(`webhook failed: ${JSON.stringify(hook.body)}`)
+    const payment = await db.query.payments.findFirst({
+      where: { stripeCheckoutSessionId: sessionId },
+    })
+    return { token, sessionId, enrollmentId: enrollment.id, payment: payment ?? null }
+  }
+
+  /** The code a block shows at `at` (default: the test clock): the typed one, or the link's. */
+  async function validCodeFor(blockId: string, at?: Date, kind: 'typed' | 'link' = 'typed') {
+    const block = await db.query.classBlocks.findFirst({ where: { id: blockId } })
+    if (!block) throw new Error(`no block ${blockId}`)
+    return codesFor(block.codeSecret, codePeriod(at ?? clock))[kind]
+  }
+
   /** Delivers an event to the Stripe webhook route, signed the way the fake provider accepts. */
   async function stripeWebhook(event: PaymentsWebhookEvent) {
     const res = await app.request('/api/webhooks/stripe', {
@@ -378,8 +575,15 @@ export async function createTestApp(overrides: Record<string, string> = {}) {
     createVideoMedia,
     addMember,
     enrol,
+    createClass,
+    enrolInClass,
+    validCodeFor,
     makePayable,
+    optIn,
+    buySeat,
+    learnerToken,
     stripeWebhook,
+    now: () => clock,
     setClock: (date: Date) => {
       clock = date
     },

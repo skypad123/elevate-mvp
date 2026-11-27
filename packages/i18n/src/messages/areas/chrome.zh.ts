@@ -17,6 +17,8 @@ export const chromeZh = {
   'nav.signOut': '退出登录',
   'nav.members': '成员',
   'nav.profiles': '教学档案',
+  'nav.classes': '班级',
+  'nav.payouts': '提现',
   'staffOnly.title': '仅限员工',
   'staffOnly.body': '{email} 没有 Support 的访问权限。',
   'staffOnly.body.noEmail': '此账户没有 Support 的访问权限。',

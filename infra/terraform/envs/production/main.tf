@@ -94,6 +94,35 @@ variable "course_previews" {
   default = true
 }
 
+variable "classes" {
+  description = "Scheduled classes (the API's CLASSES setting)."
+  type        = bool
+  default     = false
+}
+
+variable "class_sales" {
+  description = "Selling classes (the API's CLASS_SALES setting)."
+  type        = bool
+  default     = false
+}
+
+variable "release_schedule_enabled" {
+  description = "The schedule starts the release job every 15 minutes. Keep true while any profile is opted in."
+  type        = bool
+  default     = false
+}
+
+variable "alarm_email" {
+  description = "Email address the release job's alarms are sent to."
+  type        = string
+}
+
+variable "api_uses_restricted_database_user" {
+  description = "The API connects as elevate_api; false is the way back to the owner (ADR 012)."
+  type        = bool
+  default     = true
+}
+
 module "environment" {
   source = "../../modules/environment"
 
@@ -112,11 +141,19 @@ module "environment" {
   seed_super_admin_email = var.seed_super_admin_email
   csp_report_only        = var.csp_report_only
   course_previews        = var.course_previews
+  classes                = var.classes
+  class_sales            = var.class_sales
 
-  # Data is protected: deletion protection, a final snapshot, a week of backups, versioned uploads.
+  release_schedule_enabled = var.release_schedule_enabled
+  alarm_email              = var.alarm_email
+
+  api_uses_restricted_database_user = var.api_uses_restricted_database_user
+
+  # Data is protected: deletion protection, a final snapshot, 35 days of backups (the most RDS keeps;
+  # learners' attendance and payments need a restore window), versioned uploads.
   # Turn on db_multi_az when downtime during an AZ failure or maintenance is no longer acceptable.
   db_instance_class        = "db.t4g.small"
-  db_backup_retention_days = 7
+  db_backup_retention_days = 35
   db_multi_az              = false
   protect_data             = true
   log_retention_days       = 90

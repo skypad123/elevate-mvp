@@ -23,6 +23,16 @@ export const CAPABILITIES = [
   'members.manageWriters',
   'members.manageManagers',
   'stripe.links',
+  // Scheduled classes. `attendance.take` also needs the actor to be the class's assigned
+  // instructor; the API checks that separately.
+  'class.read',
+  'class.manage',
+  'attendance.read',
+  'attendance.take',
+  'attendance.review',
+  // Selling classes: a discretionary refund of a seat spends the profile's money, so only the
+  // owner and managers hold it.
+  'class.refund',
 ] as const
 export type Capability = (typeof CAPABILITIES)[number]
 
@@ -53,11 +63,13 @@ const WRITER: readonly Capability[] = [
   'course.editDraft',
   'course.proposeLiveEdit',
   'media.upload',
+  'class.read',
+  'attendance.take',
 ]
 
 /**
- * Staff fix content and can read the profile, its members and its earnings. Money, publishing and
- * membership stay with the teacher.
+ * Staff fix content and can read the profile, its members, its earnings, its classes and their
+ * attendance. Money, publishing, membership and taking attendance stay with the teacher.
  */
 const STAFF: readonly Capability[] = [
   'profile.read',
@@ -67,6 +79,8 @@ const STAFF: readonly Capability[] = [
   'media.upload',
   'earnings.read',
   'members.read',
+  'class.read',
+  'attendance.read',
 ]
 
 const NONE: readonly Capability[] = []

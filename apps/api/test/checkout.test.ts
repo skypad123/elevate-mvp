@@ -749,3 +749,76 @@ describe('checkout language', () => {
     })
   })
 })
+
+describe('self-paced checkout beside class sales', () => {
+  // Phase 3 of docs/designs/scheduled-classes-selling.md: class checkout is a separate service and
+  // a request with no class behaves as it did, with `CLASS_SALES` on.
+  it('sends the same requests and metadata, answers the same, and names no payment methods', async () => {
+    expect(t.deps.env.CLASS_SALES).toBe(true)
+    const token = (await t.signIn('unchanged-buyer@example.com')).token as string
+    const before = await t.db.query.courses.findFirst({ where: { id: sourdoughId } })
+    const start = await t.api('POST', `/api/checkout/courses/${sourdoughId}`, { token, body: {} })
+    expect(start.status).toBe(200)
+    expect(Object.keys(start.body).sort()).toEqual(['kind', 'sessionId', 'url'])
+    expect(start.body.kind).toBe('redirect')
+    const session = t.payments.sessions.get(start.body.sessionId)
+    const enrollment = await t.db.query.enrollments.findFirst({
+      where: { stripeCheckoutSessionId: start.body.sessionId },
+    })
+    expect(enrollment).toMatchObject({
+      classId: null,
+      seatReservedUntil: null,
+      reservationCount: 0,
+    })
+    // the page Stripe is asked for: the Dashboard's payment methods, the Link button, the title
+    expect(session?.allowedPaymentMethods).toBeUndefined()
+    expect(session?.hideLink).toBeUndefined()
+    expect(session?.productName).toBeUndefined()
+    expect(session?.courseTitle).toBe(before?.title)
+    expect(session?.cancelUrl).toBe(
+      'http://learner.test/course/sourdough-from-scratch?checkout=cancelled',
+    )
+    expect(session?.metadata).toEqual({
+      enrollmentId: enrollment?.id,
+      courseId: sourdoughId,
+      userId: enrollment?.userId,
+      elevatePayoutAccountId: session?.payoutAccountId,
+      elevateProfileId: before?.profileId,
+      listPriceCents: '8900',
+      discountCents: '0',
+      amountCents: '8900',
+      stripeFeeEstimateCents: '353',
+      commissionCents: String(Math.round((8900 - 353) * 0.15)),
+      applicationFeeCents: String(353 + Math.round((8900 - 353) * 0.15)),
+      teacherNetCents: String(8900 - 353 - Math.round((8900 - 353) * 0.15)),
+    })
+
+    const hook = await stripePost(t.payments.completeCheckout(start.body.sessionId))
+    expect(await hook.json()).toMatchObject({ outcome: 'applied' })
+    const payment = await t.db.query.payments.findFirst({
+      where: { stripeCheckoutSessionId: start.body.sessionId },
+    })
+    expect(payment).toMatchObject({ classId: null, amountCents: 8900, status: 'succeeded' })
+    expect(await t.db.$count(s.seatRefunds)).toBe(0)
+    expect((await t.db.query.courses.findFirst({ where: { id: sourdoughId } }))?.enrolCount).toBe(
+      (before?.enrolCount ?? 0) + 1,
+    )
+    expect(t.mailer.last()?.subject).toContain("You're enrolled")
+    const synced = await t.api('GET', `/api/checkout/sessions/${start.body.sessionId}/sync`, {
+      token,
+    })
+    // exactly the old answer: no `classId`
+    expect(synced.body).toEqual({
+      status: 'paid',
+      enrollmentId: enrollment?.id,
+      courseSlug: 'sourdough-from-scratch',
+    })
+    const page = await t.api('GET', '/api/catalog/courses/sourdough-from-scratch', { token })
+    expect(page.body.course.viewer).toMatchObject({
+      enrollmentId: enrollment?.id,
+      status: 'active',
+    })
+    expect(page.body.course.classes).toEqual([])
+    expect(page.body.course.viewerClassSeats).toEqual([])
+  })
+})

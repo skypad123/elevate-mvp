@@ -6,6 +6,9 @@ export const paymentsEn = {
   // but Elevate has not matched a company's legal name yet; not connected, or not finished
   'payments.description.enabled':
     'Learners can pay you. Payouts land in your bank on Stripe’s schedule.',
+  // The same, once the profile has accepted the held-payout terms and Elevate times its payouts
+  'payments.description.held':
+    'Learners can pay you. Elevate pays your Stripe balance to your bank once a day, and holds class money until 7 days after each class.',
   'payments.description.nameCheck':
     'The Stripe account is connected. Courses can be bought once Elevate has matched its legal name to the company.',
   'payments.description.connect':

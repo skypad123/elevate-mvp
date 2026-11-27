@@ -3,6 +3,7 @@ import type {
   CategoryCount,
   CheckoutStartResponse,
   CheckoutSyncResponse,
+  ClassCheckoutView,
   CourseCard,
   CoursePublicView,
   EnrollmentSummary,
@@ -89,4 +90,36 @@ export async function syncCheckout(sessionId: string): Promise<CheckoutSyncRespo
   return (await unwrap(
     await api.checkout.sessions[':id'].sync.$get({ param: { id: sessionId } }),
   )) as CheckoutSyncResponse
+}
+
+/**
+ * What the class checkout page shows: the class, the quote and the refund terms version. A promo
+ * code that makes the seat free, or the price under the minimum charge, is refused.
+ */
+export async function fetchClassCheckout(
+  classId: string,
+  promoCode?: string,
+): Promise<ClassCheckoutView> {
+  // The route reads `promoCode` without a validator, so the typed client does not list it; the
+  // client still sends a `query` it is given.
+  const args = { param: { classId }, ...(promoCode ? { query: { promoCode } } : {}) }
+  return (await unwrap(
+    await api.checkout.classes[':classId'].$get(args as { param: { classId: string } }),
+  )) as ClassCheckoutView
+}
+
+/**
+ * Starts paying for a seat. `termsVersion` is the refund terms version the page showed; the API
+ * refuses one that is no longer current with `terms_changed`.
+ */
+export async function startClassCheckout(
+  classId: string,
+  { locale, promoCode, termsVersion }: { locale: Locale; promoCode?: string; termsVersion: string },
+): Promise<CheckoutStartResponse> {
+  return (await unwrap(
+    await api.checkout.classes[':classId'].$post({
+      param: { classId },
+      json: { locale, termsVersion, ...(promoCode ? { promoCode } : {}) },
+    }),
+  )) as CheckoutStartResponse
 }

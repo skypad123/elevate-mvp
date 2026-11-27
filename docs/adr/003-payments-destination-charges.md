@@ -34,3 +34,9 @@ Teachers became teaching profiles ([ADR 006](006-teacher-profiles.md)). The dest
 charge is now the Stripe account of the profile's payout account, and the commission rate is the
 profile's. The fee math is unchanged. How the payee is chosen, recorded and activated is in
 [ADR 007](007-payout-accounts.md).
+
+## Update · 2026-11-25
+
+Class seats are sold through the same destination charge, but for a profile that opts in to class
+sales the money is held on manual payouts and seat refunds follow their own fee rules; see
+[ADR 013](013-class-sales-and-held-payouts.md). Self-paced sales of other profiles are unchanged.

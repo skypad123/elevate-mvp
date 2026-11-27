@@ -28,6 +28,8 @@ export type CheckoutSessionInput = {
   payoutAccountId: string
   profileId: string
   courseTitle: string
+  /** The line item's name on Stripe's page; the course title when absent. */
+  productName?: string
   courseImageUrl: string | null
   amountCents: number
   currency: string
@@ -44,6 +46,13 @@ export type CheckoutSessionInput = {
    * refuse the request).
    */
   replacesSessionId?: string
+  /**
+   * The only payment methods the page may offer, such as `card` and `paynow`. With none, Stripe
+   * offers the methods turned on in the Dashboard.
+   */
+  allowedPaymentMethods?: readonly string[]
+  /** Hides the Link button on the page. */
+  hideLink?: boolean
   /** Written to the session and its payment intent as given; the caller builds it. */
   metadata: Record<string, string>
 }
@@ -85,9 +94,90 @@ export type PaymentDetails = {
   applicationFeeId: string | null
   receiptUrl: string | null
   amountCents: number
+  /** Stripe's time for the payment (the charge's creation); null when Stripe has no charge. */
+  paidAt?: Date | null
 }
 
-export type RefundResult = { refundId: string; amountCents: number; status: string }
+/**
+ * Where a refund stands at Stripe. A card refund has succeeded when it is created; a PayNow
+ * refund is `pending` for up to 5 minutes. Stripe's `requires_action` is read as `pending`.
+ */
+export type RefundStatus = 'pending' | 'succeeded' | 'failed' | 'canceled'
+
+export type RefundResult = { refundId: string; amountCents: number; status: RefundStatus }
+
+export type CreateRefundInput = {
+  paymentIntentId: string
+  /** Part of what is left of the payment; all of it when absent. */
+  amountCents?: number
+  /**
+   * Whether Stripe returns Elevate's fee to the profile in proportion. Default true, as for a
+   * refund from Support. A seat refund keeps the fee and returns its share with
+   * `refundApplicationFee`.
+   */
+  refundApplicationFee?: boolean
+  reason?: string
+  metadata?: Record<string, string>
+  /** A retry with the same key returns the first refund instead of making another. */
+  idempotencyKey?: string
+}
+
+/** One refund of Elevate's fee on a payment. */
+export type ApplicationFeeRefund = {
+  feeRefundId: string
+  amountCents: number
+  metadata: Record<string, string>
+}
+
+export type TransferReversalResult = {
+  reversalId: string
+  /**
+   * How much of Elevate's fee on the payment has been returned in all, as Stripe answered the
+   * reversal; null when the answer did not carry the fee. With `refundApplicationFee`, the part
+   * returned with this reversal is this less what was returned before it.
+   */
+  applicationFeeRefundedCents: number | null
+}
+
+/** One reversal of a payment's transfer. */
+export type TransferReversal = {
+  reversalId: string
+  amountCents: number
+  metadata: Record<string, string>
+}
+
+/** A connected account's SGD balance. Either can be below zero. */
+export type AccountBalance = { availableCents: number; pendingCents: number }
+
+export type PayoutStatus = 'pending' | 'in_transit' | 'paid' | 'failed' | 'canceled'
+
+export type PayoutResult = {
+  payoutId: string
+  amountCents: number
+  status: PayoutStatus
+  metadata: Record<string, string>
+}
+
+/** The metadata key that names Elevate's `payouts` row on a Stripe payout. */
+export const PAYOUT_LABEL = 'payout_id'
+
+/** Stripe's actual fee on a charge, and the ids it fills in a few seconds after the payment. */
+export type ChargeFee = {
+  stripeFeeCents: number
+  balanceTransactionId: string
+  transferId: string | null
+  applicationFeeId: string | null
+}
+
+/** One refund of a charge, as Stripe has it now. */
+export type ChargeRefund = {
+  refundId: string
+  amountCents: number
+  /** Stripe's refund status: `pending`, `requires_action`, `succeeded`, `failed` or `canceled`. */
+  status: string
+  /** What `createRefund` wrote: `paymentId`, `actorId` or `enrollmentId`, and `elevateReason`. */
+  metadata: Record<string, string>
+}
 
 export type PaymentsWebhookEvent = {
   id: string
@@ -117,13 +207,46 @@ export interface PaymentsProvider {
    */
   expireCheckoutSession(sessionId: string): Promise<CheckoutSessionResult>
   retrievePaymentDetails(paymentIntentId: string): Promise<PaymentDetails>
-  createRefund(input: {
-    paymentIntentId: string
-    reason?: string
-    metadata?: Record<string, string>
-    /** A retry with the same key returns the first refund instead of making another. */
-    idempotencyKey?: string
-  }): Promise<RefundResult>
+  /** Refunds the learner and takes the same amount back from the profile (the transfer reversed). */
+  createRefund(input: CreateRefundInput): Promise<RefundResult>
+  retrieveRefund(refundId: string): Promise<RefundStatus>
+  /** Every refund of a charge, whoever made it (Elevate or the Stripe dashboard). */
+  listRefunds(chargeId: string): Promise<ChargeRefund[]>
+  /** Returns part of Elevate's fee on a payment to the profile. */
+  refundApplicationFee(input: {
+    applicationFeeId: string
+    amountCents: number
+    metadata: Record<string, string>
+    idempotencyKey: string
+  }): Promise<{ feeRefundId: string }>
+  /** Every refund of an application fee, newest first. */
+  listApplicationFeeRefunds(applicationFeeId: string): Promise<ApplicationFeeRefund[]>
+  /** Takes part of a payment's transfer back from the profile without refunding the learner. */
+  reverseTransfer(input: {
+    transferId: string
+    amountCents: number
+    refundApplicationFee: boolean
+    metadata: Record<string, string>
+    idempotencyKey: string
+  }): Promise<TransferReversalResult>
+  /** Every reversal of a transfer, newest first. */
+  listTransferReversals(transferId: string): Promise<TransferReversal[]>
+  /** Holds the account's money until `createPayout`. Safe to repeat. */
+  setManualPayouts(accountId: string): Promise<void>
+  /** Puts the account back on Stripe's daily payouts. Safe to repeat. */
+  setAutomaticPayouts(accountId: string): Promise<void>
+  retrieveBalance(accountId: string): Promise<AccountBalance>
+  /** Pays part of the account's available balance to its bank. */
+  createPayout(input: {
+    accountId: string
+    amountCents: number
+    metadata: Record<string, string>
+    idempotencyKey: string
+  }): Promise<{ payoutId: string }>
+  /** The account's payout whose `PAYOUT_LABEL` metadata is `label`, or null. */
+  findPayout(accountId: string, label: string): Promise<PayoutResult | null>
+  /** Null while Stripe has not filled the charge's balance transaction. */
+  retrieveChargeFee(chargeId: string): Promise<ChargeFee | null>
   listTransferAmountCents(destinationAccountId: string): Promise<number>
   /** Verifies the signature with one of the configured secrets and parses the event. */
   constructEvent(rawBody: string, signature: string | undefined): PaymentsWebhookEvent
@@ -170,6 +293,42 @@ export class UnconfiguredPaymentsProvider implements PaymentsProvider {
     return this.fail()
   }
   async createRefund(): Promise<never> {
+    return this.fail()
+  }
+  async retrieveRefund(): Promise<never> {
+    return this.fail()
+  }
+  async listRefunds(): Promise<never> {
+    return this.fail()
+  }
+  async refundApplicationFee(): Promise<never> {
+    return this.fail()
+  }
+  async listApplicationFeeRefunds(): Promise<never> {
+    return this.fail()
+  }
+  async reverseTransfer(): Promise<never> {
+    return this.fail()
+  }
+  async listTransferReversals(): Promise<never> {
+    return this.fail()
+  }
+  async setManualPayouts(): Promise<never> {
+    return this.fail()
+  }
+  async setAutomaticPayouts(): Promise<never> {
+    return this.fail()
+  }
+  async retrieveBalance(): Promise<never> {
+    return this.fail()
+  }
+  async createPayout(): Promise<never> {
+    return this.fail()
+  }
+  async findPayout(): Promise<never> {
+    return this.fail()
+  }
+  async retrieveChargeFee(): Promise<never> {
     return this.fail()
   }
   async listTransferAmountCents(): Promise<never> {

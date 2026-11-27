@@ -2,8 +2,10 @@ import { Avatar, Button, EmptyState, PortalShell } from '@elevate/web-ui'
 import { RequireRole, usePortalAuth } from '@elevate/web-ui/portal'
 import { useT } from '@elevate/web-ui/preferences'
 import {
+  CalendarDays,
   ClipboardCheck,
   GraduationCap,
+  Landmark,
   LogOut,
   Receipt,
   ScrollText,
@@ -13,10 +15,13 @@ import {
   Users,
 } from 'lucide-react'
 import { Outlet } from 'react-router'
+import { useSupportFeatures } from '../lib/queries'
 
 export function SupportLayout() {
-  const { user, signOut } = usePortalAuth()
+  const { user, signOut, hasRole } = usePortalAuth()
   const t = useT()
+  // Classes is off in production for all of Part 1; its pages answer 404 there, so no item.
+  const classesOn = useSupportFeatures(hasRole('support_agent')).data?.classes === true
   return (
     <RequireRole
       roles={['support_agent']}
@@ -46,6 +51,13 @@ export function SupportLayout() {
           { to: '/profiles', label: t('nav.profiles'), icon: GraduationCap },
           { to: '/people', label: t('nav.people'), icon: Users },
           { to: '/transactions', label: t('nav.transactions'), icon: Receipt },
+          ...(classesOn
+            ? [
+                { to: '/classes', label: t('nav.classes'), icon: CalendarDays },
+                // Money is held and paid out by the release job only for class sales.
+                { to: '/payouts', label: t('nav.payouts'), icon: Landmark },
+              ]
+            : []),
           { to: '/insights', label: t('nav.insights'), icon: TrendingUp },
           { to: '/audit', label: t('nav.auditLog'), icon: ScrollText },
           { to: '/settings', label: t('nav.settings'), icon: Settings },

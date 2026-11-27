@@ -258,6 +258,16 @@ describe('money per payout account', () => {
 describe('refund notices', () => {
   const noticesTo = (email: string, phrase: string) =>
     t.mailer.sent.filter((m) => m.to === email && m.subject.includes(phrase))
+  const ledgerOf = (paymentId: string) => t.db.query.refunds.findMany({ where: { paymentId } })
+  const paymentState = async (paymentId: string) => {
+    const p = await t.db.query.payments.findFirst({
+      where: { id: paymentId },
+      columns: { status: true, refundedCents: true },
+    })
+    return p ? { status: p.status, refundedCents: p.refundedCents } : null
+  }
+  /** The id Stripe gave the refund made last. */
+  const lastStripeRefund = () => t.payments.refunds.at(-1)?.refundId
 
   it('emails the learner and the owner once for a Support refund, webhook included', async () => {
     const payment = await buy('refund-me@example.com', course.courseId)
@@ -271,8 +281,55 @@ describe('refund notices', () => {
       t.payments.refundedEvent(payment.stripePaymentIntentId as string),
     )
     expect(hook.status).toBe(200)
+    expect(hook.body.outcome).toBe('ignored')
     expect(noticesTo('refund-me@example.com', 'Refund issued')).toHaveLength(1)
     expect(noticesTo('seller@example.com', 'was refunded')).toHaveLength(1)
+    // one ledger row, under the id Stripe gave the refund
+    const rows = await ledgerOf(payment.id)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ stripeRefundId: lastStripeRefund(), amountCents: 8000 })
+    expect(await paymentState(payment.id)).toEqual({ status: 'refunded', refundedCents: 8000 })
+  })
+
+  it("records a Support refund once when Stripe's notice arrives before the action records it", async () => {
+    const payment = await buy('notice-first@example.com', course.courseId)
+    const ownerBefore = noticesTo('seller@example.com', 'was refunded').length
+    const createRefund = t.payments.createRefund
+    let hookOutcome: unknown
+    // Stripe makes the refund and sends charge.refunded, which is handled before Stripe's
+    // answer to the Support action comes back.
+    t.payments.createRefund = async (input) => {
+      const result = await createRefund.call(t.payments, input)
+      const hook = await t.stripeWebhook(t.payments.refundedEvent(input.paymentIntentId))
+      hookOutcome = hook.body.outcome
+      return result
+    }
+    try {
+      const refunded = await t.api('POST', `/api/support/transactions/${payment.id}/refund`, {
+        token: admin,
+        body: { reason: 'Bought by mistake' },
+      })
+      expect(refunded.status).toBe(200)
+      expect(refunded.body.transaction).toMatchObject({ status: 'refunded', refundedCents: 8000 })
+    } finally {
+      t.payments.createRefund = createRefund
+    }
+    expect(hookOutcome).toBe('applied')
+    const adminUser = await t.db.query.users.findFirst({ where: { email: 'admin@example.com' } })
+    const rows = await ledgerOf(payment.id)
+    expect(rows).toHaveLength(1)
+    // the notice recorded it as the action would have: Support's reason, and who asked
+    expect(rows[0]).toMatchObject({
+      stripeRefundId: lastStripeRefund(),
+      amountCents: 8000,
+      reason: 'Bought by mistake',
+      requestedBy: adminUser?.id,
+    })
+    expect(await paymentState(payment.id)).toEqual({ status: 'refunded', refundedCents: 8000 })
+    const learnerNotices = noticesTo('notice-first@example.com', 'Refund issued')
+    expect(learnerNotices).toHaveLength(1)
+    expect(learnerNotices[0]?.text).toContain('Bought by mistake')
+    expect(noticesTo('seller@example.com', 'was refunded')).toHaveLength(ownerBefore + 1)
   })
 
   it('emails the learner and the owner once for a refund made in the Stripe dashboard', async () => {
@@ -288,6 +345,77 @@ describe('refund notices', () => {
     await t.stripeWebhook({ ...event, id: `${event.id}_again` })
     expect(noticesTo('dashboard-refund@example.com', 'Refund issued')).toHaveLength(1)
     expect(noticesTo('seller@example.com', 'was refunded')).toHaveLength(before + 1)
+    const rows = await ledgerOf(payment.id)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      stripeRefundId: lastStripeRefund(),
+      amountCents: 8000,
+      reason: 'Refunded in Stripe',
+      requestedBy: null,
+    })
+  })
+
+  it('records each part refund made in the Stripe dashboard once, then a Support refund of the rest', async () => {
+    const payment = await buy('part-refunds@example.com', course.courseId)
+    const paymentIntentId = payment.stripePaymentIntentId as string
+    await t.payments.createRefund({ paymentIntentId, amountCents: 3000 })
+    const first = t.payments.refundedEvent(paymentIntentId)
+    expect((await t.stripeWebhook(first)).body.outcome).toBe('applied')
+    expect(await paymentState(payment.id)).toEqual({
+      status: 'partially_refunded',
+      refundedCents: 3000,
+    })
+    // a second part refund, then Stripe's two notices, the first one again under a new id
+    await t.payments.createRefund({ paymentIntentId, amountCents: 2000 })
+    expect((await t.stripeWebhook(t.payments.refundedEvent(paymentIntentId))).body.outcome).toBe(
+      'applied',
+    )
+    expect((await t.stripeWebhook({ ...first, id: `${first.id}_late` })).body.outcome).toBe(
+      'ignored',
+    )
+    expect((await ledgerOf(payment.id)).map((r) => r.amountCents).sort((a, b) => a - b)).toEqual([
+      2000, 3000,
+    ])
+    expect(await paymentState(payment.id)).toEqual({
+      status: 'partially_refunded',
+      refundedCents: 5000,
+    })
+    expect(noticesTo('part-refunds@example.com', 'Refund issued')).toHaveLength(2)
+
+    // Support refunds what is left, and Stripe's notice of it adds nothing
+    const refunded = await t.api('POST', `/api/support/transactions/${payment.id}/refund`, {
+      token: admin,
+      body: { reason: 'The rest' },
+    })
+    expect(refunded.status).toBe(200)
+    expect(refunded.body.transaction).toMatchObject({ status: 'refunded', refundedCents: 8000 })
+    expect((await t.stripeWebhook(t.payments.refundedEvent(paymentIntentId))).body.outcome).toBe(
+      'ignored',
+    )
+    expect((await ledgerOf(payment.id)).map((r) => r.amountCents).sort((a, b) => a - b)).toEqual([
+      2000, 3000, 3000,
+    ])
+    expect(await paymentState(payment.id)).toEqual({ status: 'refunded', refundedCents: 8000 })
+    expect(noticesTo('part-refunds@example.com', 'Refund issued')).toHaveLength(3)
+  })
+
+  it('sends Support refunds to Stripe under one idempotency key per payment', async () => {
+    const payment = await buy('one-key@example.com', course.courseId)
+    const createRefund = t.payments.createRefund
+    const keys: Array<string | undefined> = []
+    t.payments.createRefund = async (input) => {
+      keys.push(input.idempotencyKey)
+      return createRefund.call(t.payments, input)
+    }
+    try {
+      await t.api('POST', `/api/support/transactions/${payment.id}/refund`, {
+        token: admin,
+        body: { reason: 'Changed their mind' },
+      })
+    } finally {
+      t.payments.createRefund = createRefund
+    }
+    expect(keys).toEqual([`support-refund:${payment.id}`])
   })
 })
 

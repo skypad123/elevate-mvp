@@ -1,7 +1,10 @@
+import { profileShareAfterRefunds, RELEASE_AFTER_MS } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { seedDatabase } from '@elevate/db/seed'
 import { translate } from '@elevate/i18n'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { SeatRefundsService } from '../src/services/seat-refunds.service'
+import { A, block, F, K, N, newClass, seat, seller, teachToken } from './helpers/selling'
 import { createTestApp, type TestApp } from './helpers/test-app'
 
 let t: TestApp
@@ -178,6 +181,13 @@ describe('earnings and transactions', () => {
     expect(recent[0].learner).toBe('s***@example.com')
     expect(recent).toHaveLength(3)
     expect(stripe).toEqual({ connected: true, chargesEnabled: true, payoutsEnabled: true })
+    // a profile that has not opted in to class sales holds nothing and has no payouts here
+    expect(earnings.body.earnings).toMatchObject({
+      heldCents: 0,
+      heldClasses: [],
+      payouts: [],
+      debtCents: 0,
+    })
     netBefore = totals.netCents
 
     const reconcile = await t.api('GET', teach('/earnings/reconcile'), { token: teacher })
@@ -391,5 +401,128 @@ describe('learner email language', () => {
     const certificate = lastTo('no-language@example.com')
     expect(certificate?.html).toContain('<html lang="en">')
     expect(certificate?.subject).toBe('Your certificate: Sourdough from Scratch')
+  })
+})
+
+describe('class sales in earnings', () => {
+  it('counts each seat by its share after refunds, and reconciles after a part refund', async () => {
+    const sell = await seller(t)
+    const first = await newClass(t, sell, [block(14)])
+    const second = await newClass(t, sell, [block(20)])
+    const withdrawn = await seat(t, first.classId)
+    const part = await seat(t, first.classId)
+    const cancelled = await seat(t, second.classId)
+    const token = await teachToken(t, sell)
+    const base = `/api/teach/profiles/${sell.profileId}`
+    expect(
+      (
+        await t.api('POST', `/api/me/classes/${withdrawn.enrollmentId}/withdraw`, {
+          token: withdrawn.token,
+        })
+      ).status,
+    ).toBe(200)
+    const refund = await t.api(
+      'POST',
+      `${base}/classes/${first.classId}/learners/${part.enrollmentId}/refund`,
+      { token, body: { amountCents: 10000, reason: 'The room was too cold.' } },
+    )
+    expect(refund.status).toBe(200)
+    const cancel = await t.api('POST', `${base}/classes/${second.classId}/cancel`, {
+      token,
+      body: { reason: 'The teacher is unwell.' },
+    })
+    expect(cancel.status).toBe(200)
+    await new SeatRefundsService(t.deps).sendUnfinished(t.now())
+
+    const rows = await t.db.query.payments.findMany({
+      where: { payoutAccountId: sell.payoutAccountId },
+      with: { refunds: true },
+    })
+    const share = (id: string) => {
+      const p = rows.find((r) => r.id === id)
+      if (!p) throw new Error('no payment')
+      return profileShareAfterRefunds({ ...p, bankDisputeLost: false })
+    }
+    // the amounts table: a withdrawal leaves the profile at zero, a cancelled seat −F
+    expect(share(withdrawn.paymentId)).toBe(0)
+    expect(share(cancelled.paymentId)).toBe(-F)
+    const partShare = N - 10000 + Math.floor((K * 10000) / A)
+    expect(share(part.paymentId)).toBe(partShare)
+
+    const earnings = (await t.api('GET', `${base}/earnings`, { token })).body.earnings
+    expect(earnings.totals.netCents).toBe(partShare - F)
+    // The summary's parts add up to the net: the withdrawal and the cancellation each return K of
+    // Elevate's fee to the profile, the part refund its share of K.
+    type Parts = {
+      grossCents: number
+      stripeFeeCents: number
+      commissionCents: number
+      refundedCents: number
+      feeReturnedCents: number
+      netCents: number
+    }
+    const added = (b: Parts) =>
+      b.grossCents - b.stripeFeeCents - b.commissionCents - b.refundedCents + b.feeReturnedCents
+    expect(earnings.totals.feeReturnedCents).toBe(2 * K + Math.floor((K * 10000) / A))
+    expect(earnings.totals.refundedCents).toBe(A - F + 10000 + A)
+    expect(added(earnings.totals)).toBe(earnings.totals.netCents)
+    for (const course of earnings.courses) expect(added(course)).toBe(course.netCents)
+
+    // Support's transaction page: each side's net after the refunds, beside the nets before
+    const detail = async (id: string) =>
+      (await t.api('GET', `/api/support/transactions/${id}`, { token: agent })).body.transaction
+    expect(await detail(withdrawn.paymentId)).toMatchObject({
+      teacherNetCents: N,
+      platformNetCents: K,
+      teacherNetAfterRefundsCents: 0,
+      platformNetAfterRefundsCents: 0,
+    })
+    expect(await detail(cancelled.paymentId)).toMatchObject({
+      teacherNetAfterRefundsCents: -F,
+      platformNetAfterRefundsCents: 0,
+    })
+    expect(await detail(part.paymentId)).toMatchObject({
+      teacherNetAfterRefundsCents: partShare,
+      platformNetAfterRefundsCents: K - Math.floor((K * 10000) / A),
+    })
+    expect(
+      Object.fromEntries(
+        earnings.recent.map((r: { paymentId: string; netCents: number }) => [
+          r.paymentId,
+          r.netCents,
+        ]),
+      ),
+    ).toEqual({
+      [withdrawn.paymentId]: 0,
+      [part.paymentId]: partShare,
+      [cancelled.paymentId]: -F,
+    })
+    expect(earnings).toMatchObject({
+      heldCents: partShare,
+      heldClasses: [
+        {
+          classId: first.classId,
+          className: expect.any(String),
+          heldCents: partShare,
+          releaseDueAt: new Date(first.lastEndsAt.getTime() + RELEASE_AFTER_MS).toISOString(),
+          waitingFor: null,
+        },
+      ],
+      payouts: [],
+      // the cancelled seat's debt counts at once
+      debtCents: F,
+    })
+    const perCourse = await t.api('GET', `${base}/earnings/courses/${sell.courseId}`, { token })
+    expect(perCourse.body.earnings.course.netCents).toBe(partShare - F)
+    expect(added(perCourse.body.earnings.course)).toBe(partShare - F)
+    for (const p of perCourse.body.earnings.payments)
+      expect(added({ ...p, grossCents: p.amountCents })).toBe(p.netCents)
+
+    const reconcile = await t.api('GET', `${base}/earnings/reconcile`, { token })
+    expect(reconcile.body.reconciliation).toMatchObject({
+      ledgerNetCents: partShare - F,
+      stripeTransferTotalCents: partShare - F,
+      differenceCents: 0,
+    })
   })
 })

@@ -1,10 +1,20 @@
 # Postgres 17 on RDS. The migrations create the citext and pg_trgm extensions; both are available
 # to the master user. RDS for Postgres 15+ requires TLS by default, and the API image carries the
 # RDS certificate bundle, so DATABASE_URL uses sslmode=verify-full.
+#
+# Two database users (ADR 012). `elevate`, the master user, owns the tables; only the migration
+# task holds its connection string. `elevate_api` is the user the API runs as: the migration task
+# creates it and sets its grants (`migrate.js`, `applyApiRole`), which leave it unable to update or
+# delete attendance rows.
 
 resource "random_password" "db" {
   length  = 32
   special = false # keeps the connection string free of characters that need URL-encoding
+}
+
+resource "random_password" "api_db" {
+  length  = 32
+  special = false # the same reason: database_url_api is built without URL-encoding
 }
 
 resource "aws_db_subnet_group" "main" {
@@ -48,6 +58,17 @@ locals {
     "postgres://%s:%s@%s:%d/%s?sslmode=verify-full",
     aws_db_instance.main.username,
     random_password.db.result,
+    aws_db_instance.main.address,
+    aws_db_instance.main.port,
+    aws_db_instance.main.db_name,
+  )
+
+  api_database_user = "elevate_api"
+
+  database_url_api = format(
+    "postgres://%s:%s@%s:%d/%s?sslmode=verify-full",
+    local.api_database_user,
+    random_password.api_db.result,
     aws_db_instance.main.address,
     aws_db_instance.main.port,
     aws_db_instance.main.db_name,

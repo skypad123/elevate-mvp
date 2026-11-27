@@ -156,6 +156,7 @@ export class ProfilesService {
       legalEntity: profile.legalEntity ? legalEntityView(profile.legalEntity) : null,
       owner: { id: profile.owner.id, email: profile.owner.email, name: profile.owner.name },
       actingAsStaff,
+      classesEnabled: this.deps.env.CLASSES,
       appliedAt: profile.appliedAt.toISOString(),
       reviewedAt: profile.reviewedAt?.toISOString() ?? null,
     }

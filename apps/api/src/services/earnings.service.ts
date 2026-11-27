@@ -7,21 +7,27 @@ import type {
 import type { schema as s } from '@elevate/db'
 import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
+import { feeReturned, type LedgerAmounts, paymentShare } from '../lib/share'
 import type { ProfileActor } from '../middleware/auth'
+import { PayoutsService } from './payouts.service'
 
-type PaymentRow = typeof s.payments.$inferSelect
+/** A payment with the ledger rows its share is worked out from. */
+type PaymentRow = typeof s.payments.$inferSelect & { refunds: LedgerAmounts[] }
+
+/** The ledger columns every earnings query reads with a payment. */
+const LEDGER = {
+  refunds: { columns: { amountCents: true, applicationFeeRefundedCents: true } },
+} as const
 
 export function maskEmail(email: string): string {
   const [local = '', domain = ''] = email.split('@')
   return `${local.slice(0, 1)}***@${domain}`
 }
 
-/** Teacher net left after refunds (a full refund reverses the whole transfer; partial pro-rata). */
-export function netAfterRefunds(p: PaymentRow): number {
-  if (p.refundedCents <= 0) return p.teacherNetCents
-  if (p.refundedCents >= p.amountCents) return 0
-  return p.teacherNetCents - Math.round((p.refundedCents * p.teacherNetCents) / p.amountCents)
-}
+/** The profile's share of one payment after its refunds and any lost bank dispute. */
+const netOf = (p: PaymentRow) => paymentShare(p, p.refunds)
+/** The part of Elevate's fee the payment's refunds returned to the profile. */
+const feeReturnedOf = (p: PaymentRow) => feeReturned(p, p.refunds)
 
 export function breakdown(rows: PaymentRow[]): MoneyBreakdown {
   const sum = (f: (p: PaymentRow) => number) => rows.reduce((n, p) => n + f(p), 0)
@@ -29,10 +35,13 @@ export function breakdown(rows: PaymentRow[]): MoneyBreakdown {
     paymentCount: rows.length,
     grossCents: sum((p) => p.amountCents),
     discountCents: sum((p) => p.discountCents),
-    stripeFeeCents: sum((p) => p.stripeFeeActualCents ?? p.stripeFeeEstimateCents),
+    // The fee taken inside Elevate's fee at checkout, so that gross − these fees − commission −
+    // refunded + feeReturned is the net. Elevate pays Stripe's actual fee, which can differ.
+    stripeFeeCents: sum((p) => p.stripeFeeEstimateCents),
     commissionCents: sum((p) => p.commissionCents),
-    netCents: sum(netAfterRefunds),
+    netCents: sum(netOf),
     refundedCents: sum((p) => p.refundedCents),
+    feeReturnedCents: sum(feeReturnedOf),
   }
 }
 
@@ -59,7 +68,10 @@ export class EarningsService {
     const { payoutAccount } = await this.profileWithAccount(profileId)
     if (!payoutAccount) return breakdown([])
     return breakdown(
-      await this.deps.db.query.payments.findMany({ where: { payoutAccountId: payoutAccount.id } }),
+      await this.deps.db.query.payments.findMany({
+        where: { payoutAccountId: payoutAccount.id },
+        with: LEDGER,
+      }),
     )
   }
 
@@ -72,6 +84,7 @@ export class EarningsService {
           where: { payoutAccountId: account.id },
           orderBy: { paidAt: 'desc', createdAt: 'desc' },
           with: {
+            ...LEDGER,
             course: { columns: { id: true, title: true, slug: true, status: true } },
             user: { columns: { email: true } },
           },
@@ -106,7 +119,7 @@ export class EarningsService {
         courseTitle: p.course.title,
         learner: maskEmail(p.user.email),
         amountCents: p.amountCents,
-        netCents: netAfterRefunds(p),
+        netCents: netOf(p),
         status: p.status,
         paidAt: p.paidAt.toISOString(),
       })),
@@ -116,6 +129,8 @@ export class EarningsService {
         payoutsEnabled: account?.payoutsEnabled ?? false,
       },
       commissionBps: profile.commissionBps,
+      // Class sales: held money and payouts, for a profile on manual payouts.
+      ...(await new PayoutsService(this.deps).forProfile(actor)),
     }
   }
 
@@ -137,7 +152,11 @@ export class EarningsService {
       ? await db.query.payments.findMany({
           where: { courseId, payoutAccountId: payoutAccount.id },
           orderBy: { paidAt: 'desc', createdAt: 'desc' },
-          with: { user: { columns: { email: true } }, promoCode: { columns: { code: true } } },
+          with: {
+            ...LEDGER,
+            user: { columns: { email: true } },
+            promoCode: { columns: { code: true } },
+          },
         })
       : []
     // Visible when the profile owns the course, or its account was paid for it.
@@ -157,10 +176,11 @@ export class EarningsService {
         learner: maskEmail(p.user.email),
         amountCents: p.amountCents,
         discountCents: p.discountCents,
-        stripeFeeCents: p.stripeFeeActualCents ?? p.stripeFeeEstimateCents,
+        stripeFeeCents: p.stripeFeeEstimateCents,
         commissionCents: p.commissionCents,
-        netCents: netAfterRefunds(p),
+        netCents: netOf(p),
         refundedCents: p.refundedCents,
+        feeReturnedCents: feeReturnedOf(p),
         status: p.status,
         promoCode: p.promoCode?.code ?? null,
         paidAt: p.paidAt.toISOString(),
@@ -175,6 +195,7 @@ export class EarningsService {
       throw errors.conflict('stripe_not_connected', 'Connect Stripe to reconcile earnings')
     const rows = await this.deps.db.query.payments.findMany({
       where: { payoutAccountId: payoutAccount.id },
+      with: LEDGER,
     })
     const ledgerNetCents = breakdown(rows).netCents
     const stripeTransferTotalCents = await this.deps.payments.listTransferAmountCents(

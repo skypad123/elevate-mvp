@@ -7,6 +7,7 @@ import {
   exists,
   ilike,
   inArray,
+  isNull,
   notExists,
   or,
   type SQL,
@@ -165,7 +166,14 @@ export class PeopleService {
     const [enrollments] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(s.enrollments)
-      .where(and(eq(s.enrollments.userId, userId), inArray(s.enrollments.status, ['active'])))
+      // Self-paced enrollments only, as this count has always meant.
+      .where(
+        and(
+          eq(s.enrollments.userId, userId),
+          inArray(s.enrollments.status, ['active']),
+          isNull(s.enrollments.classId),
+        ),
+      )
     return {
       ...personSummary(user),
       stats: { enrollments: enrollments?.count ?? 0 },

@@ -1,6 +1,6 @@
 import { ANALYTICS_EVENTS, type AnalyticsSummary } from '@elevate/core'
 import { schema as s } from '@elevate/db'
-import { asc, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
 import type { Deps } from '../deps'
 
 const percent = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : null)
@@ -24,7 +24,8 @@ export class AnalyticsService {
     const [totals] = await db
       .select({ enrolled: sql<number>`count(*)::int`, completed: completedExpr })
       .from(s.enrollments)
-      .where(eq(s.enrollments.status, 'active'))
+      // Self-paced enrollments only, as these numbers have always meant.
+      .where(and(eq(s.enrollments.status, 'active'), isNull(s.enrollments.classId)))
     const perCourse = await db
       .select({
         courseId: s.courses.id,
@@ -35,7 +36,7 @@ export class AnalyticsService {
       .from(s.courses)
       .leftJoin(
         s.enrollments,
-        sql`${s.enrollments.courseId} = ${s.courses.id} and ${s.enrollments.status} = 'active'`,
+        sql`${s.enrollments.courseId} = ${s.courses.id} and ${s.enrollments.status} = 'active' and ${s.enrollments.classId} is null`,
       )
       .where(eq(s.courses.status, 'live'))
       .groupBy(s.courses.id, s.courses.title)

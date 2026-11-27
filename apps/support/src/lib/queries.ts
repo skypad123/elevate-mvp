@@ -1,11 +1,21 @@
 import type {
   AnalyticsSummary,
   AuditEntry,
+  Correction,
+  ElevateCancelClass,
+  EraseCoordinatesResult,
   NameCheckView,
   Page,
   PayoutLedgerRow,
   PersonDetail,
   PersonSummary,
+  RefundRowAction,
+  SeatRefundView,
+  SupportClass,
+  SupportClassBlock,
+  SupportClassSummary,
+  SupportFeatures,
+  SupportPayoutsOverview,
   SupportProfileDetail,
   SupportProfileSummary,
   TransactionDetail,
@@ -45,6 +55,19 @@ export function usePerson(id: string) {
       (await unwrap(await api.support.people[':id'].$get({ param: { id } })))
         .person as PersonDetail,
   })
+}
+
+/**
+ * Deletes every location reading of one learner's check-ins and attempts, for a super admin, with
+ * the reason kept in the audit log (docs/runbooks/erase-coordinates.md). Final.
+ */
+export async function eraseCoordinates(userId: string, reason: string) {
+  return (await unwrap(
+    await api.support.learners[':userId']['erase-coordinates'].$post({
+      param: { userId },
+      json: { reason },
+    }),
+  )) as EraseCoordinatesResult
 }
 
 // ── teaching profiles ───────────────────────────────────────────────────────
@@ -178,6 +201,70 @@ export function usePayouts() {
   })
 }
 
+// ── held class money and payouts (docs/designs/scheduled-classes-selling.md) ──
+export const payoutKeys = {
+  /** Under `transactionKeys.payouts`, so a refund that refreshes the ledger refreshes this too. */
+  overview: ['support', 'payouts', 'overview'] as const,
+}
+
+/**
+ * The release job's state and the cases that need a person: the last finished run, classes under
+ * review, refunds that wait or failed, unfinished cancellations, day-limit releases, failed
+ * payouts, unnamed money and the recent runs.
+ */
+export function usePayoutsOverview() {
+  return useQuery({
+    queryKey: payoutKeys.overview,
+    queryFn: async () =>
+      (await unwrap(await api.support.payouts.overview.$get())).overview as SupportPayoutsOverview,
+  })
+}
+
+/** Releases a class under review, with a note; the next run releases its money. Super admin. */
+export async function clearReview(classId: string, note: string) {
+  return (
+    await unwrap(
+      await api.support.classes[':id']['clear-review'].$post({
+        param: { id: classId },
+        json: { note },
+      }),
+    )
+  ).review
+}
+
+/**
+ * Elevate cancels a class on one of the grounds of G17, with a note. Every active seat gets a
+ * full refund row, sent by the next run, and the profile's owner is emailed. Super admin.
+ */
+export async function cancelClassByElevate(classId: string, input: ElevateCancelClass) {
+  return (
+    await unwrap(
+      await api.support.classes[':id'].cancel.$post({ param: { id: classId }, json: input }),
+    )
+  ).class as SupportClass
+}
+
+/** Retries or closes a failed seat refund row, with a reason. Super admin. */
+export async function refundRowAction(seatRefundId: string, input: RefundRowAction) {
+  return (
+    await unwrap(
+      await api.support['seat-refunds'][':id'].$post({ param: { id: seatRefundId }, json: input }),
+    )
+  ).seatRefund as SeatRefundView
+}
+
+/** Writes a signed `correction` adjustment, with a reason; the next payout pays or takes it. */
+export async function addCorrection(payoutAccountId: string, input: Correction) {
+  return (
+    await unwrap(
+      await api.support['payout-accounts'][':id'].corrections.$post({
+        param: { id: payoutAccountId },
+        json: input,
+      }),
+    )
+  ).adjustment
+}
+
 export function useAuditLog() {
   return useInfiniteQuery({
     queryKey: transactionKeys.audit,
@@ -187,6 +274,61 @@ export function useAuditLog() {
         await api.support['audit-log'].$get({ query: pageParam ? { cursor: pageParam } : {} }),
       )) as Page<AuditEntry>,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
+  })
+}
+
+// ── scheduled classes: read only ────────────────────────────────────────────
+export const classKeys = {
+  features: ['support', 'features'] as const,
+  search: (q: string) => ['support', 'classes', 'search', q] as const,
+  detail: (id: string) => ['support', 'classes', 'detail', id] as const,
+  block: (id: string, blockId: string) => ['support', 'classes', 'block', id, blockId] as const,
+}
+
+/** Which optional areas the API has switched on; the navigation hides the ones that are off. */
+export function useSupportFeatures(enabled = true) {
+  return useQuery({
+    queryKey: classKeys.features,
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: async () => (await unwrap(await api.support.features.$get())) as SupportFeatures,
+  })
+}
+
+/** Classes whose name, profile name or a learner's email contains `q`. Runs only with text. */
+export function useClassSearch(q: string) {
+  return useQuery({
+    queryKey: classKeys.search(q),
+    enabled: q.length > 0,
+    placeholderData: keepPreviousData,
+    queryFn: async () =>
+      (await unwrap(await api.support.classes.$get({ query: { q, limit: '50' } })))
+        .items as SupportClassSummary[],
+  })
+}
+
+export function useSupportClass(id: string) {
+  return useQuery({
+    queryKey: classKeys.detail(id),
+    enabled: !!id,
+    queryFn: async () =>
+      (await unwrap(await api.support.classes[':id'].$get({ param: { id } })))
+        .class as SupportClass,
+  })
+}
+
+/** One block with each learner's row, coordinates and events. `blockId` empty means none chosen. */
+export function useSupportBlock(id: string, blockId: string) {
+  return useQuery({
+    queryKey: classKeys.block(id, blockId),
+    enabled: !!id && !!blockId,
+    placeholderData: keepPreviousData,
+    queryFn: async () =>
+      (
+        await unwrap(
+          await api.support.classes[':id'].blocks[':blockId'].$get({ param: { id, blockId } }),
+        )
+      ).block as SupportClassBlock,
   })
 }
 

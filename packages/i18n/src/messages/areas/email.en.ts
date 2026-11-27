@@ -60,4 +60,113 @@ export const emailEn = {
   'email.duplicate.removed':
     'Your other payment for this course has been refunded too, so access to the course has been removed.',
   'email.duplicate.button': 'Go to the course',
+
+  // A class's times, one line per block. {date} is like "Tue, 1 Dec 2026"; {start} and {end}
+  // are like "09:00", in the class's time zone.
+  'email.class.block': '{date}, {start}–{end}',
+  // One instant in the class's time zone. {day} is like "Tue, 1 Dec 2026"; {time} is like
+  // "9:00 am SGT".
+  'email.class.instant': '{day}, {time}',
+
+  // The receipt for a seat in a class. {className} is the class's name, {course} the course
+  // title and {teacher} the teaching profile's name; {amount} is like "S$500.00". The times
+  // follow email.classReceipt.when, one email.class.block each; {timeZone} is like "Singapore
+  // Standard Time". {address} is the venue as the teacher typed it. {date} is when withdrawal for
+  // a refund less the payment processing fee closes, an email.class.instant.
+  'email.classReceipt.title': 'Your seat is booked: {className}',
+  'email.classReceipt.paid':
+    'Thanks for your purchase. You paid {amount} for a seat in "{className}", a class of "{course}" by {teacher}.',
+  'email.classReceipt.when': 'The class meets at these times ({timeZone}):',
+  'email.classReceipt.where': 'Where: {address}',
+  'email.classReceipt.online':
+    'The class is taught online. Your instructor will email you how to join.',
+  'email.classReceipt.terms':
+    'You can withdraw until {date}, as long as you have not attended a session, and we refund the price you paid less the payment processing fee that Stripe charged on your payment; after that date you cannot withdraw for a refund.',
+  'email.classReceipt.button': 'View your class',
+
+  // A payment for a seat that arrived when the seat was gone: the class had filled, started or
+  // been cancelled. Sent once the whole payment has been returned. {amount} is like "S$500.00".
+  'email.seatLost.title': 'No seat in {className}: your payment has been returned',
+  'email.seatLost.lost':
+    'Your payment for a seat in "{className}" arrived after the seat was no longer available, so you do not have a seat.',
+  'email.seatLost.refunded':
+    'We have returned the whole {amount} to your original payment method. It can take 5–10 working days to appear.',
+  'email.seatLost.button': 'Go to the course',
+
+  // The teacher changed a block's time in a class where the learner has a seat. The old and the
+  // new times follow .before and .after, one email.class.block each. .withdraw is only for a
+  // learner who may now withdraw with a full refund.
+  'email.classTimesChanged.title': 'New times for {className}',
+  'email.classTimesChanged.changed':
+    'The teacher has changed the times of "{className}", a class you have a seat in.',
+  'email.classTimesChanged.before': 'The times were ({timeZone}):',
+  'email.classTimesChanged.after': 'The new times are ({timeZone}):',
+  'email.classTimesChanged.withdraw':
+    "If the new times do not suit you, you can withdraw on the class's page in Elevate for a full refund until the class starts.",
+  'email.classTimesChanged.button': 'View your class',
+
+  // The teacher marked the learner present by hand. {block} is one email.class.block line,
+  // followed by the time zone's name; {date} is the last day the learner can dispute the mark.
+  'email.manualMark.title': 'You were marked present: {className}',
+  'email.manualMark.marked':
+    'Your teacher marked you present by hand in "{className}" for the session on {block}.',
+  'email.manualMark.dispute':
+    "If you were not there, dispute the mark on the class's page in Elevate by {date}. After that it counts as attendance, and a refund for this class is the teacher's decision.",
+  'email.manualMark.button': 'View your class',
+
+  // The class was cancelled and the refund has been made. {amount} is like "S$500.00". .refunded
+  // is for the whole payment; .refundedPart for a learner who attended part of the class.
+  'email.classCancelled.title': 'Class cancelled: {className}',
+  'email.classCancelled.cancelled': '"{className}" has been cancelled.',
+  'email.classCancelled.refunded':
+    'We have returned {amount} to your original payment method. It can take 5–10 working days to appear.',
+  'email.classCancelled.refundedPart':
+    'You attended part of the class, so we have returned {amount}, the share for the sessions that were not taught, to your original payment method. It can take 5–10 working days to appear.',
+  'email.classCancelled.button': 'View your class',
+
+  // The class was cancelled after every session had started, and the learner is counted as
+  // having attended, so no refund is due.
+  'email.classCancelledAttended.title': 'Class cancelled: {className}',
+  'email.classCancelledAttended.body':
+    '"{className}" has been cancelled. Every session had started and you are counted as having attended, so no refund is due. If you think this is wrong, contact the teacher.',
+  'email.classCancelledAttended.button': 'View your class',
+
+  // The class was cancelled while the learner's manual mark could still be disputed. {date} is
+  // the last day to dispute it.
+  'email.classCancelledMarkOpen.title': 'Class cancelled: {className}',
+  'email.classCancelledMarkOpen.body':
+    '"{className}" has been cancelled. You were marked present by hand, and you can dispute that mark until {date}.',
+  'email.classCancelledMarkOpen.refund':
+    'If you dispute it, your whole payment will be returned. If you do not, the mark counts as attendance, and only the share for any sessions that were not taught will be returned.',
+  'email.classCancelledMarkOpen.button': 'View your class',
+
+  // The learner withdrew and the refund has been made. {amount} is like "S$480.00".
+  // .refundedLessFee when the payment processing fee was kept; .refundedFull otherwise.
+  'email.seatWithdrawn.title': 'You have withdrawn from {className}',
+  'email.seatWithdrawn.withdrawn':
+    'You have withdrawn from "{className}" and no longer have a seat in it.',
+  'email.seatWithdrawn.refundedLessFee':
+    'We have returned {amount}, what you paid less the payment processing fee, to your original payment method. It can take 5–10 working days to appear.',
+  'email.seatWithdrawn.refundedFull':
+    'We have returned the whole {amount} to your original payment method. It can take 5–10 working days to appear.',
+  'email.seatWithdrawn.button': 'Go to the course',
+
+  // The teacher refunded part or all of a seat; the learner keeps the seat. {reason} is what the
+  // teacher typed.
+  'email.seatRefunded.title': 'A refund for {className}',
+  'email.seatRefunded.refunded':
+    'The teacher of "{className}" has refunded {amount} to your original payment method. It can take 5–10 working days to appear.',
+  'email.seatRefunded.kept': 'You keep your seat in the class.',
+  'email.seatRefunded.button': 'View your class',
+
+  // The teacher moved the learner to another class of the course. {fromClass} and {className}
+  // are the old and the new class. The new class's times follow .when, one email.class.block
+  // each; {timeZone} is like "Singapore Standard Time".
+  'email.seatMoved.title': 'Your class has changed: {className}',
+  'email.seatMoved.moved':
+    'The teacher has moved you from "{fromClass}" to "{className}", another class of "{course}".',
+  'email.seatMoved.when': 'The new class meets at these times ({timeZone}):',
+  'email.seatMoved.withdraw':
+    "Because your class changed, you can withdraw on the class's page in Elevate for a full refund until the new class starts.",
+  'email.seatMoved.button': 'View your class',
 } as const

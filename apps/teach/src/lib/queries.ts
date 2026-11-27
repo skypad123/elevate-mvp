@@ -64,17 +64,42 @@ export function useReconciliation() {
 }
 
 /**
+ * For a write that needs a sign-in from the last 24 hours (the Stripe links, opting in to class
+ * sales, cancelling a class, a refund). Given the error a write failed with, it answers whether
+ * that was the API asking for a fresh sign-in; if so the user is told and sent to sign in, and
+ * comes back to the page they were on.
+ */
+export function useSignInAgain() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { toast } = useToast()
+  const t = useT()
+  return useCallback(
+    (error: unknown): boolean => {
+      if (!(error instanceof ApiError && error.code === 'reauth_required')) return false
+      toast({
+        tone: 'info',
+        title: t('payments.reauth.title'),
+        description: t('payments.reauth.description'),
+      })
+      const back = encodeURIComponent(location.pathname + location.search)
+      navigate(`/sign-in?redirect=${back}`)
+      return true
+    },
+    [navigate, location.pathname, location.search, toast, t],
+  )
+}
+
+/**
  * The two Stripe links: onboarding and the dashboard. Both are for the profile's owner and need
  * a sign-in from the last 24 hours. When the API asks for a fresh sign-in, the user is sent to
  * sign in and comes back to the page they were on.
  */
 export function useStripeLinks() {
   const { profileId } = useCurrentProfile()
-  const navigate = useNavigate()
-  const location = useLocation()
   const { toast } = useToast()
-  const t = useT()
   const errorMessage = useErrorMessage()
+  const signInAgain = useSignInAgain()
   const [busy, setBusy] = useState(false)
 
   /** `reauth`: the user is on their way to sign in again and will come back to this page. */
@@ -85,23 +110,14 @@ export function useStripeLinks() {
         await action()
         return 'done'
       } catch (error) {
-        if (error instanceof ApiError && error.code === 'reauth_required') {
-          toast({
-            tone: 'info',
-            title: t('payments.reauth.title'),
-            description: t('payments.reauth.description'),
-          })
-          const back = encodeURIComponent(location.pathname + location.search)
-          navigate(`/sign-in?redirect=${back}`)
-          return 'reauth'
-        }
+        if (signInAgain(error)) return 'reauth'
         toast({ tone: 'danger', title: 'Stripe', description: errorMessage(error) })
         return 'failed'
       } finally {
         setBusy(false)
       }
     },
-    [navigate, location.pathname, location.search, toast, t, errorMessage],
+    [signInAgain, toast, errorMessage],
   )
 
   const connect = useCallback(

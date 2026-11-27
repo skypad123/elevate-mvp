@@ -1,6 +1,8 @@
 import { z } from 'zod'
+import type { BankDisputeStatus } from '../domain/class-sales'
 import type { ProfileStatus, ProfileType } from '../domain/permissions'
 import type { ProfileSummary } from './auth'
+import type { SeatRefundView } from './class-sales'
 import { emailSchema, roleSchema, uuidSchema } from './common'
 import type { MediaAssetView } from './media'
 import type {
@@ -219,6 +221,24 @@ export type TransactionDetail = TransactionSummary & {
     requestedBy: string | null
     createdAt: string
   }>
+  /** A class payment's class; null for a self-paced payment. */
+  class: { id: string; name: string } | null
+  /** A class payment's seat: the status of its enrolment. Null for a self-paced payment. */
+  seatStatus: TransactionDetail['enrollmentStatus'] | null
+  /** Null when the learner has not disputed the charge with their bank. */
+  bankDisputeStatus: BankDisputeStatus | null
+  /** The release job has marked a class payment released. False for a self-paced payment. */
+  released: boolean
+  /** A payout to a profile on manual payouts has marked the payment as paid. */
+  paidOut: boolean
+  /** What that payout paid for it; below zero when it took a refund's debt. Null when not paid. */
+  paidOutCents: number | null
+  /** The teacher's share after the refunds (`profileShareAfterRefunds`). */
+  teacherNetAfterRefundsCents: number
+  /** Elevate's net after the refunds; null while Stripe's fee is not known or after a lost dispute. */
+  platformNetAfterRefundsCents: number | null
+  /** A class payment's seat refund rows, oldest first. */
+  seatRefunds: SeatRefundView[]
 }
 
 /** One row per payout account; the profile is shown beside it. */

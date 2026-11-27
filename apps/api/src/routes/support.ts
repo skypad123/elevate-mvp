@@ -1,13 +1,20 @@
 import {
+  clearReviewSchema,
   commissionSchema,
+  correctionSchema,
+  elevateCancelClassSchema,
+  eraseCoordinatesSchema,
   grantRoleSchema,
   nameCheckSchema,
   peopleQuerySchema,
   profilesQuerySchema,
   recoverOwnerSchema,
+  refundRowActionSchema,
   refundSchema,
   rejectSchema,
   reviewNoteSchema,
+  type SupportFeatures,
+  supportClassSearchSchema,
   transactionsQuerySchema,
 } from '@elevate/core'
 import { Hono } from 'hono'
@@ -15,12 +22,17 @@ import { z } from 'zod'
 import type { Deps } from '../deps'
 import { validate } from '../lib/validate'
 import { type AppEnv, ensureUser, requireRole, uuidParam } from '../middleware/auth'
+import { requireClasses } from '../middleware/classes-enabled'
 import { AnalyticsService } from '../services/analytics.service'
+import { AttendanceService } from '../services/attendance.service'
 import { LegalEntitiesService } from '../services/legal-entities.service'
+import { PayoutsService } from '../services/payouts.service'
 import { PeopleService } from '../services/people.service'
 import { ProfilesService } from '../services/profiles.service'
 import { RecoveryService } from '../services/recovery.service'
 import { ReviewService } from '../services/review.service'
+import { SeatRefundsService } from '../services/seat-refunds.service'
+import { SeatsService } from '../services/seats.service'
 import { TransactionsService } from '../services/transactions.service'
 
 const courseListQuerySchema = z.object({
@@ -37,6 +49,16 @@ export const supportRoutes = (deps: Deps) => {
   const review = new ReviewService(deps)
   const transactions = new TransactionsService(deps)
   const analytics = new AnalyticsService(deps)
+  const attendance = new AttendanceService(deps)
+  const seats = new SeatsService(deps)
+  const seatRefunds = new SeatRefundsService(deps)
+  const seatRefundId = uuidParam('id', 'Seat refund')
+  const payouts = new PayoutsService(deps)
+  const payoutAccountId = uuidParam('id', 'Payout account')
+  const classesOn = requireClasses(deps)
+  const classId = uuidParam('id', 'Class')
+  const blockId = uuidParam('blockId', 'Block')
+  const learnerId = uuidParam('userId', 'Learner')
   return (
     new Hono<AppEnv>()
       .use('*', requireRole('support_agent'))
@@ -183,9 +205,118 @@ export const supportRoutes = (deps: Deps) => {
         },
       )
       .get('/payouts', async (c) => c.json({ items: await transactions.payouts() }, 200))
+      // ── held class money and payouts (docs/designs/scheduled-classes-selling.md) ──
+      // The payouts page: the last run, classes under review, refunds that wait or failed,
+      // unfinished cancellations, day-limit releases, failed payouts and unnamed money.
+      .get('/payouts/overview', async (c) => c.json({ overview: await payouts.overview() }, 200))
+      // A correction adjustment, signed, with a reason: the next payout pays or takes it.
+      .post(
+        '/payout-accounts/:id/corrections',
+        requireRole('super_admin'),
+        payoutAccountId,
+        validate('json', correctionSchema),
+        async (c) => {
+          const adjustment = await payouts.addCorrection(
+            ensureUser(c.get('user')),
+            c.req.param('id'),
+            c.req.valid('json'),
+          )
+          return c.json({ adjustment }, 200)
+        },
+      )
       .get('/audit-log', validate('query', auditQuerySchema), async (c) =>
         c.json(await transactions.audit(c.req.valid('query').cursor), 200),
       )
       .get('/analytics', async (c) => c.json({ analytics: await analytics.summary() }, 200))
+      // ── scheduled classes: read only, but for Elevate's cancellation ──
+      // What the portal's navigation needs; answers whether or not classes are on.
+      .get('/features', async (c) => {
+        const features: SupportFeatures = { classes: deps.env.CLASSES }
+        return c.json(features, 200)
+      })
+      .get('/classes', classesOn, validate('query', supportClassSearchSchema), async (c) => {
+        const items = await attendance.supportSearch(c.req.valid('query'))
+        return c.json({ items }, 200)
+      })
+      .get('/classes/:id', classesOn, classId, async (c) => {
+        const detail = await attendance.supportClass(c.req.param('id'))
+        return c.json({ class: detail }, 200)
+      })
+      .get('/classes/:id/blocks/:blockId', classesOn, classId, blockId, async (c) => {
+        const block = await attendance.supportBlock(
+          ensureUser(c.get('user')),
+          c.req.param('id'),
+          c.req.param('blockId'),
+        )
+        return c.json({ block }, 200)
+      })
+      // Elevate cancels a class on one of the grounds of G17
+      // (docs/designs/scheduled-classes-selling.md, "Cancellation by Elevate"). It writes refund
+      // rows for every seat; the release job sends them.
+      .post(
+        '/classes/:id/cancel',
+        requireRole('super_admin'),
+        classesOn,
+        classId,
+        validate('json', elevateCancelClassSchema),
+        async (c) => {
+          await seats.cancelClassByElevate(
+            ensureUser(c.get('user')),
+            c.req.param('id'),
+            c.req.valid('json'),
+          )
+          const detail = await attendance.supportClass(c.req.param('id'))
+          return c.json({ class: detail }, 200)
+        },
+      )
+      // A class nobody is counted as attending, released by a person with a note; the next run
+      // releases its money with the reason `support`.
+      .post(
+        '/classes/:id/clear-review',
+        requireRole('super_admin'),
+        classesOn,
+        classId,
+        validate('json', clearReviewSchema),
+        async (c) => {
+          const review = await payouts.clearReview(
+            ensureUser(c.get('user')),
+            c.req.param('id'),
+            c.req.valid('json'),
+          )
+          return c.json({ review }, 200)
+        },
+      )
+      // A failed seat refund, retried or closed by a person.
+      .post(
+        '/seat-refunds/:id',
+        requireRole('super_admin'),
+        seatRefundId,
+        validate('json', refundRowActionSchema),
+        async (c) => {
+          const seatRefund = await seatRefunds.act(
+            ensureUser(c.get('user')),
+            c.req.param('id'),
+            c.req.valid('json'),
+          )
+          return c.json({ seatRefund }, 200)
+        },
+      )
+      // ── a learner's coordinates, erased on a privacy request ──
+      // docs/runbooks/erase-coordinates.md. Not under `/classes`, which stays read only, and not
+      // behind `CLASSES`, so a request can be met whether or not classes are on.
+      .post(
+        '/learners/:userId/erase-coordinates',
+        requireRole('super_admin'),
+        learnerId,
+        validate('json', eraseCoordinatesSchema),
+        async (c) => {
+          const result = await attendance.eraseCoordinates(
+            ensureUser(c.get('user')),
+            c.req.param('userId'),
+            c.req.valid('json'),
+          )
+          return c.json(result, 200)
+        },
+      )
   )
 }

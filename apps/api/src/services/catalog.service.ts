@@ -1,11 +1,14 @@
 import {
   type CatalogQuery,
   type CategoryCount,
+  type ClassForSale,
   COURSE_CATEGORIES,
   type CourseCard,
   type CoursePublicView,
   type Page,
   previewIsShown,
+  seatsLeft,
+  type ViewerClassSeat,
 } from '@elevate/core'
 import { schema as s } from '@elevate/db'
 import { and, EmptyFilter, eq, exists, ilike, or, sql } from 'drizzle-orm'
@@ -13,6 +16,7 @@ import type { Deps } from '../deps'
 import { errors } from '../lib/errors'
 import { hasRole, type SessionUser } from '../middleware/auth'
 import { loadActor } from './auth.service'
+import { FOR_SALE_RELATIONS, onSale, seatsTaken, toClassForSale } from './class-checkout.service'
 import { MediaService } from './media.service'
 import { profileAvatarUrl } from './profiles.service'
 
@@ -139,7 +143,7 @@ export class CatalogService {
   }
 
   async detail(slug: string, viewer: Viewer | null): Promise<CoursePublicView> {
-    const { db, learnerDb } = this.deps
+    const { learnerDb } = this.deps
     const course = await learnerDb.query.courses.findFirst({
       where: { slug },
       with: {
@@ -158,8 +162,10 @@ export class CatalogService {
       },
     })
     if (!course) throw errors.notFound('Course')
+    // Through the learner client, so only the self-paced enrollment is reported: a class
+    // enrollment for the same course is not this course page's to show.
     const enrollment = viewer
-      ? await db.query.enrollments.findFirst({
+      ? await learnerDb.query.enrollments.findFirst({
           where: { courseId: course.id, userId: viewer.id },
         })
       : null
@@ -185,6 +191,7 @@ export class CatalogService {
         durationSeconds: a.durationSeconds ?? a.media?.durationSeconds ?? null,
       })),
     }))
+    const { classes, viewerClassSeats } = await this.classesOf(course.id, viewer)
     const artefactCount = lessons.reduce((n, l) => n + l.artefacts.length, 0)
     const durationSeconds = lessons.reduce(
       (n, l) => n + l.artefacts.reduce((m, a) => m + (a.durationSeconds ?? 0), 0),
@@ -221,6 +228,44 @@ export class CatalogService {
             completedAt: enrollment.completedAt?.toISOString() ?? null,
           }
         : null,
+      classes,
+      viewerClassSeats,
+    }
+  }
+
+  /**
+   * The course's classes that are on sale, with seats left (a full class is listed, with none),
+   * and the signed-in learner's seats in classes of the course. Class rows are not course
+   * content, so they are read with `db`; the self-paced `viewer` is left as it is.
+   */
+  private async classesOf(
+    courseId: string,
+    viewer: Viewer | null,
+  ): Promise<{ classes: ClassForSale[]; viewerClassSeats: ViewerClassSeat[] }> {
+    const { db } = this.deps
+    const now = this.deps.now()
+    const rows = await db.query.classes.findMany({
+      where: { courseId, status: 'published' },
+      with: FOR_SALE_RELATIONS,
+    })
+    const classes: ClassForSale[] = []
+    for (const row of rows) {
+      if (onSale(this.deps.env, row, now) !== true) continue
+      classes.push(toClassForSale(row, seatsLeft(row.seats, await seatsTaken(db, row.id, now))))
+    }
+    classes.sort((a, b) => (a.blocks[0]?.startsAt ?? '').localeCompare(b.blocks[0]?.startsAt ?? ''))
+    const seats = viewer
+      ? await db.query.enrollments.findMany({
+          where: { userId: viewer.id, courseId, classId: { isNotNull: true }, status: 'active' },
+          columns: { id: true, classId: true, status: true },
+          orderBy: { createdAt: 'asc' },
+        })
+      : []
+    return {
+      classes,
+      viewerClassSeats: seats.flatMap((seat) =>
+        seat.classId ? [{ classId: seat.classId, enrollmentId: seat.id, status: seat.status }] : [],
+      ),
     }
   }
 }

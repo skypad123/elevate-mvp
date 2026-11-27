@@ -1,11 +1,12 @@
-import { formatSgd } from '@elevate/core'
+import { formatSgd, type LearnerClass } from '@elevate/core'
 import { Image } from 'expo-image'
 import { Link, useRouter } from 'expo-router'
-import { ArrowRight, GraduationCap } from 'lucide-react-native'
+import { ArrowRight, CalendarDays, GraduationCap } from 'lucide-react-native'
 import { Pressable, View } from 'react-native'
 import { TAB_BAR_HEIGHT } from '@/components/PillTabBar'
 import { useErrorMessage } from '@/lib/api-error'
 import { useEnrollments } from '@/lib/catalog'
+import { formatBlockTime, useMyClasses } from '@/lib/classes'
 import { formatDate } from '@/lib/format'
 import { usePreferences } from '@/lib/preferences'
 import { useBreakpoint } from '@/lib/responsive'
@@ -21,6 +22,8 @@ export default function Learning() {
   const { t, locale } = usePreferences()
   const errorMessage = useErrorMessage()
   const enrollments = useEnrollments(isSignedIn)
+  // Empty, and so not shown, while the `CLASSES` setting is off or the learner has no class.
+  const classes = useMyClasses(isSignedIn)
   const items = enrollments.data ?? []
   const continueItem =
     items.find(
@@ -40,6 +43,8 @@ export default function Learning() {
               : t('learnerLearn.learning.welcome')}
           </Text>
         </View>
+
+        {classes.data?.length ? <YourClasses items={classes.data} /> : null}
 
         {enrollments.isPending ? (
           <View style={{ gap: theme.space[4] }}>
@@ -165,5 +170,48 @@ export default function Learning() {
         )}
       </View>
     </Screen>
+  )
+}
+
+/** The learner's class enrolments, each with its next session and a link to the class screen. */
+function YourClasses({ items }: { items: LearnerClass[] }) {
+  const theme = useTheme()
+  const { isMd } = useBreakpoint()
+  const { t, locale } = usePreferences()
+  const now = Date.now()
+  return (
+    <View style={{ gap: theme.space[3] }}>
+      <Text variant="h2">{t('learnerClass.list.title')}</Text>
+      <Grid columns={isMd ? 2 : 1} gap={theme.space[4]}>
+        {items.map((item) => {
+          const next = item.blocks.find((block) => new Date(block.endsAt).getTime() > now)
+          return (
+            <Link key={item.enrollmentId} href={`/class/${item.enrollmentId}`} asChild>
+              <Pressable testID={`your-class-${item.enrollmentId}`}>
+                <Card style={{ gap: theme.space[2] }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space[2] }}>
+                    <CalendarDays size={18} color={theme.colors.brand} />
+                    <Text variant="h3" numberOfLines={2} style={{ flex: 1 }}>
+                      {item.class.name}
+                    </Text>
+                    <ArrowRight size={16} color={theme.colors.inkTertiary} />
+                  </View>
+                  <Text variant="small" tone="secondary">
+                    {item.class.courseTitle}
+                  </Text>
+                  <Text variant="caption" tone="tertiary">
+                    {next
+                      ? t('learnerClass.list.next', {
+                          time: formatBlockTime(next, { timeZone: item.class.timeZone, locale }, t),
+                        })
+                      : t('learnerClass.list.ended')}
+                  </Text>
+                </Card>
+              </Pressable>
+            </Link>
+          )
+        })}
+      </Grid>
+    </View>
   )
 }

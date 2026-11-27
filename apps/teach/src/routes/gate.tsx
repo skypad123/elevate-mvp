@@ -47,6 +47,8 @@ export function ProfileGate() {
   // The pages Stripe sends the owner back to only wait and redirect. They sit outside both
   // layouts, so a profile that becomes ready while one of them waits does not start it again.
   if (approved && sub.startsWith('/stripe/')) return <Outlet />
+  // A class's code screen goes on a projector: no navigation, no names, nothing but the code.
+  if (approved && sub.endsWith('/code')) return <Outlet />
 
   // A company's set-up needs the profile's details; wait for them rather than flash the portal.
   if (approved && company && !profile) return <FullPageSpinner />

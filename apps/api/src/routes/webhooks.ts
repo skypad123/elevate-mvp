@@ -24,8 +24,9 @@ export const webhookRoutes = (deps: Deps) => {
         })
         throw errors.badRequest('invalid_signature', 'Webhook signature verification failed')
       }
-      const fresh = await ledger.record('mux', event.id, event.type, event)
-      if (!fresh) return c.json({ received: true, duplicate: true }, 200)
+      // Only a first delivery is handled: a Mux event is never handled again, even after a failure.
+      const recorded = await ledger.record('mux', event.id, event.type, event)
+      if (recorded !== 'new') return c.json({ received: true, duplicate: true }, 200)
       try {
         const outcome = await media.applyVideoEvent(event)
         await ledger.markProcessed('mux', event.id)
@@ -50,8 +51,10 @@ export const webhookRoutes = (deps: Deps) => {
         })
         throw errors.badRequest('invalid_signature', 'Webhook signature verification failed')
       }
-      const fresh = await ledger.record('stripe', event.id, event.type, event)
-      if (!fresh) return c.json({ received: true, duplicate: true }, 200)
+      // A redelivery of an event whose handling failed or never finished is handled again; every
+      // Stripe handler leaves the same rows when it runs twice.
+      const recorded = await ledger.record('stripe', event.id, event.type, event)
+      if (recorded === 'duplicate') return c.json({ received: true, duplicate: true }, 200)
       try {
         const outcome = await dispatchStripeEvent(event, stripeHandlers, deps)
         await ledger.markProcessed('stripe', event.id)

@@ -446,6 +446,8 @@ request ──► authenticate (unchanged: user rebuilt from the session on ever
   - `changeSet.review`, `media.upload`, `earnings.read`
   - `members.read`, `members.manageWriters`, `members.manageManagers`
   - `stripe.links`
+  - `class.refund`, added by scheduled classes Part 2 (`scheduled-classes-selling.md`). Part 1's
+    class and attendance capabilities are in its own design's table (`scheduled-classes-attendance.md`).
 - **The role table.** A manager exists only on corporate profiles; on a personal profile the
   manager row is empty. Invitation capabilities also need the profile to be approved.
 
@@ -467,6 +469,7 @@ request ──► authenticate (unchanged: user rebuilt from the session on ever
   | `members.manageWriters`  | yes   | yes     | no     | no    |
   | `members.manageManagers` | yes   | no      | no     | no    |
   | `stripe.links`           | yes   | no      | no     | no    |
+  | `class.refund`           | yes   | yes     | no     | no    |
 
 - **Unapproved profiles.** While a profile is `applied` or `rejected`, its owner and members get
   only `profile.read` and `profile.edit`, whatever their role, as applicants have today.
@@ -1633,6 +1636,18 @@ A second try works. This was the case before this step.
     | `DELETE courses/:id`                                                             | `course.delete`                                                                                                                                                                                                                                                                                                         |
     | `POST courses/:id/submit`                                                        | `course.submit`                                                                                                                                                                                                                                                                                                         |
     | lesson, artefact, quiz and prerequisite routes (create, update, reorder, delete) | `course.editDraft` on `draft` or `rejected`; on `live`, `course.editLive` edits the live rows and `course.proposeLiveEdit` edits the change set (step 2)                                                                                                                                                                |
+    | `GET class-sales`                                                                | `profile.read`                                                                                                                                                                                                                                                                                                          |
+    | `POST class-sales/accept`, `POST class-sales/leave`                              | `stripe.links`, plus recent sign-in                                                                                                                                                                                                                                                                                     |
+    | `GET classes/:id/seats`                                                          | `earnings.read`                                                                                                                                                                                                                                                                                                         |
+    | `GET classes/:id/learners/:enrollmentId/move-targets`                            | `class.manage`                                                                                                                                                                                                                                                                                                          |
+    | `POST classes/:id/learners/:enrollmentId/move`                                   | `class.manage`                                                                                                                                                                                                                                                                                                          |
+    | `POST classes/:id/learners/:enrollmentId/refund`                                 | `class.refund`, plus recent sign-in                                                                                                                                                                                                                                                                                     |
+    | `POST classes/:id/cancel`                                                        | `class.manage`, plus recent sign-in                                                                                                                                                                                                                                                                                     |
+
+    The last seven rows are selling a class (scheduled classes Part 2,
+    `docs/designs/scheduled-classes-selling.md`); like Part 1's class routes, which are listed in
+    `docs/designs/scheduled-classes-attendance.md`, they answer 404 while `CLASSES` is off. None of
+    them calls Stripe to move money: they write rows that the release job sends (ADR 013).
 
     Step 2 adds the member, invitation and change-set rows (2.10). `role-routes.test.ts` (2.16)
     uses this table as its expected values.

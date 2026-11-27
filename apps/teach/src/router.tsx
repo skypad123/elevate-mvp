@@ -4,6 +4,11 @@ import { api } from './lib/api'
 import { ProfileProvider } from './lib/profile'
 import { ApplyPage } from './routes/apply'
 import { CorporateApplyPage, CorporateReapplyPage } from './routes/apply-corporate'
+import { CodeScreen } from './routes/classes/code-screen'
+import { ClassDetailPage } from './routes/classes/detail'
+import { ClassFormPage } from './routes/classes/form'
+import { ClassesPage } from './routes/classes/list'
+import { RosterPage } from './routes/classes/roster'
 import { CourseBuilder } from './routes/courses/builder'
 import { CourseChangesPage } from './routes/courses/changes'
 import { CoursesPage } from './routes/courses/list'
@@ -74,6 +79,13 @@ export const router = createBrowserRouter([
           { path: 'courses', element: <CoursesPage /> },
           { path: 'courses/:id', element: <CourseBuilder /> },
           { path: 'courses/:id/changes', element: <CourseChangesPage /> },
+          { path: 'classes', element: <ClassesPage /> },
+          { path: 'classes/new', element: <ClassFormPage /> },
+          { path: 'classes/:id', element: <ClassDetailPage /> },
+          { path: 'classes/:id/edit', element: <ClassFormPage /> },
+          // The roster screen, and the code screen it opens in a new window for a projector.
+          { path: 'classes/:id/blocks/:blockId', element: <RosterPage /> },
+          { path: 'classes/:id/blocks/:blockId/code', element: <CodeScreen /> },
           { path: 'earnings', element: <EarningsPage /> },
           { path: 'earnings/:courseId', element: <CourseEarningsPage /> },
           { path: 'members', element: <MembersPage /> },

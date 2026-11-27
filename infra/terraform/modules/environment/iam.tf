@@ -125,10 +125,16 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["*"]
   }
 
+  # The migrate family runs migrations; the API family runs check-api-role, the seed and previews;
+  # the release family is started by hand when the schedule cannot run it.
   statement {
-    sid       = "EcsRunMigration"
-    actions   = ["ecs:RunTask"]
-    resources = ["arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${aws_ecs_task_definition.api.family}:*"]
+    sid     = "EcsRunMigration"
+    actions = ["ecs:RunTask"]
+    resources = [
+      "arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${aws_ecs_task_definition.api.family}:*",
+      "arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${aws_ecs_task_definition.migrate.family}:*",
+      "arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${aws_ecs_task_definition.release.family}:*",
+    ]
 
     condition {
       test     = "ArnEquals"
@@ -158,6 +164,26 @@ data "aws_iam_policy_document" "deploy" {
       test     = "StringEquals"
       variable = "iam:PassedToService"
       values   = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+
+  # The deploy points the release schedule at the revision it registered (scheduler.tf). Writing
+  # the schedule back passes its role again.
+  statement {
+    sid       = "ReleaseSchedule"
+    actions   = ["scheduler:GetSchedule", "scheduler:UpdateSchedule"]
+    resources = [aws_scheduler_schedule.release.arn]
+  }
+
+  statement {
+    sid       = "PassSchedulerRole"
+    actions   = ["iam:PassRole"]
+    resources = [aws_iam_role.release_scheduler.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+      values   = ["scheduler.amazonaws.com"]
     }
   }
 

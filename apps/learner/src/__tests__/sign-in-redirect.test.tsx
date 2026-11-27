@@ -64,9 +64,20 @@ describe('needsSignIn', () => {
       '/checkout/abc',
       '/checkout/success?x=1',
       '/learn/e/lesson/l',
+      '/class/e1',
+      '/class/e1/',
     ])
       expect(needsSignIn(path)).toBe(true)
-    for (const path of ['/', '/course/sourdough', '/c/TOKEN', '/sign-in', '/learning-paths'])
+    for (const path of [
+      '/',
+      '/course/sourdough',
+      '/c/TOKEN',
+      '/sign-in',
+      '/learning-paths',
+      // The check-in screen opens signed out, to offer the app or sign-in.
+      '/class/check-in/b1',
+      '/class/check-in/b1?c=ABCDEFGHJKMNPQRSTVWX',
+    ])
       expect(needsSignIn(path)).toBe(false)
   })
 })

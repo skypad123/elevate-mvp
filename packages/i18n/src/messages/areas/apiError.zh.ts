@@ -38,4 +38,28 @@ export const apiErrorZh = {
   'apiError.attempt_expired': '本次作答已超时。',
 
   'apiError.not_complete': '完成课程即可获得证书。',
+
+  // Scheduled classes: drafted by Claude, signed off by the author on 2026-11-24.
+  'apiError.check_in_not_open': '本堂课尚未开放签到。',
+  'apiError.check_in_closed': '本堂课的签到已结束。',
+  'apiError.check_in_locked': '签到码错误次数过多，请几分钟后再试。',
+  'apiError.check_in_code_wrong': '签到码不正确，请输入当前显示的签到码。',
+  'apiError.check_in_code_expired': '此签到码已过期，请输入当前显示的签到码。',
+  'apiError.check_in_overturned': '您本堂课的签到已被撤销，请联系讲师。',
+  'apiError.dispute_window_closed': '申诉期限已过。',
+  'apiError.already_disputed': '您已对此提出申诉。',
+
+  // Selling a class: drafted by Claude; signed off by the author on 2026-11-27.
+  'apiError.class_not_on_sale': '这个班级暂不开放报名。',
+  'apiError.class_full': '这个班级已满。',
+  'apiError.already_in_class': '您已在这个班级中有名额。',
+  'apiError.own_class': '您不能报名自己授课或管理的班级。',
+  'apiError.class_requires_payment': '此优惠码不能用于班级。',
+  'apiError.terms_changed': '退款条款已更新，请重新加载本页查看。',
+  'apiError.too_many_reservations': '您为这个班级发起支付的次数过多，请稍后再试。',
+  'apiError.withdrawal_closed': '这个班级的退出期限已过，请联系教师。',
+  'apiError.withdrawal_attended': '您已出席这个班级，是否退款由教师决定。',
+  'apiError.class_cancelled': '这个班级已取消，您的退款将随取消一并处理。',
+  'apiError.refund_in_progress': '这个名额的退款已在处理中。',
+  'apiError.seat_has_no_payment': '这个名额没有付款记录，因此没有可退的款项。请联系教师。',
 } satisfies Record<keyof typeof apiErrorEn, string>

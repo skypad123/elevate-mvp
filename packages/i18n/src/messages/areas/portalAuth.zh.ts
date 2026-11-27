@@ -1,6 +1,6 @@
 import type { portalAuthEn } from './portalAuth.en'
 
-/** Drafted by Claude; to be reviewed and signed off by the author. */
+/** Drafted by Claude; signed off by the author on 2026-11-27. */
 export const portalAuthZh = {
   'portalAuth.signIn.eyebrow': '登录',
   'portalAuth.signIn.emailLabel': '邮箱',

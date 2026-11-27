@@ -12,6 +12,21 @@ resource "aws_ssm_parameter" "database_url" {
   value = local.database_url
 }
 
+# The API's restricted database user (database.tf). The API task reads the connection string as
+# DATABASE_URL, unless api_uses_restricted_database_user is false; the migration task reads the
+# password to create the user or reset its password.
+resource "aws_ssm_parameter" "database_url_api" {
+  name  = "${local.param_prefix}/DATABASE_URL_API"
+  type  = "SecureString"
+  value = local.database_url_api
+}
+
+resource "aws_ssm_parameter" "api_database_password" {
+  name  = "${local.param_prefix}/API_DATABASE_PASSWORD"
+  type  = "SecureString"
+  value = random_password.api_db.result
+}
+
 resource "aws_ssm_parameter" "session_secret" {
   name  = "${local.param_prefix}/SESSION_SECRET"
   type  = "SecureString"

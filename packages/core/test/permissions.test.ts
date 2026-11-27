@@ -34,6 +34,12 @@ const EXPECTED: Record<
   'members.manageWriters': [true, true, false, false],
   'members.manageManagers': [true, false, false, false],
   'stripe.links': [true, false, false, false],
+  'class.read': [true, true, true, true],
+  'class.manage': [true, true, false, false],
+  'attendance.read': [true, true, false, true],
+  'attendance.take': [true, true, true, false],
+  'attendance.review': [true, true, false, false],
+  'class.refund': [true, true, false, false],
 }
 
 const ROLES: ActorRole[] = ['owner', 'manager', 'writer', 'staff']
@@ -114,7 +120,26 @@ describe('can', () => {
     }
   })
 
-  it('never lets staff touch money, publishing or membership', () => {
+  it('grants no class or attendance capability before approval, except to staff', () => {
+    const classCapabilities = CAPABILITIES.filter(
+      (capability) => capability.startsWith('class.') || capability.startsWith('attendance.'),
+    )
+    expect(classCapabilities).toHaveLength(6)
+    for (const profileStatus of ['applied', 'rejected'] as const) {
+      for (const profileType of TYPES) {
+        for (const role of ['owner', 'manager', 'writer'] as const) {
+          for (const capability of classCapabilities) {
+            expect(
+              can(actor(role, profileType, { profileStatus }), capability),
+              `${role} ${profileType} ${profileStatus} ${capability}`,
+            ).toBe(false)
+          }
+        }
+      }
+    }
+  })
+
+  it('never lets staff touch money, publishing, membership or attendance', () => {
     const forbidden: Capability[] = [
       'course.create',
       'course.proposeLiveEdit',
@@ -125,9 +150,25 @@ describe('can', () => {
       'members.manageWriters',
       'members.manageManagers',
       'stripe.links',
+      'class.manage',
+      'class.refund',
+      'attendance.take',
+      'attendance.review',
     ]
     for (const capability of forbidden) {
       expect(can(actor('staff', 'corporate'), capability), capability).toBe(false)
+    }
+  })
+
+  it('lets only the owner and a manager grant a discretionary seat refund', () => {
+    for (const profileType of TYPES) {
+      expect(can(actor('owner', profileType), 'class.refund')).toBe(true)
+      expect(can(actor('manager', profileType), 'class.refund')).toBe(profileType === 'corporate')
+      expect(can(actor('writer', profileType), 'class.refund')).toBe(false)
+      expect(can(actor('staff', profileType), 'class.refund')).toBe(false)
+      expect(can(actor('owner', profileType, { profileStatus: 'applied' }), 'class.refund')).toBe(
+        false,
+      )
     }
   })
 })

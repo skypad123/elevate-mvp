@@ -72,6 +72,40 @@ variable "seed_super_admin_email" {
   default     = null
 }
 
+variable "classes" {
+  description = "Whether the API serves scheduled classes (the CLASSES setting). Off: every class route answers 404, and the learner's class list is empty."
+  type        = bool
+  default     = false
+}
+
+variable "class_sales" {
+  description = "Whether classes are sold (the CLASS_SALES setting). Off: no class is on sale and class checkout answers \"not on sale\"; seats already sold, withdrawals, refunds, the release job and check-in keep working."
+  type        = bool
+  default     = false
+}
+
+variable "release_schedule_enabled" {
+  description = "Whether the schedule starts the release job every 15 minutes, and the alarm on runs that did not finish exists. Must stay true while any profile is opted in to class sales: off stops every seat refund and every payout to an opted-in profile."
+  type        = bool
+  default     = false
+}
+
+variable "alarm_email" {
+  description = "Email address the release job's alarms are sent to. AWS sends it a confirmation link first."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alarm_email))
+    error_message = "alarm_email must be one email address, such as ops@example.com."
+  }
+}
+
+variable "api_uses_restricted_database_user" {
+  description = "Whether the API connects as the restricted database user elevate_api (ADR 012). false is the way back: the API connects as the owner again, and the deploy skips its check of the user."
+  type        = bool
+  default     = true
+}
+
 variable "integrations" {
   description = <<-EOT
     Third-party integrations to switch on. Each one reads its keys from SSM parameters that are
